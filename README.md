@@ -1,6 +1,6 @@
 # Halftone Studio
 
-Vercel-inspired halftone generator for brand design work.
+Halftone generator for brand design work.
 
 ## Local preview
 
