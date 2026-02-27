@@ -1,5 +1,6 @@
 const previewCanvas = document.getElementById("previewCanvas");
 const previewCtx = previewCanvas.getContext("2d");
+const canvasWrap = document.querySelector(".canvas-wrap");
 
 const hiddenCanvas = document.createElement("canvas");
 const hiddenCtx = hiddenCanvas.getContext("2d", { willReadFrequently: true });
@@ -81,6 +82,7 @@ const presets = {
 };
 
 let sourceImage = null;
+let resizeTimer = null;
 
 function hexToRgb(hex) {
   const value = hex.replace("#", "");
@@ -112,6 +114,47 @@ function updateOutputs() {
   controls.jitterOut.textContent = `${controls.jitter.value}%`;
 }
 
+function fitCanvasToStage() {
+  const stageRect = canvasWrap.getBoundingClientRect();
+  const stageWidth = Math.max(320, Math.floor(stageRect.width));
+  const stageHeight = Math.max(260, Math.floor(stageRect.height));
+  const maxDisplayWidth = 1320;
+  const maxDisplayHeight = 860;
+  const availableWidth = Math.min(stageWidth, maxDisplayWidth);
+  const availableHeight = Math.min(stageHeight, maxDisplayHeight);
+  const aspect = sourceImage ? sourceImage.width / sourceImage.height : 3 / 2;
+
+  let cssWidth = availableWidth;
+  let cssHeight = Math.floor(cssWidth / aspect);
+
+  if (cssHeight > availableHeight) {
+    cssHeight = availableHeight;
+    cssWidth = Math.floor(cssHeight * aspect);
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  let backingWidth = Math.max(1, Math.floor(cssWidth * dpr));
+  let backingHeight = Math.max(1, Math.floor(cssHeight * dpr));
+
+  const maxPixels = 5_000_000;
+  const pixels = backingWidth * backingHeight;
+  if (pixels > maxPixels) {
+    const scale = Math.sqrt(maxPixels / pixels);
+    backingWidth = Math.max(1, Math.floor(backingWidth * scale));
+    backingHeight = Math.max(1, Math.floor(backingHeight * scale));
+  }
+
+  if (previewCanvas.width !== backingWidth || previewCanvas.height !== backingHeight) {
+    previewCanvas.width = backingWidth;
+    previewCanvas.height = backingHeight;
+    hiddenCanvas.width = backingWidth;
+    hiddenCanvas.height = backingHeight;
+  }
+
+  previewCanvas.style.width = `${cssWidth}px`;
+  previewCanvas.style.height = `${cssHeight}px`;
+}
+
 function applyPreset(name) {
   const preset = presets[name];
   if (!preset) return;
@@ -127,34 +170,11 @@ function applyPreset(name) {
 }
 
 function drawPlaceholder() {
+  fitCanvasToStage();
+
   const { width, height } = previewCanvas;
   previewCtx.fillStyle = "#0b0b0b";
   previewCtx.fillRect(0, 0, width, height);
-
-  previewCtx.strokeStyle = "#202020";
-  previewCtx.strokeRect(40, 40, width - 80, height - 80);
-
-  previewCtx.fillStyle = "#8a8a8a";
-  previewCtx.font = "500 24px Geist, sans-serif";
-  previewCtx.textAlign = "center";
-  previewCtx.fillText("Upload an image to generate a halftone", width / 2, height / 2);
-  previewCtx.font = "400 15px IBM Plex Mono, monospace";
-  previewCtx.fillStyle = "#666";
-  previewCtx.fillText("Try the Flash Poster preset for retro print quality", width / 2, height / 2 + 28);
-}
-
-function setCanvasSizeFromImage(img) {
-  const maxWidth = 1600;
-  const maxHeight = 1200;
-  const ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
-
-  const width = Math.floor(img.width * ratio);
-  const height = Math.floor(img.height * ratio);
-
-  previewCanvas.width = width;
-  previewCanvas.height = height;
-  hiddenCanvas.width = width;
-  hiddenCanvas.height = height;
 }
 
 function adjustedLuma(r, g, b, contrast, gamma) {
@@ -172,6 +192,8 @@ function sampleLuma(data, width, height, x, y, contrast, gamma) {
 }
 
 function generateHalftone() {
+  fitCanvasToStage();
+
   if (!sourceImage) {
     drawPlaceholder();
     return;
@@ -252,7 +274,6 @@ function loadImageFromFile(file) {
     const img = new Image();
     img.onload = () => {
       sourceImage = img;
-      setCanvasSizeFromImage(img);
       generateHalftone();
     };
     img.src = reader.result;
@@ -297,6 +318,13 @@ controls.presetSelect.addEventListener("change", () => {
 
 [controls.inkColor, controls.paperColor].forEach((input) => {
   input.addEventListener("input", generateHalftone);
+});
+
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    generateHalftone();
+  }, 120);
 });
 
 controls.regenerateBtn.addEventListener("click", generateHalftone);
