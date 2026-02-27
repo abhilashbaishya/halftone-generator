@@ -5,9 +5,53 @@ const canvasWrap = document.querySelector(".canvas-wrap");
 const hiddenCanvas = document.createElement("canvas");
 const hiddenCtx = hiddenCanvas.getContext("2d", { willReadFrequently: true });
 
+const QUALITY_MODES = {
+  draft: {
+    sampleRadius: 0.4,
+    edgeBoost: 0.12,
+    ditherAmount: 0.06,
+    exportScale: 1,
+    maxPixels: 5_000_000
+  },
+  high: {
+    sampleRadius: 0.58,
+    edgeBoost: 0.22,
+    ditherAmount: 0.1,
+    exportScale: 2,
+    maxPixels: 8_000_000
+  },
+  ultra: {
+    sampleRadius: 0.7,
+    edgeBoost: 0.3,
+    ditherAmount: 0.14,
+    exportScale: 3,
+    maxPixels: 10_500_000
+  }
+};
+
+const BAYER_4X4 = [
+  0 / 16,
+  8 / 16,
+  2 / 16,
+  10 / 16,
+  12 / 16,
+  4 / 16,
+  14 / 16,
+  6 / 16,
+  3 / 16,
+  11 / 16,
+  1 / 16,
+  9 / 16,
+  15 / 16,
+  7 / 16,
+  13 / 16,
+  5 / 16
+];
+
 const controls = {
   imageInput: document.getElementById("imageInput"),
   presetSelect: document.getElementById("presetSelect"),
+  quality: document.getElementById("quality"),
   cellSize: document.getElementById("cellSize"),
   contrast: document.getElementById("contrast"),
   gamma: document.getElementById("gamma"),
@@ -32,6 +76,7 @@ const controls = {
 
 const presets = {
   clean: {
+    quality: "high",
     cellSize: 8,
     contrast: 1.1,
     gamma: 1.0,
@@ -44,6 +89,7 @@ const presets = {
     paperColor: "#f5f5f5"
   },
   bold: {
+    quality: "high",
     cellSize: 11,
     contrast: 1.5,
     gamma: 0.85,
@@ -56,6 +102,7 @@ const presets = {
     paperColor: "#ececec"
   },
   subtle: {
+    quality: "high",
     cellSize: 6,
     contrast: 0.9,
     gamma: 1.25,
@@ -68,6 +115,7 @@ const presets = {
     paperColor: "#f4f4f4"
   },
   flash: {
+    quality: "ultra",
     cellSize: 7,
     contrast: 1.45,
     gamma: 0.88,
@@ -103,6 +151,10 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function getQualityConfig() {
+  return QUALITY_MODES[controls.quality.value] || QUALITY_MODES.high;
+}
+
 function updateOutputs() {
   controls.cellSizeOut.textContent = `${controls.cellSize.value} px`;
   controls.contrastOut.textContent = Number(controls.contrast.value).toFixed(2);
@@ -136,7 +188,7 @@ function fitCanvasToStage() {
   let backingWidth = Math.max(1, Math.floor(cssWidth * dpr));
   let backingHeight = Math.max(1, Math.floor(cssHeight * dpr));
 
-  const maxPixels = 5_000_000;
+  const maxPixels = getQualityConfig().maxPixels;
   const pixels = backingWidth * backingHeight;
   if (pixels > maxPixels) {
     const scale = Math.sqrt(maxPixels / pixels);
@@ -171,10 +223,8 @@ function applyPreset(name) {
 
 function drawPlaceholder() {
   fitCanvasToStage();
-
-  const { width, height } = previewCanvas;
   previewCtx.fillStyle = "#0b0b0b";
-  previewCtx.fillRect(0, 0, width, height);
+  previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
 }
 
 function adjustedLuma(r, g, b, contrast, gamma) {
@@ -184,11 +234,137 @@ function adjustedLuma(r, g, b, contrast, gamma) {
   return clamp(value, 0, 1);
 }
 
-function sampleLuma(data, width, height, x, y, contrast, gamma) {
-  const px = clamp(Math.round(x), 0, width - 1);
-  const py = clamp(Math.round(y), 0, height - 1);
-  const idx = (py * width + px) * 4;
-  return adjustedLuma(data[idx], data[idx + 1], data[idx + 2], contrast, gamma);
+function buildLumaBuffers(data, width, height, contrast, gamma) {
+  const luma = new Float32Array(width * height);
+  const integral = new Float32Array((width + 1) * (height + 1));
+
+  for (let y = 0; y < height; y += 1) {
+    let row = 0;
+    const integralRow = (y + 1) * (width + 1);
+    const integralPrevRow = y * (width + 1);
+
+    for (let x = 0; x < width; x += 1) {
+      const pixelIndex = (y * width + x) * 4;
+      const l = adjustedLuma(data[pixelIndex], data[pixelIndex + 1], data[pixelIndex + 2], contrast, gamma);
+
+      luma[y * width + x] = l;
+      row += l;
+      integral[integralRow + x + 1] = integral[integralPrevRow + x + 1] + row;
+    }
+  }
+
+  return { luma, integral };
+}
+
+function sampleBoxAverage(integral, width, height, cx, cy, radius) {
+  const x0 = clamp(Math.floor(cx - radius), 0, width - 1);
+  const y0 = clamp(Math.floor(cy - radius), 0, height - 1);
+  const x1 = clamp(Math.floor(cx + radius), 0, width - 1);
+  const y1 = clamp(Math.floor(cy + radius), 0, height - 1);
+
+  if (x1 < x0 || y1 < y0) return 1;
+
+  const stride = width + 1;
+  const sum =
+    integral[(y1 + 1) * stride + (x1 + 1)] -
+    integral[y0 * stride + (x1 + 1)] -
+    integral[(y1 + 1) * stride + x0] +
+    integral[y0 * stride + x0];
+
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+  return area > 0 ? sum / area : 1;
+}
+
+function sampleEdgeStrength(integral, width, height, cx, cy, radius) {
+  const r = Math.max(1, radius * 0.7);
+  const left = sampleBoxAverage(integral, width, height, cx - r, cy, r);
+  const right = sampleBoxAverage(integral, width, height, cx + r, cy, r);
+  const up = sampleBoxAverage(integral, width, height, cx, cy - r, r);
+  const down = sampleBoxAverage(integral, width, height, cx, cy + r, r);
+
+  return clamp(Math.hypot(right - left, down - up) * 1.8, 0, 1);
+}
+
+function renderHalftone(targetCtx, targetCanvas, width, height) {
+  const cellSize = Number(controls.cellSize.value);
+  const contrast = Number(controls.contrast.value);
+  const gamma = Number(controls.gamma.value);
+  const minDot = Number(controls.minDot.value) / 100;
+  const angle = (Number(controls.screenAngle.value) * Math.PI) / 180;
+  const toneCurve = Number(controls.toneCurve.value);
+  const microDotAmount = Number(controls.microDot.value) / 100;
+  const jitter = Number(controls.jitter.value) / 100;
+  const quality = getQualityConfig();
+
+  const ink = hexToRgb(controls.inkColor.value);
+  const paper = hexToRgb(controls.paperColor.value);
+
+  hiddenCanvas.width = width;
+  hiddenCanvas.height = height;
+  hiddenCtx.clearRect(0, 0, width, height);
+  hiddenCtx.drawImage(sourceImage, 0, 0, width, height);
+
+  const imageData = hiddenCtx.getImageData(0, 0, width, height);
+  const { integral } = buildLumaBuffers(imageData.data, width, height, contrast, gamma);
+
+  targetCtx.clearRect(0, 0, width, height);
+  targetCtx.fillStyle = `rgb(${paper.r} ${paper.g} ${paper.b})`;
+  targetCtx.fillRect(0, 0, width, height);
+  targetCtx.fillStyle = `rgb(${ink.r} ${ink.g} ${ink.b})`;
+
+  const centerX = width * 0.5;
+  const centerY = height * 0.5;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const diagonal = Math.sqrt(width * width + height * height);
+  const radiusScale = cellSize * 0.5;
+  const samplingRadius = Math.max(1, cellSize * quality.sampleRadius);
+
+  for (let gy = -diagonal; gy <= diagonal; gy += cellSize) {
+    for (let gx = -diagonal; gx <= diagonal; gx += cellSize) {
+      const x = centerX + gx * cos - gy * sin;
+      const y = centerY + gx * sin + gy * cos;
+
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+
+      const gridX = Math.round((gx + diagonal) / cellSize);
+      const gridY = Math.round((gy + diagonal) / cellSize);
+
+      const baseLuma = sampleBoxAverage(integral, width, height, x, y, samplingRadius);
+      const edgeStrength = sampleEdgeStrength(integral, width, height, x, y, samplingRadius);
+
+      let darkness = Math.pow(1 - baseLuma, toneCurve);
+      darkness = clamp(darkness + edgeStrength * quality.edgeBoost * (1 - darkness), 0, 1);
+
+      const bayer = BAYER_4X4[((gridY & 3) * 4) + (gridX & 3)] - 0.5;
+      darkness = clamp(darkness + bayer * quality.ditherAmount * (1 - darkness * 0.55), 0, 1);
+
+      if (darkness < 0.003) continue;
+
+      const dotStrength = minDot + (1 - minDot) * darkness;
+      const radius = clamp(dotStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
+
+      const jx = (hash2d(gridX, gridY, 0.1) - 0.5) * cellSize * 0.5 * jitter;
+      const jy = (hash2d(gridX, gridY, 0.9) - 0.5) * cellSize * 0.5 * jitter;
+
+      targetCtx.beginPath();
+      targetCtx.arc(x + jx, y + jy, radius, 0, Math.PI * 2);
+      targetCtx.fill();
+
+      if (microDotAmount <= 0 || darkness >= 0.6) continue;
+
+      const microChance = microDotAmount * (1 - darkness) * 0.65;
+      if (hash2d(gridX, gridY, 2.4) > microChance) continue;
+
+      const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
+      const mx = x + (hash2d(gridX, gridY, 3.6) - 0.5) * cellSize * 0.35;
+      const my = y + (hash2d(gridX, gridY, 4.8) - 0.5) * cellSize * 0.35;
+
+      targetCtx.beginPath();
+      targetCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
+      targetCtx.fill();
+    }
+  }
 }
 
 function generateHalftone() {
@@ -199,73 +375,7 @@ function generateHalftone() {
     return;
   }
 
-  const cellSize = Number(controls.cellSize.value);
-  const contrast = Number(controls.contrast.value);
-  const gamma = Number(controls.gamma.value);
-  const minDot = Number(controls.minDot.value) / 100;
-  const angle = (Number(controls.screenAngle.value) * Math.PI) / 180;
-  const toneCurve = Number(controls.toneCurve.value);
-  const microDotAmount = Number(controls.microDot.value) / 100;
-  const jitter = Number(controls.jitter.value) / 100;
-
-  const ink = hexToRgb(controls.inkColor.value);
-  const paper = hexToRgb(controls.paperColor.value);
-
-  hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-  hiddenCtx.drawImage(sourceImage, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-
-  const imageData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-  const data = imageData.data;
-
-  previewCtx.fillStyle = `rgb(${paper.r} ${paper.g} ${paper.b})`;
-  previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-  previewCtx.fillStyle = `rgb(${ink.r} ${ink.g} ${ink.b})`;
-
-  const centerX = hiddenCanvas.width * 0.5;
-  const centerY = hiddenCanvas.height * 0.5;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const diagonal = Math.sqrt(hiddenCanvas.width * hiddenCanvas.width + hiddenCanvas.height * hiddenCanvas.height);
-  const radiusScale = cellSize * 0.5;
-
-  for (let gy = -diagonal; gy <= diagonal; gy += cellSize) {
-    for (let gx = -diagonal; gx <= diagonal; gx += cellSize) {
-      const x = centerX + gx * cos - gy * sin;
-      const y = centerY + gx * sin + gy * cos;
-
-      if (x < 0 || y < 0 || x >= hiddenCanvas.width || y >= hiddenCanvas.height) continue;
-
-      const luma = sampleLuma(data, hiddenCanvas.width, hiddenCanvas.height, x, y, contrast, gamma);
-      const darkness = Math.pow(1 - luma, toneCurve);
-
-      if (darkness < 0.004) continue;
-
-      const dotStrength = minDot + (1 - minDot) * darkness;
-      const radius = dotStrength * radiusScale;
-
-      const gridX = Math.round((gx + diagonal) / cellSize);
-      const gridY = Math.round((gy + diagonal) / cellSize);
-      const jx = (hash2d(gridX, gridY, 0.1) - 0.5) * cellSize * 0.5 * jitter;
-      const jy = (hash2d(gridX, gridY, 0.9) - 0.5) * cellSize * 0.5 * jitter;
-
-      previewCtx.beginPath();
-      previewCtx.arc(x + jx, y + jy, radius, 0, Math.PI * 2);
-      previewCtx.fill();
-
-      if (microDotAmount <= 0 || darkness >= 0.62) continue;
-
-      const microChance = microDotAmount * (1 - darkness) * 0.62;
-      if (hash2d(gridX, gridY, 2.4) > microChance) continue;
-
-      const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
-      const mx = x + (hash2d(gridX, gridY, 3.6) - 0.5) * cellSize * 0.35;
-      const my = y + (hash2d(gridX, gridY, 4.8) - 0.5) * cellSize * 0.35;
-
-      previewCtx.beginPath();
-      previewCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
-      previewCtx.fill();
-    }
-  }
+  renderHalftone(previewCtx, previewCanvas, previewCanvas.width, previewCanvas.height);
 }
 
 function loadImageFromFile(file) {
@@ -282,7 +392,30 @@ function loadImageFromFile(file) {
 }
 
 function exportPng() {
-  const url = previewCanvas.toDataURL("image/png");
+  if (!sourceImage) return;
+
+  const quality = getQualityConfig();
+  const scale = quality.exportScale;
+  const maxExportPixels = 24_000_000;
+
+  let exportWidth = previewCanvas.width * scale;
+  let exportHeight = previewCanvas.height * scale;
+  const exportPixels = exportWidth * exportHeight;
+
+  if (exportPixels > maxExportPixels) {
+    const factor = Math.sqrt(maxExportPixels / exportPixels);
+    exportWidth = Math.floor(exportWidth * factor);
+    exportHeight = Math.floor(exportHeight * factor);
+  }
+
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = Math.max(1, exportWidth);
+  exportCanvas.height = Math.max(1, exportHeight);
+  const exportCtx = exportCanvas.getContext("2d");
+
+  renderHalftone(exportCtx, exportCanvas, exportCanvas.width, exportCanvas.height);
+
+  const url = exportCanvas.toDataURL("image/png");
   const link = document.createElement("a");
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   link.href = url;
@@ -298,6 +431,10 @@ controls.imageInput.addEventListener("change", (event) => {
 
 controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
+});
+
+controls.quality.addEventListener("change", () => {
+  generateHalftone();
 });
 
 [
