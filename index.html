@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Halftone Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>Halftone Studio</h1>
+            <p>Vercel-inspired generator for brand exploration</p>
+          </div>
+        </div>
+        <button id="exportBtn" class="button button-primary">Export PNG</button>
+      </header>
+
+      <main class="layout">
+        <section class="panel controls-panel">
+          <div class="panel-head">
+            <h2>Controls</h2>
+            <p>Dial in a signature halftone look quickly.</p>
+          </div>
+
+          <label class="field file-field" for="imageInput">
+            <span>Source Image</span>
+            <input id="imageInput" type="file" accept="image/*" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Preset</span>
+            </div>
+            <select id="presetSelect">
+              <option value="clean">Clean Editorial</option>
+              <option value="bold">Bold Poster</option>
+              <option value="subtle">Subtle Texture</option>
+              <option value="flash">Flash Poster</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Cell Size</span>
+              <output id="cellSizeOut">8 px</output>
+            </div>
+            <input id="cellSize" type="range" min="3" max="20" value="8" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Contrast</span>
+              <output id="contrastOut">1.10</output>
+            </div>
+            <input id="contrast" type="range" min="0.5" max="2.5" step="0.05" value="1.1" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Gamma</span>
+              <output id="gammaOut">1.00</output>
+            </div>
+            <input id="gamma" type="range" min="0.4" max="2.4" step="0.05" value="1" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Minimum Dot</span>
+              <output id="minDotOut">0%</output>
+            </div>
+            <input id="minDot" type="range" min="0" max="60" value="0" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Screen Angle</span>
+              <output id="angleOut">28 deg</output>
+            </div>
+            <input id="screenAngle" type="range" min="-75" max="75" value="28" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Tone Curve</span>
+              <output id="toneCurveOut">0.88</output>
+            </div>
+            <input id="toneCurve" type="range" min="0.45" max="2.2" step="0.01" value="0.88" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Micro Dot Layer</span>
+              <output id="microDotOut">40%</output>
+            </div>
+            <input id="microDot" type="range" min="0" max="100" value="40" />
+          </label>
+
+          <label class="field">
+            <div class="field-title">
+              <span>Dot Jitter</span>
+              <output id="jitterOut">10%</output>
+            </div>
+            <input id="jitter" type="range" min="0" max="100" value="10" />
+          </label>
+
+          <div class="field split">
+            <label>
+              <span>Ink Color</span>
+              <input id="inkColor" type="color" value="#111111" />
+            </label>
+            <label>
+              <span>Paper Color</span>
+              <input id="paperColor" type="color" value="#f5f5f5" />
+            </label>
+          </div>
+
+          <button id="regenerateBtn" class="button">Regenerate</button>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="panel-head">
+            <h2>Preview</h2>
+            <p>High-contrast, scalable texture for lockups and backgrounds.</p>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="previewCanvas" width="1200" height="800"></canvas>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

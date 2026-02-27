@@ -1,0 +1,230 @@
+:root {
+  --bg: #050505;
+  --bg-elev: #0d0d0d;
+  --border: #232323;
+  --text: #fafafa;
+  --muted: #9b9b9b;
+  --accent: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 10%, #171717 0%, #090909 40%, #040404 100%);
+}
+
+.app-shell {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0f0f0f 0%, #080808 100%);
+  margin-bottom: 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.brand p,
+.panel-head p {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 18px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #101010 0%, #0a0a0a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.controls-panel {
+  padding: 18px;
+}
+
+.preview-panel {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-head {
+  margin-bottom: 14px;
+}
+
+h2 {
+  font-size: 0.92rem;
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.field span,
+.field-title {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.field-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-field input,
+select,
+input[type="range"],
+input[type="color"] {
+  width: 100%;
+}
+
+select,
+input[type="file"] {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--text);
+  padding: 10px;
+  font-family: inherit;
+}
+
+input[type="color"] {
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  padding: 4px;
+}
+
+input[type="range"] {
+  accent-color: #fff;
+}
+
+output {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.split {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.split label {
+  display: grid;
+  gap: 8px;
+}
+
+.button {
+  width: 100%;
+  border: 1px solid #2c2c2c;
+  background: #101010;
+  color: #fff;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.86rem;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  border-color: #3d3d3d;
+  background: #171717;
+}
+
+.button-primary {
+  width: auto;
+  background: #fff;
+  color: #0a0a0a;
+  border-color: #fff;
+  font-weight: 600;
+}
+
+.canvas-wrap {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: #0a0a0a;
+  min-height: 520px;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  display: block;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .button-primary {
+    width: 100%;
+  }
+
+  .canvas-wrap,
+  canvas {
+    min-height: 360px;
+  }
+}
