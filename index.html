@@ -27,13 +27,12 @@
             <div class="field-title">
               <span>Preset</span>
             </div>
-            <select id="presetSelect">
-              <option value="clean">Clean Editorial</option>
-              <option value="bold">Bold Poster</option>
-              <option value="subtle">Subtle Texture</option>
-              <option value="flash">Flash Poster</option>
-            </select>
+            <select id="presetSelect"></select>
           </label>
+          <div class="field split preset-actions">
+            <button id="savePresetBtn" class="button button-small" type="button">Save Preset</button>
+            <button id="deletePresetBtn" class="button button-small" type="button">Delete Preset</button>
+          </div>
         </section>
 
         <section class="control-group">
@@ -112,6 +111,13 @@
             </div>
             <input id="microDot" type="range" min="0" max="100" value="40" />
           </label>
+          <label class="field">
+            <div class="field-title">
+              <span>Random Seed</span>
+              <output id="seedOut">0</output>
+            </div>
+            <input id="seed" type="range" min="0" max="9999" step="1" value="0" />
+          </label>
         </section>
 
         <section class="control-group">
@@ -137,8 +143,29 @@
       </aside>
 
       <section class="preview-stage">
-        <div class="canvas-wrap">
-          <canvas id="previewCanvas" width="1200" height="800"></canvas>
+        <div class="preview-toolbar">
+          <label class="zoom-control" for="zoomRange">
+            <span>Zoom</span>
+            <output id="zoomOut">100%</output>
+          </label>
+          <input id="zoomRange" type="range" min="0.5" max="4" step="0.05" value="1" />
+          <button id="resetViewBtn" class="button button-small" type="button">Reset View</button>
+          <p id="renderStatus" class="render-status" aria-live="polite">Idle</p>
+        </div>
+        <div class="canvas-wrap" id="compareStage">
+          <div class="canvas-plane" id="canvasPlane">
+            <canvas id="sourceCanvas" width="1200" height="800"></canvas>
+            <div class="halftone-overlay" id="halftoneOverlay">
+              <canvas id="previewCanvas" width="1200" height="800"></canvas>
+            </div>
+          </div>
+          <button
+            id="splitHandle"
+            class="split-handle"
+            type="button"
+            aria-label="Adjust split preview"
+            title="Drag to compare source and halftone"
+          ></button>
         </div>
       </section>
     </main>

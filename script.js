@@ -1,9 +1,45 @@
 const previewCanvas = document.getElementById("previewCanvas");
+const sourceCanvas = document.getElementById("sourceCanvas");
 const previewCtx = previewCanvas.getContext("2d");
-const canvasWrap = document.querySelector(".canvas-wrap");
+const sourceCtx = sourceCanvas.getContext("2d");
+
+const canvasWrap = document.getElementById("compareStage");
+const canvasPlane = document.getElementById("canvasPlane");
+const halftoneOverlay = document.getElementById("halftoneOverlay");
+const splitHandle = document.getElementById("splitHandle");
 
 const hiddenCanvas = document.createElement("canvas");
 const hiddenCtx = hiddenCanvas.getContext("2d", { willReadFrequently: true });
+
+if (!previewCtx || !sourceCtx || !hiddenCtx) {
+  throw new Error("Canvas context is unavailable.");
+}
+
+const DEFAULT_QUALITY = "high";
+const DEFAULT_PRESET = "flash";
+const CUSTOM_PRESETS_KEY = "halftone.customPresets.v1";
+
+const PRESET_FIELDS = [
+  "quality",
+  "cellSize",
+  "contrast",
+  "gamma",
+  "minDot",
+  "screenAngle",
+  "toneCurve",
+  "microDot",
+  "jitter",
+  "seed",
+  "inkColor",
+  "paperColor"
+];
+
+const PRESET_LABELS = {
+  clean: "Clean Editorial",
+  bold: "Bold Poster",
+  subtle: "Subtle Texture",
+  flash: "Flash Poster"
+};
 
 const QUALITY_MODES = {
   draft: {
@@ -51,6 +87,8 @@ const BAYER_4X4 = [
 const controls = {
   imageInput: document.getElementById("imageInput"),
   presetSelect: document.getElementById("presetSelect"),
+  savePresetBtn: document.getElementById("savePresetBtn"),
+  deletePresetBtn: document.getElementById("deletePresetBtn"),
   quality: document.getElementById("quality"),
   cellSize: document.getElementById("cellSize"),
   contrast: document.getElementById("contrast"),
@@ -60,10 +98,14 @@ const controls = {
   toneCurve: document.getElementById("toneCurve"),
   microDot: document.getElementById("microDot"),
   jitter: document.getElementById("jitter"),
+  seed: document.getElementById("seed"),
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
   regenerateBtn: document.getElementById("regenerateBtn"),
   exportBtn: document.getElementById("exportBtn"),
+  zoomRange: document.getElementById("zoomRange"),
+  resetViewBtn: document.getElementById("resetViewBtn"),
+  renderStatus: document.getElementById("renderStatus"),
   cellSizeOut: document.getElementById("cellSizeOut"),
   contrastOut: document.getElementById("contrastOut"),
   gammaOut: document.getElementById("gammaOut"),
@@ -71,10 +113,12 @@ const controls = {
   angleOut: document.getElementById("angleOut"),
   toneCurveOut: document.getElementById("toneCurveOut"),
   microDotOut: document.getElementById("microDotOut"),
-  jitterOut: document.getElementById("jitterOut")
+  jitterOut: document.getElementById("jitterOut"),
+  seedOut: document.getElementById("seedOut"),
+  zoomOut: document.getElementById("zoomOut")
 };
 
-const presets = {
+const builtInPresets = {
   clean: {
     quality: "high",
     cellSize: 8,
@@ -85,6 +129,7 @@ const presets = {
     toneCurve: 1.1,
     microDot: 16,
     jitter: 4,
+    seed: 0,
     inkColor: "#111111",
     paperColor: "#f5f5f5"
   },
@@ -98,6 +143,7 @@ const presets = {
     toneCurve: 0.75,
     microDot: 10,
     jitter: 12,
+    seed: 121,
     inkColor: "#0f0f0f",
     paperColor: "#ececec"
   },
@@ -111,6 +157,7 @@ const presets = {
     toneCurve: 1.35,
     microDot: 28,
     jitter: 8,
+    seed: 33,
     inkColor: "#202020",
     paperColor: "#f4f4f4"
   },
@@ -124,13 +171,35 @@ const presets = {
     toneCurve: 0.72,
     microDot: 48,
     jitter: 18,
+    seed: 777,
     inkColor: "#1f9377",
     paperColor: "#eeebda"
   }
 };
 
+const compareState = {
+  split: 0.5,
+  zoom: 1,
+  draggingSplit: false
+};
+
 let sourceImage = null;
 let resizeTimer = null;
+let renderFrame = null;
+let customPresets = {};
+
+let renderWorker = null;
+let workerEnabled = false;
+let renderRequestId = 0;
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function numberValue(control, fallback = 0) {
+  const parsed = Number(control.value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 function hexToRgb(hex) {
   const value = hex.replace("#", "");
@@ -142,28 +211,228 @@ function hexToRgb(hex) {
   };
 }
 
-function hash2d(x, y, seed = 0) {
-  const v = Math.sin(x * 127.1 + y * 311.7 + seed * 17.13) * 43758.5453123;
+function hash2d(x, y, salt, seed) {
+  const v = Math.sin((x + seed * 0.137) * 127.1 + (y + seed * 0.311) * 311.7 + (salt + seed * 0.017) * 17.13) * 43758.5453123;
   return v - Math.floor(v);
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
 function getQualityConfig() {
-  return QUALITY_MODES[controls.quality.value] || QUALITY_MODES.high;
+  return QUALITY_MODES[controls.quality.value] || QUALITY_MODES[DEFAULT_QUALITY];
 }
 
-function updateOutputs() {
-  controls.cellSizeOut.textContent = `${controls.cellSize.value} px`;
-  controls.contrastOut.textContent = Number(controls.contrast.value).toFixed(2);
-  controls.gammaOut.textContent = Number(controls.gamma.value).toFixed(2);
-  controls.minDotOut.textContent = `${controls.minDot.value}%`;
-  controls.angleOut.textContent = `${controls.screenAngle.value} deg`;
-  controls.toneCurveOut.textContent = Number(controls.toneCurve.value).toFixed(2);
-  controls.microDotOut.textContent = `${controls.microDot.value}%`;
-  controls.jitterOut.textContent = `${controls.jitter.value}%`;
+function setRenderStatus(text, busy = false) {
+  controls.renderStatus.textContent = text;
+  controls.renderStatus.dataset.busy = busy ? "true" : "false";
+}
+
+function sanitizePreset(rawPreset) {
+  if (!rawPreset || typeof rawPreset !== "object") return null;
+
+  const sanitized = {
+    quality: typeof rawPreset.quality === "string" ? rawPreset.quality : DEFAULT_QUALITY,
+    cellSize: Number(rawPreset.cellSize),
+    contrast: Number(rawPreset.contrast),
+    gamma: Number(rawPreset.gamma),
+    minDot: Number(rawPreset.minDot),
+    screenAngle: Number(rawPreset.screenAngle),
+    toneCurve: Number(rawPreset.toneCurve),
+    microDot: Number(rawPreset.microDot),
+    jitter: Number(rawPreset.jitter),
+    seed: Number(rawPreset.seed),
+    inkColor: typeof rawPreset.inkColor === "string" ? rawPreset.inkColor : "#111111",
+    paperColor: typeof rawPreset.paperColor === "string" ? rawPreset.paperColor : "#f5f5f5"
+  };
+
+  if (!QUALITY_MODES[sanitized.quality]) {
+    sanitized.quality = DEFAULT_QUALITY;
+  }
+
+  const numericKeys = ["cellSize", "contrast", "gamma", "minDot", "screenAngle", "toneCurve", "microDot", "jitter", "seed"];
+  if (numericKeys.some((key) => !Number.isFinite(sanitized[key]))) {
+    return null;
+  }
+
+  return sanitized;
+}
+
+function loadCustomPresets() {
+  try {
+    const serialized = window.localStorage.getItem(CUSTOM_PRESETS_KEY);
+    if (!serialized) return {};
+
+    const parsed = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const next = {};
+    Object.entries(parsed).forEach(([name, preset]) => {
+      if (typeof name !== "string" || !name.trim()) return;
+      if (Object.prototype.hasOwnProperty.call(builtInPresets, name)) return;
+      const sanitized = sanitizePreset(preset);
+      if (sanitized) next[name] = sanitized;
+    });
+
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function persistCustomPresets() {
+  try {
+    window.localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(customPresets));
+  } catch {
+    // Ignore write errors (e.g. storage blocked).
+  }
+}
+
+function formatPresetLabel(name) {
+  return PRESET_LABELS[name] || name;
+}
+
+function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
+  controls.presetSelect.textContent = "";
+
+  const builtInGroup = document.createElement("optgroup");
+  builtInGroup.label = "Built-in";
+  Object.keys(builtInPresets).forEach((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = formatPresetLabel(name);
+    builtInGroup.append(option);
+  });
+  controls.presetSelect.append(builtInGroup);
+
+  const customNames = Object.keys(customPresets).sort((a, b) => a.localeCompare(b));
+  if (customNames.length > 0) {
+    const customGroup = document.createElement("optgroup");
+    customGroup.label = "Saved";
+    customNames.forEach((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      customGroup.append(option);
+    });
+    controls.presetSelect.append(customGroup);
+  }
+
+  const hasSelected =
+    Object.prototype.hasOwnProperty.call(builtInPresets, selectedName) ||
+    Object.prototype.hasOwnProperty.call(customPresets, selectedName);
+  controls.presetSelect.value = hasSelected ? selectedName : DEFAULT_PRESET;
+}
+
+function getPresetByName(name) {
+  return builtInPresets[name] || customPresets[name] || null;
+}
+
+function captureCurrentPreset() {
+  return {
+    quality: controls.quality.value,
+    cellSize: numberValue(controls.cellSize, 8),
+    contrast: numberValue(controls.contrast, 1.1),
+    gamma: numberValue(controls.gamma, 1),
+    minDot: numberValue(controls.minDot, 0),
+    screenAngle: numberValue(controls.screenAngle, 0),
+    toneCurve: numberValue(controls.toneCurve, 1),
+    microDot: numberValue(controls.microDot, 0),
+    jitter: numberValue(controls.jitter, 0),
+    seed: numberValue(controls.seed, 0),
+    inkColor: controls.inkColor.value,
+    paperColor: controls.paperColor.value
+  };
+}
+
+function saveCurrentPreset() {
+  const active = controls.presetSelect.value;
+  const suggested = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
+  const providedName = window.prompt("Save preset as:", suggested);
+  if (providedName === null) return;
+
+  const name = providedName.trim();
+  if (!name) {
+    window.alert("Preset name cannot be empty.");
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(builtInPresets, name)) {
+    window.alert("That name is reserved by a built-in preset.");
+    return;
+  }
+
+  customPresets[name] = captureCurrentPreset();
+  persistCustomPresets();
+  rebuildPresetSelect(name);
+  controls.presetSelect.value = name;
+}
+
+function deleteCurrentPreset() {
+  const selected = controls.presetSelect.value;
+  if (!Object.prototype.hasOwnProperty.call(customPresets, selected)) {
+    window.alert("Select a saved preset to delete.");
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete preset "${selected}"?`);
+  if (!confirmed) return;
+
+  delete customPresets[selected];
+  persistCustomPresets();
+  rebuildPresetSelect(DEFAULT_PRESET);
+  applyPreset(DEFAULT_PRESET);
+}
+
+function updateZoomOutput() {
+  controls.zoomOut.textContent = `${Math.round(compareState.zoom * 100)}%`;
+  controls.zoomRange.value = compareState.zoom.toFixed(2);
+}
+
+function applyViewTransform() {
+  canvasPlane.style.transform = `translate(-50%, -50%) scale(${compareState.zoom})`;
+  updateZoomOutput();
+  updateSplitPreview();
+}
+
+function resetView() {
+  compareState.zoom = 1;
+  applyViewTransform();
+}
+
+function setZoom(nextZoom) {
+  compareState.zoom = clamp(nextZoom, 0.5, 4);
+  applyViewTransform();
+}
+
+function updateSplitPreview() {
+  const split = clamp(compareState.split, 0.05, 0.95);
+  compareState.split = split;
+
+  const rightInset = (1 - split) * 100;
+  halftoneOverlay.style.clipPath = `inset(0 ${rightInset}% 0 0)`;
+
+  const wrapRect = canvasWrap.getBoundingClientRect();
+  const planeRect = canvasPlane.getBoundingClientRect();
+  const planeWidth = planeRect.width;
+  const planeHeight = planeRect.height;
+
+  if (planeWidth > 0 && planeHeight > 0) {
+    const left = planeRect.left - wrapRect.left + planeWidth * split;
+    const top = planeRect.top - wrapRect.top;
+    splitHandle.style.left = `${left}px`;
+    splitHandle.style.top = `${top}px`;
+    splitHandle.style.height = `${planeHeight}px`;
+  } else {
+    splitHandle.style.left = "50%";
+    splitHandle.style.top = "0";
+    splitHandle.style.height = "100%";
+  }
+}
+
+function setSplitFromClientX(clientX) {
+  const planeRect = canvasPlane.getBoundingClientRect();
+  if (planeRect.width <= 0) return;
+
+  compareState.split = (clientX - planeRect.left) / planeRect.width;
+  updateSplitPreview();
 }
 
 function fitCanvasToStage() {
@@ -196,35 +465,46 @@ function fitCanvasToStage() {
     backingHeight = Math.max(1, Math.floor(backingHeight * scale));
   }
 
-  if (previewCanvas.width !== backingWidth || previewCanvas.height !== backingHeight) {
+  const resized = previewCanvas.width !== backingWidth || previewCanvas.height !== backingHeight;
+
+  if (resized) {
     previewCanvas.width = backingWidth;
     previewCanvas.height = backingHeight;
+    sourceCanvas.width = backingWidth;
+    sourceCanvas.height = backingHeight;
     hiddenCanvas.width = backingWidth;
     hiddenCanvas.height = backingHeight;
   }
 
-  previewCanvas.style.width = `${cssWidth}px`;
-  previewCanvas.style.height = `${cssHeight}px`;
-}
+  const widthCss = `${cssWidth}px`;
+  const heightCss = `${cssHeight}px`;
 
-function applyPreset(name) {
-  const preset = presets[name];
-  if (!preset) return;
+  previewCanvas.style.width = widthCss;
+  previewCanvas.style.height = heightCss;
+  sourceCanvas.style.width = widthCss;
+  sourceCanvas.style.height = heightCss;
+  canvasPlane.style.width = widthCss;
+  canvasPlane.style.height = heightCss;
 
-  Object.entries(preset).forEach(([key, value]) => {
-    if (controls[key]) {
-      controls[key].value = String(value);
-    }
-  });
-
-  updateOutputs();
-  generateHalftone();
+  return resized;
 }
 
 function drawPlaceholder() {
-  fitCanvasToStage();
+  sourceCtx.fillStyle = "#131313";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+
   previewCtx.fillStyle = "#0b0b0b";
   previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+}
+
+function drawSourcePreview() {
+  if (!sourceImage) {
+    sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+    return;
+  }
+
+  sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.drawImage(sourceImage, 0, 0, sourceCanvas.width, sourceCanvas.height);
 }
 
 function adjustedLuma(r, g, b, contrast, gamma) {
@@ -235,7 +515,6 @@ function adjustedLuma(r, g, b, contrast, gamma) {
 }
 
 function buildLumaBuffers(data, width, height, contrast, gamma) {
-  const luma = new Float32Array(width * height);
   const integral = new Float32Array((width + 1) * (height + 1));
 
   for (let y = 0; y < height; y += 1) {
@@ -246,14 +525,12 @@ function buildLumaBuffers(data, width, height, contrast, gamma) {
     for (let x = 0; x < width; x += 1) {
       const pixelIndex = (y * width + x) * 4;
       const l = adjustedLuma(data[pixelIndex], data[pixelIndex + 1], data[pixelIndex + 2], contrast, gamma);
-
-      luma[y * width + x] = l;
       row += l;
       integral[integralRow + x + 1] = integral[integralPrevRow + x + 1] + row;
     }
   }
 
-  return { luma, integral };
+  return { integral };
 }
 
 function sampleBoxAverage(integral, width, height, cx, cy, radius) {
@@ -285,19 +562,25 @@ function sampleEdgeStrength(integral, width, height, cx, cy, radius) {
   return clamp(Math.hypot(right - left, down - up) * 1.8, 0, 1);
 }
 
-function renderHalftone(targetCtx, targetCanvas, width, height) {
-  const cellSize = Number(controls.cellSize.value);
-  const contrast = Number(controls.contrast.value);
-  const gamma = Number(controls.gamma.value);
-  const minDot = Number(controls.minDot.value) / 100;
-  const angle = (Number(controls.screenAngle.value) * Math.PI) / 180;
-  const toneCurve = Number(controls.toneCurve.value);
-  const microDotAmount = Number(controls.microDot.value) / 100;
-  const jitter = Number(controls.jitter.value) / 100;
-  const quality = getQualityConfig();
+function getRenderSettings() {
+  return {
+    cellSize: Math.max(1, numberValue(controls.cellSize, 8)),
+    contrast: numberValue(controls.contrast, 1.1),
+    gamma: numberValue(controls.gamma, 1),
+    minDot: numberValue(controls.minDot, 0) / 100,
+    angle: (numberValue(controls.screenAngle, 0) * Math.PI) / 180,
+    toneCurve: numberValue(controls.toneCurve, 1),
+    microDotAmount: numberValue(controls.microDot, 0) / 100,
+    jitter: numberValue(controls.jitter, 0) / 100,
+    seed: numberValue(controls.seed, 0),
+    quality: getQualityConfig(),
+    ink: hexToRgb(controls.inkColor.value),
+    paper: hexToRgb(controls.paperColor.value)
+  };
+}
 
-  const ink = hexToRgb(controls.inkColor.value);
-  const paper = hexToRgb(controls.paperColor.value);
+function renderHalftoneOnMain(targetCtx, width, height, settings) {
+  const { cellSize, contrast, gamma, minDot, angle, toneCurve, microDotAmount, jitter, seed, quality, ink, paper } = settings;
 
   hiddenCanvas.width = width;
   hiddenCanvas.height = height;
@@ -344,8 +627,8 @@ function renderHalftone(targetCtx, targetCanvas, width, height) {
       const dotStrength = minDot + (1 - minDot) * darkness;
       const radius = clamp(dotStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
 
-      const jx = (hash2d(gridX, gridY, 0.1) - 0.5) * cellSize * 0.5 * jitter;
-      const jy = (hash2d(gridX, gridY, 0.9) - 0.5) * cellSize * 0.5 * jitter;
+      const jx = (hash2d(gridX, gridY, 0.1, seed) - 0.5) * cellSize * 0.5 * jitter;
+      const jy = (hash2d(gridX, gridY, 0.9, seed) - 0.5) * cellSize * 0.5 * jitter;
 
       targetCtx.beginPath();
       targetCtx.arc(x + jx, y + jy, radius, 0, Math.PI * 2);
@@ -354,11 +637,11 @@ function renderHalftone(targetCtx, targetCanvas, width, height) {
       if (microDotAmount <= 0 || darkness >= 0.6) continue;
 
       const microChance = microDotAmount * (1 - darkness) * 0.65;
-      if (hash2d(gridX, gridY, 2.4) > microChance) continue;
+      if (hash2d(gridX, gridY, 2.4, seed) > microChance) continue;
 
       const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
-      const mx = x + (hash2d(gridX, gridY, 3.6) - 0.5) * cellSize * 0.35;
-      const my = y + (hash2d(gridX, gridY, 4.8) - 0.5) * cellSize * 0.35;
+      const mx = x + (hash2d(gridX, gridY, 3.6, seed) - 0.5) * cellSize * 0.35;
+      const my = y + (hash2d(gridX, gridY, 4.8, seed) - 0.5) * cellSize * 0.35;
 
       targetCtx.beginPath();
       targetCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
@@ -367,27 +650,189 @@ function renderHalftone(targetCtx, targetCanvas, width, height) {
   }
 }
 
-function generateHalftone() {
-  fitCanvasToStage();
+async function createScaledBitmap(image, width, height) {
+  try {
+    return await createImageBitmap(image, {
+      resizeWidth: width,
+      resizeHeight: height,
+      resizeQuality: "high"
+    });
+  } catch {
+    return createImageBitmap(image);
+  }
+}
 
-  if (!sourceImage) {
-    drawPlaceholder();
+function disableWorker() {
+  workerEnabled = false;
+  if (renderWorker) {
+    renderWorker.terminate();
+    renderWorker = null;
+  }
+}
+
+function initializeWorker() {
+  if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
+    disableWorker();
     return;
   }
 
-  renderHalftone(previewCtx, previewCanvas, previewCanvas.width, previewCanvas.height);
+  try {
+    renderWorker = new Worker("renderer-worker.js");
+    workerEnabled = true;
+
+    renderWorker.addEventListener("message", (event) => {
+      const { type, requestId, bitmap } = event.data || {};
+
+      if (type === "error") {
+        if (requestId === renderRequestId) {
+          disableWorker();
+          const settings = getRenderSettings();
+          renderHalftoneOnMain(previewCtx, previewCanvas.width, previewCanvas.height, settings);
+          setRenderStatus("Ready", false);
+        }
+        return;
+      }
+
+      if (type !== "rendered") return;
+
+      if (requestId !== renderRequestId) {
+        if (bitmap && typeof bitmap.close === "function") bitmap.close();
+        return;
+      }
+
+      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      previewCtx.drawImage(bitmap, 0, 0, previewCanvas.width, previewCanvas.height);
+      if (bitmap && typeof bitmap.close === "function") bitmap.close();
+      setRenderStatus("Ready", false);
+    });
+
+    renderWorker.addEventListener("error", () => {
+      disableWorker();
+      requestRender();
+    });
+  } catch {
+    disableWorker();
+  }
+}
+
+function renderWithWorker(width, height, settings) {
+  if (!renderWorker || !workerEnabled || !sourceImage) return;
+
+  const requestId = ++renderRequestId;
+  setRenderStatus("Rendering...", true);
+
+  createScaledBitmap(sourceImage, width, height)
+    .then((sourceBitmap) => {
+      if (requestId !== renderRequestId) {
+        if (typeof sourceBitmap.close === "function") sourceBitmap.close();
+        return;
+      }
+
+      if (!renderWorker || !workerEnabled) {
+        if (typeof sourceBitmap.close === "function") sourceBitmap.close();
+        renderHalftoneOnMain(previewCtx, width, height, settings);
+        setRenderStatus("Ready", false);
+        return;
+      }
+
+      renderWorker.postMessage(
+        {
+          type: "render",
+          requestId,
+          width,
+          height,
+          settings,
+          sourceBitmap
+        },
+        [sourceBitmap]
+      );
+    })
+    .catch(() => {
+      if (requestId !== renderRequestId) return;
+      disableWorker();
+      renderHalftoneOnMain(previewCtx, width, height, settings);
+      setRenderStatus("Ready", false);
+    });
+}
+
+function generateHalftone() {
+  fitCanvasToStage();
+  updateSplitPreview();
+
+  if (!sourceImage) {
+    drawPlaceholder();
+    setRenderStatus("Upload an image", false);
+    return;
+  }
+
+  drawSourcePreview();
+
+  const width = previewCanvas.width;
+  const height = previewCanvas.height;
+  const settings = getRenderSettings();
+
+  if (workerEnabled && renderWorker) {
+    renderWithWorker(width, height, settings);
+    return;
+  }
+
+  setRenderStatus("Rendering...", true);
+  renderHalftoneOnMain(previewCtx, width, height, settings);
+  setRenderStatus("Ready", false);
+}
+
+function requestRender() {
+  if (renderFrame !== null) return;
+
+  renderFrame = window.requestAnimationFrame(() => {
+    renderFrame = null;
+    generateHalftone();
+  });
+}
+
+function applyPreset(name) {
+  const preset = getPresetByName(name);
+  if (!preset) return;
+
+  PRESET_FIELDS.forEach((key) => {
+    if (!(key in controls)) return;
+    if (preset[key] === undefined) return;
+    controls[key].value = String(preset[key]);
+  });
+
+  controls.presetSelect.value = name;
+  updateOutputs();
+  requestRender();
+}
+
+function updateOutputs() {
+  controls.cellSizeOut.textContent = `${numberValue(controls.cellSize, 8)} px`;
+  controls.contrastOut.textContent = numberValue(controls.contrast, 1.1).toFixed(2);
+  controls.gammaOut.textContent = numberValue(controls.gamma, 1).toFixed(2);
+  controls.minDotOut.textContent = `${numberValue(controls.minDot, 0)}%`;
+  controls.angleOut.textContent = `${numberValue(controls.screenAngle, 0)} deg`;
+  controls.toneCurveOut.textContent = numberValue(controls.toneCurve, 1).toFixed(2);
+  controls.microDotOut.textContent = `${numberValue(controls.microDot, 0)}%`;
+  controls.jitterOut.textContent = `${numberValue(controls.jitter, 0)}%`;
+  controls.seedOut.textContent = `${Math.round(numberValue(controls.seed, 0))}`;
+  updateZoomOutput();
 }
 
 function loadImageFromFile(file) {
   const reader = new FileReader();
+
   reader.onload = () => {
+    if (typeof reader.result !== "string") return;
+
     const img = new Image();
     img.onload = () => {
       sourceImage = img;
-      generateHalftone();
+      resetView();
+      requestRender();
     };
     img.src = reader.result;
   };
+
   reader.readAsDataURL(file);
 }
 
@@ -411,9 +856,12 @@ function exportPng() {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = Math.max(1, exportWidth);
   exportCanvas.height = Math.max(1, exportHeight);
-  const exportCtx = exportCanvas.getContext("2d");
 
-  renderHalftone(exportCtx, exportCanvas, exportCanvas.width, exportCanvas.height);
+  const exportCtx = exportCanvas.getContext("2d");
+  if (!exportCtx) return;
+
+  const settings = getRenderSettings();
+  renderHalftoneOnMain(exportCtx, exportCanvas.width, exportCanvas.height, settings);
 
   const url = exportCanvas.toDataURL("image/png");
   const link = document.createElement("a");
@@ -423,8 +871,27 @@ function exportPng() {
   link.click();
 }
 
-controls.imageInput.addEventListener("change", (event) => {
-  const file = event.target.files?.[0];
+function handleSplitPointerDown(event) {
+  if (event.button !== 0) return;
+  compareState.draggingSplit = true;
+  splitHandle.setPointerCapture(event.pointerId);
+  setSplitFromClientX(event.clientX);
+}
+
+function handleSplitPointerMove(event) {
+  if (!compareState.draggingSplit) return;
+  setSplitFromClientX(event.clientX);
+}
+
+function handleSplitPointerUp(event) {
+  compareState.draggingSplit = false;
+  if (splitHandle.hasPointerCapture(event.pointerId)) {
+    splitHandle.releasePointerCapture(event.pointerId);
+  }
+}
+
+controls.imageInput.addEventListener("change", () => {
+  const file = controls.imageInput.files?.[0];
   if (!file) return;
   loadImageFromFile(file);
 });
@@ -433,9 +900,10 @@ controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
 });
 
-controls.quality.addEventListener("change", () => {
-  generateHalftone();
-});
+controls.savePresetBtn.addEventListener("click", saveCurrentPreset);
+controls.deletePresetBtn.addEventListener("click", deleteCurrentPreset);
+
+controls.quality.addEventListener("change", requestRender);
 
 [
   controls.cellSize,
@@ -445,30 +913,62 @@ controls.quality.addEventListener("change", () => {
   controls.screenAngle,
   controls.toneCurve,
   controls.microDot,
-  controls.jitter
+  controls.jitter,
+  controls.seed
 ].forEach((input) => {
   input.addEventListener("input", () => {
     updateOutputs();
-    generateHalftone();
+    requestRender();
   });
 });
 
 [controls.inkColor, controls.paperColor].forEach((input) => {
-  input.addEventListener("input", generateHalftone);
+  input.addEventListener("input", requestRender);
 });
+
+controls.zoomRange.addEventListener("input", () => {
+  setZoom(numberValue(controls.zoomRange, 1));
+});
+
+controls.resetViewBtn.addEventListener("click", resetView);
+
+splitHandle.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft") {
+    compareState.split -= 0.02;
+    updateSplitPreview();
+    return;
+  }
+
+  if (event.key === "ArrowRight") {
+    compareState.split += 0.02;
+    updateSplitPreview();
+  }
+});
+
+splitHandle.addEventListener("pointerdown", handleSplitPointerDown);
+splitHandle.addEventListener("pointermove", handleSplitPointerMove);
+splitHandle.addEventListener("pointerup", handleSplitPointerUp);
+splitHandle.addEventListener("pointercancel", handleSplitPointerUp);
 
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    generateHalftone();
+    requestRender();
   }, 120);
 });
 
-controls.regenerateBtn.addEventListener("click", generateHalftone);
+controls.regenerateBtn.addEventListener("click", requestRender);
 controls.exportBtn.addEventListener("click", exportPng);
 
+customPresets = loadCustomPresets();
+rebuildPresetSelect(DEFAULT_PRESET);
+initializeWorker();
+resetView();
+updateSplitPreview();
 updateOutputs();
-applyPreset("flash");
+applyPreset(DEFAULT_PRESET);
+
 if (!sourceImage) {
   drawPlaceholder();
+  setRenderStatus("Upload an image", false);
 }
