@@ -1,20 +1,12 @@
-const BAYER_4X4 = [
-  0 / 16,
-  8 / 16,
-  2 / 16,
-  10 / 16,
-  12 / 16,
-  4 / 16,
-  14 / 16,
-  6 / 16,
-  3 / 16,
-  11 / 16,
-  1 / 16,
-  9 / 16,
-  15 / 16,
-  7 / 16,
-  13 / 16,
-  5 / 16
+const BAYER_8X8 = [
+   0 / 64, 32 / 64,  8 / 64, 40 / 64,  2 / 64, 34 / 64, 10 / 64, 42 / 64,
+  48 / 64, 16 / 64, 56 / 64, 24 / 64, 50 / 64, 18 / 64, 58 / 64, 26 / 64,
+  12 / 64, 44 / 64,  4 / 64, 36 / 64, 14 / 64, 46 / 64,  6 / 64, 38 / 64,
+  60 / 64, 28 / 64, 52 / 64, 20 / 64, 62 / 64, 30 / 64, 54 / 64, 22 / 64,
+   3 / 64, 35 / 64, 11 / 64, 43 / 64,  1 / 64, 33 / 64,  9 / 64, 41 / 64,
+  51 / 64, 19 / 64, 59 / 64, 27 / 64, 49 / 64, 17 / 64, 57 / 64, 25 / 64,
+  15 / 64, 47 / 64,  7 / 64, 39 / 64, 13 / 64, 45 / 64,  5 / 64, 37 / 64,
+  63 / 64, 31 / 64, 55 / 64, 23 / 64, 61 / 64, 29 / 64, 53 / 64, 21 / 64
 ];
 
 const hiddenCanvas = new OffscreenCanvas(1, 1);
@@ -78,12 +70,20 @@ function sampleBoxAverage(integral, width, height, cx, cy, radius) {
 
 function sampleEdgeStrength(integral, width, height, cx, cy, radius) {
   const r = Math.max(1, radius * 0.7);
-  const left = sampleBoxAverage(integral, width, height, cx - r, cy, r);
-  const right = sampleBoxAverage(integral, width, height, cx + r, cy, r);
-  const up = sampleBoxAverage(integral, width, height, cx, cy - r, r);
-  const down = sampleBoxAverage(integral, width, height, cx, cy + r, r);
 
-  return clamp(Math.hypot(right - left, down - up) * 1.8, 0, 1);
+  const tl = sampleBoxAverage(integral, width, height, cx - r, cy - r, r);
+  const tc = sampleBoxAverage(integral, width, height, cx,     cy - r, r);
+  const tr = sampleBoxAverage(integral, width, height, cx + r, cy - r, r);
+  const ml = sampleBoxAverage(integral, width, height, cx - r, cy,     r);
+  const mr = sampleBoxAverage(integral, width, height, cx + r, cy,     r);
+  const bl = sampleBoxAverage(integral, width, height, cx - r, cy + r, r);
+  const bc = sampleBoxAverage(integral, width, height, cx,     cy + r, r);
+  const br = sampleBoxAverage(integral, width, height, cx + r, cy + r, r);
+
+  const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+  const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+
+  return clamp(Math.hypot(gx, gy) * 1.4, 0, 1);
 }
 
 function renderHalftone(width, height, settings) {
@@ -121,7 +121,7 @@ function renderHalftone(width, height, settings) {
       let darkness = Math.pow(1 - baseLuma, toneCurve);
       darkness = clamp(darkness + edgeStrength * quality.edgeBoost * (1 - darkness), 0, 1);
 
-      const bayer = BAYER_4X4[((gridY & 3) * 4) + (gridX & 3)] - 0.5;
+      const bayer = BAYER_8X8[((gridY & 7) * 8) + (gridX & 7)] - 0.5;
       darkness = clamp(darkness + bayer * quality.ditherAmount * (1 - darkness * 0.55), 0, 1);
 
       if (darkness < 0.003) continue;
@@ -138,16 +138,29 @@ function renderHalftone(width, height, settings) {
 
       if (microDotAmount <= 0 || darkness >= 0.6) continue;
 
-      const microChance = microDotAmount * (1 - darkness) * 0.65;
-      if (hash2d(gridX, gridY, 2.4, seed) > microChance) continue;
-
+      const microBase = microDotAmount * (1 - darkness);
       const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
-      const mx = x + (hash2d(gridX, gridY, 3.6, seed) - 0.5) * cellSize * 0.35;
-      const my = y + (hash2d(gridX, gridY, 4.8, seed) - 0.5) * cellSize * 0.35;
+      const maxMicro = Math.min(3, Math.ceil(microBase * 3));
+      const quadrantOffsets = [
+        [-0.25, -0.25],
+        [ 0.25,  0.25],
+        [-0.25,  0.25]
+      ];
 
-      outputCtx.beginPath();
-      outputCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
-      outputCtx.fill();
+      for (let mi = 0; mi < maxMicro; mi++) {
+        const salt = 2.4 + mi * 1.7;
+        const chance = microBase * (0.65 - mi * 0.15);
+        if (hash2d(gridX, gridY, salt, seed) > chance) continue;
+
+        const qx = quadrantOffsets[mi][0];
+        const qy = quadrantOffsets[mi][1];
+        const mx = x + (qx + (hash2d(gridX, gridY, salt + 1.2, seed) - 0.5) * 0.2) * cellSize;
+        const my = y + (qy + (hash2d(gridX, gridY, salt + 2.4, seed) - 0.5) * 0.2) * cellSize;
+
+        outputCtx.beginPath();
+        outputCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
+        outputCtx.fill();
+      }
     }
   }
 }
