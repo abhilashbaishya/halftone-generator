@@ -909,6 +909,20 @@ controls.imageInput.addEventListener("change", () => {
   loadImageFromFile(file);
 });
 
+document.addEventListener("paste", (event) => {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      event.preventDefault();
+      const file = item.getAsFile();
+      if (file) loadImageFromFile(file);
+      return;
+    }
+  }
+});
+
 controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
 });
