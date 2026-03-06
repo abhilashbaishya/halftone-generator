@@ -104,45 +104,54 @@ input[type="color"] {
 select,
 input[type="file"] {
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #0c0b0a;
   color: var(--text);
-  padding: 9px;
+  padding: 9px 12px;
   font-family: inherit;
   font-size: 0.84rem;
 }
 
 input[type="range"] {
+  --val: 0.5;
   appearance: none;
-  height: 6px;
-  background: var(--track);
+  height: 8px;
+  background: linear-gradient(
+    to right,
+    #d7ccc1 0%,
+    #d7ccc1 calc(var(--val) * 100%),
+    var(--track) calc(var(--val) * 100%),
+    var(--track) 100%
+  );
   border-radius: 999px;
   outline: none;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  border: 1px solid #dddbd8;
-  background: #0d0d0d;
+  border: none;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  border: 1px solid #dddbd8;
-  background: #0d0d0d;
+  border: none;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
 
 input[type="color"] {
-  height: 36px;
+  height: 40px;
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #0c0b0a;
   padding: 3px;
 }
@@ -180,12 +189,12 @@ output {
   border: 1px solid #3a332e;
   background: #171311;
   color: #f4f0ec;
-  border-radius: 8px;
+  border-radius: 20px;
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 10px 12px;
+  padding: 10px 16px;
   cursor: pointer;
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
@@ -200,6 +209,11 @@ output {
   color: #0d0d0d;
   border-color: #e7ddd1;
   font-weight: 600;
+}
+
+.button-primary:hover {
+  background: #d4c8ba;
+  border-color: #d4c8ba;
 }
 
 .button-small {

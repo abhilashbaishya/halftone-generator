@@ -16,7 +16,7 @@ if (!previewCtx || !sourceCtx || !hiddenCtx) {
 }
 
 const DEFAULT_QUALITY = "high";
-const DEFAULT_PRESET = "flash";
+const DEFAULT_PRESET = "clean";
 const CUSTOM_PRESETS_KEY = "halftone.customPresets.v1";
 
 const PRESET_FIELDS = [
@@ -112,17 +112,17 @@ const controls = {
 
 const builtInPresets = {
   clean: {
-    quality: "high",
-    cellSize: 8,
-    contrast: 1.1,
-    gamma: 1.0,
-    minDot: 0,
+    quality: "ultra",
+    cellSize: 7,
+    contrast: 1.55,
+    gamma: 0.82,
+    minDot: 4,
     screenAngle: 22,
-    toneCurve: 1.1,
-    microDot: 16,
-    jitter: 4,
+    toneCurve: 0.7,
+    microDot: 24,
+    jitter: 6,
     seed: 0,
-    inkColor: "#111111",
+    inkColor: "#0a0a0a",
     paperColor: "#f5f5f5"
   },
   bold: {
@@ -818,6 +818,15 @@ function applyPreset(name) {
   requestRender();
 }
 
+function updateSliderFills() {
+  document.querySelectorAll('input[type="range"]').forEach((input) => {
+    const min = parseFloat(input.min) || 0;
+    const max = parseFloat(input.max) || 100;
+    const val = parseFloat(input.value) || 0;
+    input.style.setProperty("--val", (val - min) / (max - min));
+  });
+}
+
 function updateOutputs() {
   controls.cellSizeOut.textContent = `${numberValue(controls.cellSize, 8)} px`;
   controls.contrastOut.textContent = numberValue(controls.contrast, 1.1).toFixed(2);
@@ -829,6 +838,7 @@ function updateOutputs() {
   controls.jitterOut.textContent = `${numberValue(controls.jitter, 0)}%`;
   controls.seedOut.textContent = `${Math.round(numberValue(controls.seed, 0))}`;
   updateZoomOutput();
+  updateSliderFills();
 }
 
 function loadImageFromFile(file) {
@@ -955,6 +965,7 @@ controls.quality.addEventListener("change", requestRender);
 
 controls.zoomRange.addEventListener("input", () => {
   setZoom(numberValue(controls.zoomRange, 1));
+  updateSliderFills();
 });
 
 controls.resetViewBtn.addEventListener("click", resetView);
@@ -996,6 +1007,15 @@ updateOutputs();
 applyPreset(DEFAULT_PRESET);
 
 if (!sourceImage) {
-  drawPlaceholder();
-  setRenderStatus("Upload an image", false);
+  const placeholder = new Image();
+  placeholder.onload = () => {
+    sourceImage = placeholder;
+    resetView();
+    requestRender();
+  };
+  placeholder.onerror = () => {
+    drawPlaceholder();
+    setRenderStatus("Upload an image", false);
+  };
+  placeholder.src = "placeholder.jpg";
 }
