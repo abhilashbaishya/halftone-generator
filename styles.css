@@ -154,6 +154,12 @@ input[type="color"] {
   border-radius: 12px;
   background: #0c0b0a;
   padding: 3px;
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+
+input[type="color"]:hover {
+  border-color: #5d534a;
 }
 
 output {
