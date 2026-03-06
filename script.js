@@ -395,7 +395,7 @@ function setZoom(nextZoom) {
 }
 
 function updateSplitPreview() {
-  const split = clamp(compareState.split, 0.05, 0.95);
+  const split = clamp(compareState.split, 0, 1);
   compareState.split = split;
 
   const rightInset = (1 - split) * 100;
