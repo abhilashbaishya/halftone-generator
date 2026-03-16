@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and PNG export." />
     <title>Halftone Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,6 +14,7 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <h1 class="sr-only">Halftone Studio</h1>
     <main class="workspace">
       <aside class="control-rail">
         <section class="control-group">
@@ -154,9 +156,9 @@
         </div>
         <div class="canvas-wrap" id="compareStage">
           <div class="canvas-plane" id="canvasPlane">
-            <canvas id="sourceCanvas" width="1200" height="800"></canvas>
+            <canvas id="sourceCanvas" width="1200" height="800" aria-label="Source image"></canvas>
             <div class="halftone-overlay" id="halftoneOverlay">
-              <canvas id="previewCanvas" width="1200" height="800"></canvas>
+              <canvas id="previewCanvas" width="1200" height="800" aria-label="Halftone preview"></canvas>
             </div>
           </div>
           <button
