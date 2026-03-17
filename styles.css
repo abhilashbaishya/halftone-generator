@@ -72,6 +72,7 @@ html.light {
 
 * {
   box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .sr-only {
@@ -100,7 +101,6 @@ body {
   color: var(--text);
   height: 100vh;
   overflow: hidden;
-  transition: background 0.2s ease, color 0.2s ease;
 }
 
 h1,
@@ -128,7 +128,6 @@ p {
   gap: 12px;
   height: calc(100vh - 24px);
   overflow: auto;
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .control-group {
@@ -136,7 +135,6 @@ p {
   border-radius: 10px;
   padding: 12px;
   background: linear-gradient(180deg, var(--group-bg-start) 0%, var(--group-bg-end) 100%);
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .group-head {
@@ -193,7 +191,6 @@ input[type="file"] {
   padding: 9px 12px;
   font-family: inherit;
   font-size: 0.84rem;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 input[type="range"] {
@@ -209,7 +206,6 @@ input[type="range"] {
   );
   border-radius: 999px;
   outline: none;
-  transition: background 0.2s ease;
 }
 
 input[type="range"]:focus-visible {
@@ -343,7 +339,6 @@ output {
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr;
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .preview-toolbar {
@@ -354,7 +349,6 @@ output {
   padding: 10px;
   border-bottom: 1px solid var(--toolbar-border);
   background: linear-gradient(180deg, var(--toolbar-bg-start) 0%, var(--toolbar-bg-end) 100%);
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .zoom-control {
