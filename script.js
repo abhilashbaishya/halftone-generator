@@ -998,6 +998,28 @@ window.addEventListener("resize", () => {
 controls.regenerateBtn.addEventListener("click", requestRender);
 controls.exportBtn.addEventListener("click", exportPng);
 
+// ── Theme toggle ──────────────────────────────────────────────────────────
+const themeToggle = document.getElementById("themeToggle");
+const iconSun = document.getElementById("iconSun");
+const iconMoon = document.getElementById("iconMoon");
+const THEME_KEY = "halftone.theme";
+
+function applyTheme(theme) {
+  const isLight = theme === "light";
+  document.documentElement.classList.toggle("light", isLight);
+  iconSun.style.display = isLight ? "none" : "";
+  iconMoon.style.display = isLight ? "" : "none";
+  themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+}
+
+themeToggle.addEventListener("click", () => {
+  const next = document.documentElement.classList.contains("light") ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+
+applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
 initializeWorker();

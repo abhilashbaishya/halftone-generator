@@ -152,6 +152,22 @@
           </label>
           <input id="zoomRange" type="range" min="0.5" max="4" step="0.05" value="1" />
           <button id="resetViewBtn" class="button button-small" type="button">Reset View</button>
+          <button id="themeToggle" class="button button-small theme-toggle" type="button" aria-label="Switch to light mode">
+            <svg id="iconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="8" cy="8" r="3"/>
+              <line x1="8" y1="1" x2="8" y2="2.5"/>
+              <line x1="8" y1="13.5" x2="8" y2="15"/>
+              <line x1="1" y1="8" x2="2.5" y2="8"/>
+              <line x1="13.5" y1="8" x2="15" y2="8"/>
+              <line x1="3.05" y1="3.05" x2="4.1" y2="4.1"/>
+              <line x1="11.9" y1="11.9" x2="12.95" y2="12.95"/>
+              <line x1="12.95" y1="3.05" x2="11.9" y2="4.1"/>
+              <line x1="4.1" y1="11.9" x2="3.05" y2="12.95"/>
+            </svg>
+            <svg id="iconMoon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none">
+              <path d="M13.5 10A6 6 0 0 1 6 2.5a6 6 0 1 0 7.5 7.5z"/>
+            </svg>
+          </button>
           <p id="renderStatus" class="render-status" aria-live="polite">Idle</p>
         </div>
         <div class="canvas-wrap" id="compareStage">

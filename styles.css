@@ -1,12 +1,73 @@
+/* ── Dark theme (exact values from cutting-mat-generator.vercel.app) ── */
 :root {
-  --bg: #0b0b0b;
-  --rail: #11100f;
-  --panel-border: #2b2723;
-  --text: #f0eee9;
-  --muted: #9f968e;
-  --track: #23201d;
-  --status-idle: #9f968e;
-  --status-busy: #9cc7bb;
+  --body-bg: oklch(14.5% 0 0);
+  --rail-start: oklch(20% 0 0);
+  --rail-end: oklch(17% 0 0);
+  --panel-border: oklch(32% 0 0);
+  --group-bg-start: oklch(20% 0 0);
+  --group-bg-end: oklch(18% 0 0);
+  --preview-bg: oklch(11% 0 0);
+  --toolbar-bg-start: oklch(18% 0 0);
+  --toolbar-bg-end: oklch(15% 0 0);
+  --toolbar-border: oklch(32% 0 0);
+
+  --text: oklch(98% 0 0);
+  --muted: oklch(71% 0 0);
+  --heading: oklch(85% 0 0);
+  --output-color: oklch(98% 0 0);
+
+  --input-bg: oklch(20% 0 0);
+  --track: oklch(26% 0 0);
+  --slider-fill: oklch(71% 0 0);
+  --focus-color: oklch(80% 0 0);
+
+  --btn-border: oklch(32% 0 0);
+  --btn-bg: oklch(20% 0 0);
+  --btn-color: oklch(98% 0 0);
+  --btn-hover-border: oklch(42% 0 0);
+  --btn-hover-bg: oklch(26% 0 0);
+  --btn-primary-bg: oklch(98% 0 0);
+  --btn-primary-color: oklch(10% 0 0);
+  --btn-primary-hover: oklch(88% 0 0);
+
+  --status-idle: oklch(71% 0 0);
+  --status-busy: oklch(65% 0.12 165);
+}
+
+/* ── Light theme (exact values from cutting-mat-generator.vercel.app) ── */
+html.light {
+  --body-bg: oklch(100% 0 0);
+  --rail-start: oklch(98% 0 0);
+  --rail-end: oklch(96% 0 0);
+  --panel-border: oklch(88% 0 0);
+  --group-bg-start: oklch(96% 0 0);
+  --group-bg-end: oklch(94% 0 0);
+  --preview-bg: oklch(96% 0 0);
+  --toolbar-bg-start: oklch(98% 0 0);
+  --toolbar-bg-end: oklch(96% 0 0);
+  --toolbar-border: oklch(88% 0 0);
+
+  --text: oklch(10% 0 0);
+  --muted: oklch(45% 0 0);
+  --heading: oklch(30% 0 0);
+  --output-color: oklch(10% 0 0);
+
+  --input-bg: oklch(100% 0 0);
+  --track: oklch(88% 0 0);
+  --slider-fill: oklch(45% 0 0);
+  --focus-color: oklch(10% 0 0);
+
+  --btn-border: oklch(88% 0 0);
+  --btn-bg: oklch(96% 0 0);
+  --btn-color: oklch(10% 0 0);
+  --btn-hover-border: oklch(80% 0 0);
+  --btn-hover-bg: oklch(92% 0 0);
+  --btn-primary-bg: oklch(10% 0 0);
+  --btn-primary-color: oklch(100% 0 0);
+  --btn-primary-hover: oklch(20% 0 0);
+
+  --status-idle: oklch(45% 0 0);
+  --status-busy: oklch(55% 0.12 165);
 }
 
 * {
@@ -35,10 +96,11 @@
 body {
   margin: 0;
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #161718;
+  background: var(--body-bg);
   color: var(--text);
   height: 100vh;
   overflow: hidden;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 h1,
@@ -57,7 +119,7 @@ p {
 }
 
 .control-rail {
-  background: linear-gradient(180deg, var(--rail) 0%, #0f0e0d 100%);
+  background: linear-gradient(180deg, var(--rail-start) 0%, var(--rail-end) 100%);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   padding: 16px;
@@ -66,13 +128,15 @@ p {
   gap: 12px;
   height: calc(100vh - 24px);
   overflow: auto;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .control-group {
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   padding: 12px;
-  background: linear-gradient(180deg, #151311 0%, #12100f 100%);
+  background: linear-gradient(180deg, var(--group-bg-start) 0%, var(--group-bg-end) 100%);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .group-head {
@@ -83,7 +147,7 @@ h2 {
   font-size: 0.85rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #d7ccc1;
+  color: var(--heading);
 }
 
 .field {
@@ -124,11 +188,12 @@ select,
 input[type="file"] {
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  background: #0c0b0a;
+  background: var(--input-bg);
   color: var(--text);
   padding: 9px 12px;
   font-family: inherit;
   font-size: 0.84rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 input[type="range"] {
@@ -137,17 +202,18 @@ input[type="range"] {
   height: 8px;
   background: linear-gradient(
     to right,
-    #d7ccc1 0%,
-    #d7ccc1 calc(var(--val) * 100%),
+    var(--slider-fill) 0%,
+    var(--slider-fill) calc(var(--val) * 100%),
     var(--track) calc(var(--val) * 100%),
     var(--track) 100%
   );
   border-radius: 999px;
   outline: none;
+  transition: background 0.2s ease;
 }
 
 input[type="range"]:focus-visible {
-  outline: 2px solid #e7ddd1;
+  outline: 2px solid var(--focus-color);
   outline-offset: 3px;
   border-radius: 999px;
 }
@@ -177,19 +243,19 @@ input[type="color"] {
   height: 40px;
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  background: #0c0b0a;
+  background: var(--input-bg);
   padding: 3px;
   cursor: pointer;
   transition: border-color 0.16s ease;
 }
 
 input[type="color"]:hover {
-  border-color: #5d534a;
+  border-color: var(--btn-hover-border);
 }
 
 output {
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #f1eeea;
+  color: var(--output-color);
   font-size: 0.72rem;
 }
 
@@ -217,9 +283,9 @@ output {
 }
 
 .button {
-  border: 1px solid #3a332e;
-  background: #171311;
-  color: #f4f0ec;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-color);
   border-radius: 20px;
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
@@ -227,24 +293,24 @@ output {
   text-transform: uppercase;
   padding: 10px 16px;
   cursor: pointer;
-  transition: border-color 0.16s ease, background-color 0.16s ease;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 
 .button:hover {
-  border-color: #5d534a;
-  background: #201a17;
+  border-color: var(--btn-hover-border);
+  background: var(--btn-hover-bg);
 }
 
 .button-primary {
-  background: #e7ddd1;
-  color: #0d0d0d;
-  border-color: #e7ddd1;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-color);
+  border-color: var(--btn-primary-bg);
   font-weight: 600;
 }
 
 .button-primary:hover {
-  background: #d4c8ba;
-  border-color: #d4c8ba;
+  background: var(--btn-primary-hover);
+  border-color: var(--btn-primary-hover);
 }
 
 .button-small {
@@ -252,24 +318,43 @@ output {
   font-size: 0.66rem;
 }
 
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
 .preview-stage {
   border: 1px solid var(--panel-border);
   border-radius: 8px;
-  background: #070707;
+  background: var(--preview-bg);
   min-height: calc(100vh - 24px);
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .preview-toolbar {
   display: grid;
-  grid-template-columns: minmax(92px, auto) minmax(120px, 180px) auto 1fr;
+  grid-template-columns: minmax(92px, auto) minmax(120px, 180px) auto auto 1fr;
   gap: 10px;
   align-items: center;
   padding: 10px;
-  border-bottom: 1px solid #34383c;
-  background: linear-gradient(180deg, #111315 0%, #0c0d0f 100%);
+  border-bottom: 1px solid var(--toolbar-border);
+  background: linear-gradient(180deg, var(--toolbar-bg-start) 0%, var(--toolbar-bg-end) 100%);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .zoom-control {
@@ -381,7 +466,7 @@ canvas {
 }
 
 .split-handle:focus-visible {
-  outline: 2px solid #e7ddd1;
+  outline: 2px solid var(--focus-color);
   outline-offset: -2px;
 }
 
