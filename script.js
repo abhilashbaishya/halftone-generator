@@ -27,9 +27,6 @@ const PRESET_FIELDS = [
   "minDot",
   "screenAngle",
   "toneCurve",
-  "microDot",
-  "jitter",
-  "seed",
   "inkColor",
   "paperColor"
 ];
@@ -79,8 +76,6 @@ const BAYER_8X8 = [
 const controls = {
   imageInput: document.getElementById("imageInput"),
   presetSelect: document.getElementById("presetSelect"),
-  savePresetBtn: document.getElementById("savePresetBtn"),
-  deletePresetBtn: document.getElementById("deletePresetBtn"),
   quality: document.getElementById("quality"),
   cellSize: document.getElementById("cellSize"),
   contrast: document.getElementById("contrast"),
@@ -88,9 +83,6 @@ const controls = {
   minDot: document.getElementById("minDot"),
   screenAngle: document.getElementById("screenAngle"),
   toneCurve: document.getElementById("toneCurve"),
-  microDot: document.getElementById("microDot"),
-  jitter: document.getElementById("jitter"),
-  seed: document.getElementById("seed"),
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
   regenerateBtn: document.getElementById("regenerateBtn"),
@@ -104,9 +96,6 @@ const controls = {
   minDotOut: document.getElementById("minDotOut"),
   angleOut: document.getElementById("angleOut"),
   toneCurveOut: document.getElementById("toneCurveOut"),
-  microDotOut: document.getElementById("microDotOut"),
-  jitterOut: document.getElementById("jitterOut"),
-  seedOut: document.getElementById("seedOut"),
   zoomOut: document.getElementById("zoomOut")
 };
 
@@ -178,6 +167,9 @@ const compareState = {
 let sourceImage = null;
 let resizeTimer = null;
 let renderFrame = null;
+let hiddenJitter = 6;
+let hiddenMicroDot = 24;
+let hiddenSeed = 0;
 let customPresets = {};
 
 let renderWorker = null;
@@ -326,9 +318,9 @@ function captureCurrentPreset() {
     minDot: numberValue(controls.minDot, 0),
     screenAngle: numberValue(controls.screenAngle, 0),
     toneCurve: numberValue(controls.toneCurve, 1),
-    microDot: numberValue(controls.microDot, 0),
-    jitter: numberValue(controls.jitter, 0),
-    seed: numberValue(controls.seed, 0),
+    microDot: hiddenMicroDot,
+    jitter: hiddenJitter,
+    seed: hiddenSeed,
     inkColor: controls.inkColor.value,
     paperColor: controls.paperColor.value
   };
@@ -570,9 +562,9 @@ function getRenderSettings() {
     minDot: numberValue(controls.minDot, 0) / 100,
     angle: (numberValue(controls.screenAngle, 0) * Math.PI) / 180,
     toneCurve: numberValue(controls.toneCurve, 1),
-    microDotAmount: numberValue(controls.microDot, 0) / 100,
-    jitter: numberValue(controls.jitter, 0) / 100,
-    seed: numberValue(controls.seed, 0),
+    microDotAmount: hiddenMicroDot / 100,
+    jitter: hiddenJitter / 100,
+    seed: hiddenSeed,
     quality: getQualityConfig(),
     ink: hexToRgb(controls.inkColor.value),
     paper: hexToRgb(controls.paperColor.value)
@@ -813,6 +805,10 @@ function applyPreset(name) {
     controls[key].value = String(preset[key]);
   });
 
+  if (preset.jitter !== undefined) hiddenJitter = preset.jitter;
+  if (preset.microDot !== undefined) hiddenMicroDot = preset.microDot;
+  if (preset.seed !== undefined) hiddenSeed = preset.seed;
+
   controls.presetSelect.value = name;
   updateOutputs();
   requestRender();
@@ -834,9 +830,6 @@ function updateOutputs() {
   controls.minDotOut.textContent = `${numberValue(controls.minDot, 0)}%`;
   controls.angleOut.textContent = `${numberValue(controls.screenAngle, 0)} deg`;
   controls.toneCurveOut.textContent = numberValue(controls.toneCurve, 1).toFixed(2);
-  controls.microDotOut.textContent = `${numberValue(controls.microDot, 0)}%`;
-  controls.jitterOut.textContent = `${numberValue(controls.jitter, 0)}%`;
-  controls.seedOut.textContent = `${Math.round(numberValue(controls.seed, 0))}`;
   updateZoomOutput();
   updateSliderFills();
 }
@@ -937,9 +930,6 @@ controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
 });
 
-controls.savePresetBtn.addEventListener("click", saveCurrentPreset);
-controls.deletePresetBtn.addEventListener("click", deleteCurrentPreset);
-
 controls.quality.addEventListener("change", requestRender);
 
 [
@@ -948,10 +938,7 @@ controls.quality.addEventListener("change", requestRender);
   controls.gamma,
   controls.minDot,
   controls.screenAngle,
-  controls.toneCurve,
-  controls.microDot,
-  controls.jitter,
-  controls.seed
+  controls.toneCurve
 ].forEach((input) => {
   input.addEventListener("input", () => {
     updateOutputs();
