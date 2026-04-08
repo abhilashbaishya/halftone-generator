@@ -35,7 +35,8 @@ const PRESET_LABELS = {
   red: "Crimson Poster",
   orange: "Amber Press",
   neon: "Electric",
-  blue: "Blueprint"
+  blue: "Blueprint",
+  fine: "Fine Screen"
 };
 
 const QUALITY_MODES = {
@@ -155,6 +156,20 @@ const builtInPresets = {
     seed: 256,
     inkColor: "#1d3fd8",
     paperColor: "#eef2ff"
+  },
+  fine: {
+    quality: "ultra",
+    cellSize: 8,
+    contrast: 1.65,
+    gamma: 0.9,
+    minDot: 0,
+    screenAngle: 30,
+    toneCurve: 1.0,
+    microDot: 0,
+    jitter: 0,
+    seed: 0,
+    inkColor: "#0a0a0a",
+    paperColor: "#f8f8f8"
   }
 };
 
@@ -857,7 +872,7 @@ function exportPng() {
 
   const quality = getQualityConfig();
   const scale = quality.exportScale;
-  const maxExportPixels = 24_000_000;
+  const maxExportPixels = 48_000_000;
 
   let exportWidth = previewCanvas.width * scale;
   let exportHeight = previewCanvas.height * scale;
