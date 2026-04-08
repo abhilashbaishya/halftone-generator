@@ -194,6 +194,9 @@ let hiddenMicroDot = 24;
 let hiddenSeed = 0;
 let customPresets = {};
 
+let presetCS = null;
+let qualityCS = null;
+
 let renderWorker = null;
 let workerEnabled = false;
 let renderRequestId = 0;
@@ -295,6 +298,308 @@ function formatPresetLabel(name) {
   return PRESET_LABELS[name] || name;
 }
 
+class ColorPicker {
+  static _registry = [];
+
+  constructor(native) {
+    this.native = native;
+    this.h = 0; this.s = 0; this.v = 1;
+    this._open = false;
+    this._build();
+    this._fromHex(native.value);
+    ColorPicker._registry.push(this);
+  }
+
+  _rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    let h = 0;
+    const s = max === 0 ? 0 : d / max, v = max;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    return [h, s, v];
+  }
+
+  _hsvToRgb(h, s, v) {
+    const i = Math.floor(h * 6), f = h * 6 - i;
+    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    const cases = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]];
+    const [r, g, b] = cases[i % 6];
+    return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+  }
+
+  _toHex() {
+    const { r, g, b } = this._hsvToRgb(this.h, this.s, this.v);
+    return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
+  }
+
+  _fromHex(hex) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return;
+    [this.h, this.s, this.v] = this._rgbToHsv(rgb.r, rgb.g, rgb.b);
+  }
+
+  _build() {
+    this.native.hidden = true;
+    this.native.disabled = true;
+
+    this.wrap = document.createElement("div");
+    this.wrap.className = "cpick";
+    this.native.parentNode.insertBefore(this.wrap, this.native);
+    this.wrap.appendChild(this.native);
+
+    // Trigger: swatch + hex
+    this.trigger = document.createElement("div");
+    this.trigger.className = "cpick-trigger";
+    this.swatch = document.createElement("div");
+    this.swatch.className = "cpick-swatch";
+    this.hexIn = document.createElement("input");
+    this.hexIn.type = "text";
+    this.hexIn.className = "cpick-hex";
+    this.hexIn.maxLength = 7;
+    this.hexIn.spellcheck = false;
+    this.trigger.append(this.swatch, this.hexIn);
+    this.wrap.appendChild(this.trigger);
+
+    // Panel
+    this.panel = document.createElement("div");
+    this.panel.className = "cpick-panel";
+
+    // Gradient area (SV picker)
+    this.gradWrap = document.createElement("div");
+    this.gradWrap.className = "cpick-grad";
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "cpick-canvas";
+    this.canvas.width = 560;
+    this.canvas.height = 440;
+    this.thumb = document.createElement("div");
+    this.thumb.className = "cpick-thumb";
+    this.gradWrap.append(this.canvas, this.thumb);
+
+    // Hue row: color dot + slider
+    this.hueRow = document.createElement("div");
+    this.hueRow.className = "cpick-hue-row";
+    this.hueDot = document.createElement("div");
+    this.hueDot.className = "cpick-hue-dot";
+    this.hueSlider = document.createElement("input");
+    this.hueSlider.type = "range";
+    this.hueSlider.className = "cpick-hue";
+    this.hueSlider.min = "0";
+    this.hueSlider.max = "360";
+    this.hueSlider.step = "1";
+    this.hueRow.append(this.hueDot, this.hueSlider);
+
+    this.panel.append(this.gradWrap, this.hueRow);
+    document.body.appendChild(this.panel);
+
+    // Events
+    this.trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._open ? this.close() : this.open();
+    });
+    document.addEventListener("click", (e) => {
+      if (this._open && !this.panel.contains(e.target)) this.close();
+    });
+
+    this.canvas.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this._pickSV(e);
+      const move = (e) => this._pickSV(e);
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    });
+
+    this.hueSlider.addEventListener("input", () => {
+      this.h = Number(this.hueSlider.value) / 360;
+      const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
+      this.hueDot.style.background = `rgb(${r},${g},${b})`;
+      this._drawCanvas();
+      this._emit();
+    });
+
+    this.hexIn.addEventListener("change", () => {
+      let v = this.hexIn.value.trim();
+      if (!v.startsWith("#")) v = "#" + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        this._fromHex(v);
+        this.hueSlider.value = Math.round(this.h * 360);
+        this._drawCanvas();
+        this._emit();
+      }
+    });
+  }
+
+  _pickSV(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    this.s = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    this.v = clamp(1 - (e.clientY - rect.top) / rect.height, 0, 1);
+    this._updateThumb();
+    this._emit();
+  }
+
+  _drawCanvas() {
+    const ctx = this.canvas.getContext("2d");
+    const w = this.canvas.width, h = this.canvas.height;
+    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(0, 0, w, h);
+    const wg = ctx.createLinearGradient(0, 0, w, 0);
+    wg.addColorStop(0, "rgba(255,255,255,1)");
+    wg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = wg;
+    ctx.fillRect(0, 0, w, h);
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, "rgba(0,0,0,0)");
+    bg.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  _updateThumb() {
+    this.thumb.style.left = (this.s * 100) + "%";
+    this.thumb.style.top = ((1 - this.v) * 100) + "%";
+  }
+
+  _emit() {
+    const hex = this._toHex();
+    this.native.value = hex;
+    this.swatch.style.background = hex;
+    this.hexIn.value = hex.toUpperCase();
+    this._updateThumb();
+    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
+    this.hueDot.style.background = `rgb(${r},${g},${b})`;
+    this.native.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  syncFromNative() {
+    this._fromHex(this.native.value);
+    this.hueSlider.value = Math.round(this.h * 360);
+    const hex = this.native.value;
+    this.swatch.style.background = hex;
+    this.hexIn.value = hex.toUpperCase();
+    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
+    this.hueDot.style.background = `rgb(${r},${g},${b})`;
+    if (this._open) { this._drawCanvas(); this._updateThumb(); }
+  }
+
+  open() {
+    ColorPicker._registry.forEach(cp => { if (cp !== this) cp.close(); });
+    this._open = true;
+    this.syncFromNative();
+    this._drawCanvas();
+    this._updateThumb();
+    this.panel.style.display = "block";
+    requestAnimationFrame(() => this._reposition());
+  }
+
+  _reposition() {
+    const rect = this.trigger.getBoundingClientRect();
+    const panelW = 280;
+    let left = rect.left;
+    if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
+    if (left < 8) left = 8;
+    this.panel.style.left = left + "px";
+    this.panel.style.top = (rect.bottom + 6) + "px";
+  }
+
+  close() {
+    if (!this._open) return;
+    this._open = false;
+    this.panel.style.display = "none";
+  }
+}
+
+class CustomSelect {
+  constructor(native) {
+    this.native = native;
+    this._open = false;
+    this._init();
+  }
+
+  _init() {
+    this.native.hidden = true;
+    this.wrapper = document.createElement("div");
+    this.wrapper.className = "csel";
+    this.native.parentNode.insertBefore(this.wrapper, this.native);
+    this.wrapper.appendChild(this.native);
+
+    this.trigger = document.createElement("button");
+    this.trigger.type = "button";
+    this.trigger.className = "csel-trigger";
+    this.wrapper.appendChild(this.trigger);
+
+    this.panel = document.createElement("div");
+    this.panel.className = "csel-panel";
+    this.wrapper.appendChild(this.panel);
+
+    this.trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._open ? this.close() : this.open();
+    });
+    document.addEventListener("click", () => this.close());
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") this.close(); });
+    this.syncTrigger();
+  }
+
+  syncTrigger() {
+    const opt = this.native.options[this.native.selectedIndex];
+    const label = opt ? opt.text : "";
+    this.trigger.innerHTML = `<span>${label}</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  _buildPanel() {
+    this.panel.innerHTML = "";
+    const cur = this.native.value;
+    Array.from(this.native.children).forEach((child) => {
+      if (child.tagName === "OPTGROUP") {
+        const lbl = document.createElement("div");
+        lbl.className = "csel-group-label";
+        lbl.textContent = child.label;
+        this.panel.appendChild(lbl);
+        Array.from(child.children).forEach((opt) => this.panel.appendChild(this._makeItem(opt, cur)));
+      } else if (child.tagName === "OPTION") {
+        this.panel.appendChild(this._makeItem(child, cur));
+      }
+    });
+  }
+
+  _makeItem(opt, cur) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "csel-item" + (opt.value === cur ? " csel-item--active" : "");
+    btn.innerHTML = `<span>${opt.text}</span>${opt.value === cur ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ""}`;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.native.value = opt.value;
+      this.native.dispatchEvent(new Event("change", { bubbles: true }));
+      this.close();
+      this.syncTrigger();
+    });
+    return btn;
+  }
+
+  open() {
+    this._open = true;
+    this._buildPanel();
+    this.wrapper.classList.add("csel--open");
+  }
+
+  close() {
+    if (!this._open) return;
+    this._open = false;
+    this.wrapper.classList.remove("csel--open");
+  }
+
+  refresh() {
+    this.syncTrigger();
+    if (this._open) this._buildPanel();
+  }
+}
+
 function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
   controls.presetSelect.textContent = "";
 
@@ -325,6 +630,7 @@ function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
     Object.prototype.hasOwnProperty.call(builtInPresets, selectedName) ||
     Object.prototype.hasOwnProperty.call(customPresets, selectedName);
   controls.presetSelect.value = hasSelected ? selectedName : DEFAULT_PRESET;
+  presetCS?.refresh();
 }
 
 function getPresetByName(name) {
@@ -832,6 +1138,10 @@ function applyPreset(name) {
   if (preset.seed !== undefined) hiddenSeed = preset.seed;
 
   controls.presetSelect.value = name;
+  presetCS?.syncTrigger();
+  qualityCS?.syncTrigger();
+  inkCP.syncFromNative();
+  paperCP.syncFromNative();
   updateOutputs();
   requestRender();
 }
@@ -1030,6 +1340,11 @@ themeToggle.addEventListener("click", () => {
 });
 
 applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+
+presetCS = new CustomSelect(controls.presetSelect);
+qualityCS = new CustomSelect(controls.quality);
+const inkCP = new ColorPicker(controls.inkColor);
+const paperCP = new ColorPicker(controls.paperColor);
 
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
