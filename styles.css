@@ -34,8 +34,10 @@
   --status-idle: #7b7b7b;
   --status-busy: oklch(65% 0.12 165);
 
+  --csel-trigger-bg: #222222;
+  --csel-panel-bg: #191919;
   --csel-border: 0 0 0 1px #ffffff14;
-  --csel-panel-shadow: 0 0 0 1px #ffffff14, 0 8px 32px rgba(0,0,0,0.5);
+  --csel-panel-shadow: 0 0 0 1px #ffffff14, 0 8px 32px rgba(0,0,0,0.6);
   --csel-item-hover: #2a2a2a;
   --csel-item-active: #313131;
 }
@@ -76,10 +78,12 @@ html.light {
   --status-idle: #8d8d8d;
   --status-busy: oklch(50% 0.12 165);
 
+  --csel-trigger-bg: #ffffff;
+  --csel-panel-bg: #f6f6f6;
   --csel-border: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
   --csel-panel-shadow: 0px 0px 0px 1px #0000000f, 0px 4px 16px rgba(0,0,0,0.1);
-  --csel-item-hover: #f6f6f6;
-  --csel-item-active: #f0f0f0;
+  --csel-item-hover: #eeeeee;
+  --csel-item-active: #e8e8e8;
 }
 
 * {
@@ -278,7 +282,7 @@ input[type="range"] {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 14px;
-  background: var(--input-bg);
+  background: var(--csel-trigger-bg);
   border: none;
   border-radius: 12px;
   box-shadow: var(--csel-border);
@@ -287,10 +291,7 @@ input[type="range"] {
   font-size: 0.875rem;
   cursor: pointer;
   text-align: left;
-}
-
-.csel-trigger:hover {
-  background: var(--btn-hover-bg);
+  outline: none;
 }
 
 .csel-trigger svg {
@@ -309,7 +310,7 @@ input[type="range"] {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: var(--input-bg);
+  background: var(--csel-panel-bg);
   border: none;
   border-radius: 12px;
   box-shadow: var(--csel-panel-shadow);
@@ -347,10 +348,6 @@ input[type="range"] {
 
 .csel-item:hover {
   background: var(--csel-item-hover);
-}
-
-.csel-item--active {
-  background: var(--csel-item-active);
 }
 
 .csel-item--active svg {
