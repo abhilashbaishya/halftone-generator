@@ -877,6 +877,8 @@ function exportPng() {
   if (!exportCtx) return;
 
   const settings = getRenderSettings();
+  const pixelScale = exportCanvas.width / Math.max(1, previewCanvas.width);
+  settings.cellSize = Math.max(1, settings.cellSize * pixelScale);
   renderHalftoneOnMain(exportCtx, exportCanvas.width, exportCanvas.height, settings);
 
   const url = exportCanvas.toDataURL("image/png");
