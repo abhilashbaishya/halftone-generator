@@ -60,6 +60,13 @@ const QUALITY_MODES = {
     ditherAmount: 0.14,
     exportScale: 3,
     maxPixels: 10_500_000
+  },
+  print: {
+    sampleRadius: 1.0,
+    edgeBoost: 0.1,
+    ditherAmount: 0,
+    exportScale: 4,
+    maxPixels: 10_500_000
   }
 };
 
@@ -158,7 +165,7 @@ const builtInPresets = {
     paperColor: "#eef2ff"
   },
   fine: {
-    quality: "ultra",
+    quality: "print",
     cellSize: 8,
     contrast: 1.65,
     gamma: 0.9,
