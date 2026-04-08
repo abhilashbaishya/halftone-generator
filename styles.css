@@ -15,7 +15,7 @@
   --input-bg: #222222;
   --input-border: #2a2a2a;
   --track: #313131;
-  --slider-fill: #b5b5b5;
+  --slider-fill: #eeeeee;
   --focus-color: #eeeeee;
   --thumb-bg: #ffffff;
 
@@ -40,11 +40,13 @@
   --csel-panel-shadow: 0 0 0 1px #ffffff14, 0 8px 32px rgba(0,0,0,0.6);
   --csel-item-hover: #2a2a2a;
   --csel-item-active: #313131;
+
+  --radius: 8px;
 }
 
 /* ── Light theme (exact oklch.fyi values) ── */
 html.light {
-  --body-bg: #f0f0f0;
+  --body-bg: #f6f6f6;
   --rail-bg: #ffffff;
   --rail-border: #e8e8e8;
   --panel-border: #e8e8e8;
@@ -59,7 +61,7 @@ html.light {
   --input-bg: #ffffff;
   --input-border: #e8e8e8;
   --track: #e0e0e0;
-  --slider-fill: #646464;
+  --slider-fill: #202020;
   --focus-color: #202020;
   --thumb-bg: #ffffff;
 
@@ -71,19 +73,19 @@ html.light {
   --btn-primary-bg: #202020;
   --btn-primary-color: #ffffff;
   --btn-primary-hover: #424242;
-  --btn-shadow: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
-  --btn-primary-shadow: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
+  --btn-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 2px 4px 0px #0000000f;
+  --btn-primary-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 2px 4px 0px #0000000f;
 
   --divider: #e0e0e0;
   --status-idle: #8d8d8d;
   --status-busy: oklch(50% 0.12 165);
 
   --csel-trigger-bg: #ffffff;
-  --csel-panel-bg: #f6f6f6;
+  --csel-panel-bg: #ffffff;
   --csel-border: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
-  --csel-panel-shadow: 0px 0px 0px 1px #0000000f, 0px 4px 16px rgba(0,0,0,0.1);
-  --csel-item-hover: #eeeeee;
-  --csel-item-active: #e8e8e8;
+  --csel-panel-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 8px 24px rgba(0,0,0,0.12);
+  --csel-item-hover: #f0f0f0;
+  --csel-item-active: #f0f0f0;
 }
 
 * {
@@ -136,7 +138,7 @@ h1, h2, p {
 .control-rail {
   background: var(--rail-bg);
   border: 1px solid var(--rail-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -154,35 +156,16 @@ h1, h2, p {
 /* ── Section groups with dotted dividers ── */
 .control-group {
   border: none;
+  border-top: 1px dashed var(--divider);
   padding: 14px 0 0;
   background: none;
   margin-top: 12px;
-  position: relative;
-}
-
-.control-group::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--divider) 0px,
-    var(--divider) 4px,
-    transparent 4px,
-    transparent 8px
-  );
 }
 
 .control-group:first-child {
+  border-top: none;
   padding-top: 0;
   margin-top: 0;
-}
-
-.control-group:first-child::before {
-  display: none;
 }
 
 .group-head {
@@ -195,7 +178,7 @@ h2 {
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--muted);
+  color: var(--heading);
 }
 
 /* ── Fields ── */
@@ -239,7 +222,7 @@ input[type="range"] {
   border: none;
   background: var(--btn-bg);
   color: var(--btn-color);
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 0.875rem;
   letter-spacing: 0;
@@ -284,7 +267,7 @@ input[type="range"] {
   padding: 10px 14px;
   background: var(--csel-trigger-bg);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: var(--csel-border);
   color: var(--text);
   font-family: inherit;
@@ -312,7 +295,7 @@ input[type="range"] {
   right: 0;
   background: var(--csel-panel-bg);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: var(--csel-panel-shadow);
   padding: 6px;
   z-index: 100;
@@ -338,7 +321,7 @@ input[type="range"] {
   padding: 8px 10px;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text);
   font-family: inherit;
   font-size: 0.875rem;
@@ -358,7 +341,7 @@ input[type="range"] {
 input[type="range"] {
   --val: 0.5;
   appearance: none;
-  height: 5px;
+  height: 3px;
   background: linear-gradient(
     to right,
     var(--slider-fill) 0%,
@@ -412,7 +395,7 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   gap: 8px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--input-bg);
   padding: 10px 14px;
   cursor: pointer;
@@ -449,7 +432,7 @@ input[type="range"]::-moz-range-thumb {
   width: 280px;
   background: var(--rail-bg);
   border: 1px solid var(--input-border);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 0;
   z-index: 9999;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -583,23 +566,7 @@ output {
   gap: 8px;
   margin-top: 16px;
   padding-top: 14px;
-  position: relative;
-}
-
-.rail-actions::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--divider) 0px,
-    var(--divider) 4px,
-    transparent 4px,
-    transparent 8px
-  );
+  border-top: 1px dashed var(--divider);
 }
 
 #regenerateBtn,
@@ -613,7 +580,7 @@ output {
   border: none;
   background: var(--btn-bg);
   color: var(--btn-color);
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 0.875rem;
   font-weight: 500;
@@ -667,7 +634,7 @@ output {
 /* ── Preview Stage ── */
 .preview-stage {
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--preview-bg);
   min-height: calc(100vh - 24px);
   overflow: hidden;
@@ -825,13 +792,13 @@ canvas {
   .control-rail {
     height: auto;
     order: 2;
-    border-radius: 12px;
+    border-radius: var(--radius);
     padding: 14px;
   }
 
   .preview-stage {
     order: 1;
-    border-radius: 12px;
+    border-radius: var(--radius);
     min-height: 62vh;
   }
 
