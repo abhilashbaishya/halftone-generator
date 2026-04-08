@@ -16,7 +16,7 @@ if (!previewCtx || !sourceCtx || !hiddenCtx) {
 }
 
 const DEFAULT_QUALITY = "high";
-const DEFAULT_PRESET = "clean";
+const DEFAULT_PRESET = "red";
 const CUSTOM_PRESETS_KEY = "halftone.customPresets.v1";
 
 const PRESET_FIELDS = [
@@ -32,10 +32,10 @@ const PRESET_FIELDS = [
 ];
 
 const PRESET_LABELS = {
-  clean: "Clean Editorial",
-  bold: "Bold Poster",
-  subtle: "Subtle Texture",
-  flash: "Flash Poster"
+  red: "Crimson Poster",
+  orange: "Amber Press",
+  neon: "Electric",
+  blue: "Blueprint"
 };
 
 const QUALITY_MODES = {
@@ -100,61 +100,61 @@ const controls = {
 };
 
 const builtInPresets = {
-  clean: {
+  red: {
     quality: "ultra",
-    cellSize: 7,
-    contrast: 1.55,
-    gamma: 0.82,
-    minDot: 4,
+    cellSize: 9,
+    contrast: 1.9,
+    gamma: 0.7,
+    minDot: 10,
     screenAngle: 22,
-    toneCurve: 0.7,
-    microDot: 24,
-    jitter: 6,
-    seed: 0,
-    inkColor: "#0a0a0a",
+    toneCurve: 0.58,
+    microDot: 14,
+    jitter: 4,
+    seed: 11,
+    inkColor: "#cc0000",
     paperColor: "#f5f5f5"
   },
-  bold: {
-    quality: "high",
-    cellSize: 11,
-    contrast: 1.5,
-    gamma: 0.85,
-    minDot: 8,
-    screenAngle: 35,
-    toneCurve: 0.75,
-    microDot: 10,
-    jitter: 12,
-    seed: 121,
-    inkColor: "#0f0f0f",
-    paperColor: "#ececec"
-  },
-  subtle: {
+  orange: {
     quality: "high",
     cellSize: 6,
-    contrast: 0.9,
-    gamma: 1.25,
-    minDot: 4,
-    screenAngle: 18,
-    toneCurve: 1.35,
-    microDot: 28,
-    jitter: 8,
-    seed: 33,
-    inkColor: "#202020",
-    paperColor: "#f4f4f4"
-  },
-  flash: {
-    quality: "ultra",
-    cellSize: 7,
-    contrast: 1.45,
-    gamma: 0.88,
-    minDot: 10,
-    screenAngle: 30,
+    contrast: 1.65,
+    gamma: 0.78,
+    minDot: 7,
+    screenAngle: 15,
     toneCurve: 0.72,
-    microDot: 48,
-    jitter: 18,
-    seed: 777,
-    inkColor: "#1f9377",
-    paperColor: "#eeebda"
+    microDot: 32,
+    jitter: 14,
+    seed: 42,
+    inkColor: "#d4580c",
+    paperColor: "#fff4ec"
+  },
+  neon: {
+    quality: "ultra",
+    cellSize: 6,
+    contrast: 1.8,
+    gamma: 0.74,
+    minDot: 6,
+    screenAngle: 30,
+    toneCurve: 0.62,
+    microDot: 10,
+    jitter: 4,
+    seed: 99,
+    inkColor: "#0a0a0a",
+    paperColor: "#00ff87"
+  },
+  blue: {
+    quality: "high",
+    cellSize: 10,
+    contrast: 1.7,
+    gamma: 0.78,
+    minDot: 10,
+    screenAngle: 45,
+    toneCurve: 0.65,
+    microDot: 15,
+    jitter: 8,
+    seed: 256,
+    inkColor: "#1d3fd8",
+    paperColor: "#eef2ff"
   }
 };
 
