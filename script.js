@@ -382,15 +382,13 @@ class ColorPicker {
     // Hue row: color dot + slider
     this.hueRow = document.createElement("div");
     this.hueRow.className = "cpick-hue-row";
-    this.hueDot = document.createElement("div");
-    this.hueDot.className = "cpick-hue-dot";
     this.hueSlider = document.createElement("input");
     this.hueSlider.type = "range";
     this.hueSlider.className = "cpick-hue";
     this.hueSlider.min = "0";
     this.hueSlider.max = "360";
     this.hueSlider.step = "1";
-    this.hueRow.append(this.hueDot, this.hueSlider);
+    this.hueRow.append(this.hueSlider);
 
     this.panel.append(this.gradWrap, this.hueRow);
     document.body.appendChild(this.panel);
@@ -413,10 +411,17 @@ class ColorPicker {
       window.addEventListener("mouseup", up);
     });
 
+    this.canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      this._pickSV(e.touches[0]);
+      const move = (e) => this._pickSV(e.touches[0]);
+      const up = () => { window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); };
+      window.addEventListener("touchmove", move, { passive: false });
+      window.addEventListener("touchend", up);
+    }, { passive: false });
+
     this.hueSlider.addEventListener("input", () => {
       this.h = Number(this.hueSlider.value) / 360;
-      const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
-      this.hueDot.style.background = `rgb(${r},${g},${b})`;
       this._drawCanvas();
       this._emit();
     });
@@ -470,8 +475,6 @@ class ColorPicker {
     this.swatch.style.background = hex;
     this.hexIn.value = hex.toUpperCase();
     this._updateThumb();
-    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
-    this.hueDot.style.background = `rgb(${r},${g},${b})`;
     this.native.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
@@ -481,8 +484,6 @@ class ColorPicker {
     const hex = this.native.value;
     this.swatch.style.background = hex;
     this.hexIn.value = hex.toUpperCase();
-    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
-    this.hueDot.style.background = `rgb(${r},${g},${b})`;
     if (this._open) { this._drawCanvas(); this._updateThumb(); }
   }
 
@@ -498,7 +499,7 @@ class ColorPicker {
 
   _reposition() {
     const rect = this.trigger.getBoundingClientRect();
-    const panelW = 280;
+    const panelW = this.panel.offsetWidth;
     let left = rect.left;
     if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
     if (left < 8) left = 8;

@@ -435,7 +435,7 @@ input[type="range"]::-moz-range-thumb {
 .cpick-panel {
   display: none;
   position: fixed;
-  width: 280px;
+  width: min(280px, calc(100vw - 16px));
   background: var(--rail-bg);
   border: 1px solid var(--input-border);
   border-radius: 10px;
@@ -475,17 +475,7 @@ html:not(.light) .cpick-panel {
 .cpick-hue-row {
   display: flex;
   align-items: center;
-  gap: 10px;
   padding: 10px 12px 14px;
-}
-
-.cpick-hue-dot {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 2.5px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
 }
 
 input.cpick-hue {
@@ -855,5 +845,9 @@ canvas {
 
   .canvas-wrap {
     min-height: 52vh;
+  }
+
+  .cpick-canvas {
+    height: 160px;
   }
 }
