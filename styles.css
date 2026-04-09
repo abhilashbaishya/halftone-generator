@@ -36,10 +36,10 @@
 
   --csel-trigger-bg: #222222;
   --csel-panel-bg: #191919;
-  --csel-border: 0 0 0 1px #ffffff14;
-  --csel-panel-shadow: 0 0 0 1px #ffffff14, 0 8px 32px rgba(0,0,0,0.6);
-  --csel-item-hover: #2a2a2a;
-  --csel-item-active: #313131;
+  --csel-border: 0 0 0 1px #ffffff26;
+  --csel-panel-shadow: 0 0 0 1px #ffffff26, 0 8px 32px rgba(0,0,0,0.6);
+  --csel-item-hover: #303030;
+  --csel-item-active: #363636;
 
   --radius: 8px;
 }
@@ -322,7 +322,7 @@ input[type="range"] {
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: var(--text);
+  color: #ffffff;
   font-family: inherit;
   font-size: 0.875rem;
   cursor: pointer;
@@ -335,6 +335,10 @@ input[type="range"] {
 
 .csel-item--active svg {
   color: var(--muted);
+}
+
+html.light .csel-item {
+  color: var(--text);
 }
 
 /* ── Range Sliders ── */
