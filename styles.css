@@ -654,6 +654,7 @@ output {
 }
 
 .render-status {
+  display: none;
   justify-self: end;
   font-size: 0.72rem;
   letter-spacing: 0;
@@ -675,7 +676,6 @@ output {
   place-items: center;
   position: relative;
   overflow: hidden;
-  touch-action: none;
 }
 
 .canvas-plane {
@@ -849,5 +849,32 @@ canvas {
 
   .cpick-canvas {
     height: 160px;
+  }
+
+  .preview-toolbar {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .zoom-control {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .theme-toggle {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  #zoomRange {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  #resetViewBtn {
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
 }
