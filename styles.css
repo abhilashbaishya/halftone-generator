@@ -27,8 +27,8 @@
   --btn-primary-bg: #eeeeee;
   --btn-primary-color: #101010;
   --btn-primary-hover: #b5b5b5;
-  --btn-shadow: 0 0 0 1px #ffffff14;
-  --btn-primary-shadow: 0 0 0 1px #ffffff14;
+  --btn-shadow: 0 0 0 1px #ffffff1f;
+  --btn-primary-shadow: 0 0 0 1px #ffffff1f;
 
   --divider: #313131;
   --status-idle: #7b7b7b;
@@ -42,6 +42,7 @@
   --csel-item-active: #363636;
 
   --radius: 8px;
+  --panel-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Light theme (exact oklch.fyi values) ── */
@@ -73,8 +74,8 @@ html.light {
   --btn-primary-bg: #202020;
   --btn-primary-color: #ffffff;
   --btn-primary-hover: #424242;
-  --btn-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 2px 4px 0px #0000000f;
-  --btn-primary-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 2px 4px 0px #0000000f;
+  --btn-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
+  --btn-primary-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
 
   --divider: #e0e0e0;
   --status-idle: #8d8d8d;
@@ -86,6 +87,7 @@ html.light {
   --csel-panel-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 8px 24px rgba(0,0,0,0.12);
   --csel-item-hover: #f0f0f0;
   --csel-item-active: #f0f0f0;
+  --panel-shadow: none;
 }
 
 * {
@@ -146,7 +148,7 @@ h1, h2, p {
   height: calc(100vh - 24px);
   overflow: auto;
   scrollbar-width: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--panel-shadow);
 }
 
 .control-rail::-webkit-scrollbar {
@@ -644,7 +646,7 @@ output {
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--panel-shadow);
 }
 
 .preview-toolbar {
