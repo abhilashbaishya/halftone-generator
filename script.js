@@ -1,3 +1,27 @@
+// ── Image persistence via IndexedDB ──
+const DB_NAME = "halftone", DB_STORE = "image", DB_KEY = "last";
+function openDb() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function saveImageToDb(dataUrl) {
+  openDb().then(db => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put(dataUrl, DB_KEY);
+  }).catch(() => {});
+}
+function loadImageFromDb() {
+  return openDb().then(db => new Promise((res, rej) => {
+    const req = db.transaction(DB_STORE).objectStore(DB_STORE).get(DB_KEY);
+    req.onsuccess = () => res(req.result || null);
+    req.onerror = () => rej(req.error);
+  }));
+}
+
 const previewCanvas = document.getElementById("previewCanvas");
 const sourceCanvas = document.getElementById("sourceCanvas");
 const previewCtx = previewCanvas.getContext("2d");
@@ -1176,6 +1200,7 @@ function loadImageFromFile(file) {
     const img = new Image();
     img.onload = () => {
       sourceImage = img;
+      saveImageToDb(reader.result);
       resetView();
       requestRender();
     };
@@ -1356,15 +1381,14 @@ updateOutputs();
 applyPreset(DEFAULT_PRESET);
 
 if (!sourceImage) {
-  const placeholder = new Image();
-  placeholder.onload = () => {
-    sourceImage = placeholder;
-    resetView();
-    requestRender();
-  };
-  placeholder.onerror = () => {
+  loadImageFromDb().then(dataUrl => {
+    const src = dataUrl || "placeholder.jpg";
+    const img = new Image();
+    img.onload = () => { sourceImage = img; resetView(); requestRender(); };
+    img.onerror = () => { drawPlaceholder(); setRenderStatus("Upload an image", false); };
+    img.src = src;
+  }).catch(() => {
     drawPlaceholder();
     setRenderStatus("Upload an image", false);
-  };
-  placeholder.src = "placeholder.jpg";
+  });
 }
