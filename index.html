@@ -96,6 +96,27 @@
             </div>
             <input id="minDot" type="range" min="0" max="60" value="0" />
           </label>
+          <label class="field">
+            <div class="field-title">
+              <span>Grain</span>
+              <output id="grainOut">0%</output>
+            </div>
+            <input id="grainStrength" type="range" min="0" max="100" step="1" value="0" />
+          </label>
+          <label class="field">
+            <div class="field-title">
+              <span>Bloom</span>
+              <output id="bloomOut">0%</output>
+            </div>
+            <input id="bloomStrength" type="range" min="0" max="100" step="1" value="0" />
+          </label>
+          <label class="field">
+            <div class="field-title">
+              <span>CRT</span>
+              <output id="crtOut">0%</output>
+            </div>
+            <input id="crtStrength" type="range" min="0" max="100" step="1" value="0" />
+          </label>
         </section>
 
         <section class="control-group">
@@ -160,15 +181,18 @@
             aria-label="Adjust split preview"
             title="Drag to compare source and halftone"
           >
-            <svg class="split-arrows" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M5 3L1 8L5 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M11 3L15 8L11 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg class="split-arrows" width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 22L28 16L22 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 22L4 16L10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
         </div>
       </section>
     </main>
 
+    <script src="grain-pass.js"></script>
+    <script src="bloom-pass.js"></script>
+    <script src="crt-pass.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

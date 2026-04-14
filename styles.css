@@ -345,7 +345,7 @@ html.light .csel-item {
 
 /* ── Range Sliders ── */
 input[type="range"] {
-  --val: 0.5;
+  --val: 0;
   appearance: none;
   height: 3px;
   background: linear-gradient(

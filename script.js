@@ -1,3 +1,8 @@
+const grainPass = new GrainPass();
+const bloomPass = new BloomPass();
+const crtPass = new CRTPass();
+let grainSeed = Math.random();
+
 // ── Image persistence via IndexedDB ──
 const DB_NAME = "halftone", DB_STORE = "image", DB_KEY = "last";
 function openDb() {
@@ -122,6 +127,12 @@ const controls = {
   zoomRange: document.getElementById("zoomRange"),
   resetViewBtn: document.getElementById("resetViewBtn"),
   renderStatus: document.getElementById("renderStatus"),
+  grainStrength: document.getElementById("grainStrength"),
+  grainOut: document.getElementById("grainOut"),
+  bloomStrength: document.getElementById("bloomStrength"),
+  bloomOut: document.getElementById("bloomOut"),
+  crtStrength: document.getElementById("crtStrength"),
+  crtOut: document.getElementById("crtOut"),
   cellSizeOut: document.getElementById("cellSizeOut"),
   contrastOut: document.getElementById("contrastOut"),
   gammaOut: document.getElementById("gammaOut"),
@@ -1046,6 +1057,7 @@ function initializeWorker() {
           disableWorker();
           const settings = getRenderSettings();
           renderHalftoneOnMain(previewCtx, previewCanvas.width, previewCanvas.height, settings);
+          applyPostProcess(previewCtx, previewCanvas);
           setRenderStatus("Ready", false);
         }
         return;
@@ -1061,6 +1073,7 @@ function initializeWorker() {
       previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
       previewCtx.drawImage(bitmap, 0, 0, previewCanvas.width, previewCanvas.height);
       if (bitmap && typeof bitmap.close === "function") bitmap.close();
+      applyPostProcess(previewCtx, previewCanvas);
       setRenderStatus("Ready", false);
     });
 
@@ -1089,6 +1102,7 @@ function renderWithWorker(width, height, settings) {
       if (!renderWorker || !workerEnabled) {
         if (typeof sourceBitmap.close === "function") sourceBitmap.close();
         renderHalftoneOnMain(previewCtx, width, height, settings);
+        applyPostProcess(previewCtx, previewCanvas);
         setRenderStatus("Ready", false);
         return;
       }
@@ -1109,6 +1123,7 @@ function renderWithWorker(width, height, settings) {
       if (requestId !== renderRequestId) return;
       disableWorker();
       renderHalftoneOnMain(previewCtx, width, height, settings);
+      applyPostProcess(previewCtx, previewCanvas);
       setRenderStatus("Ready", false);
     });
 }
@@ -1136,6 +1151,7 @@ function generateHalftone() {
 
   setRenderStatus("Rendering...", true);
   renderHalftoneOnMain(previewCtx, width, height, settings);
+  applyPostProcess(previewCtx, previewCanvas);
   setRenderStatus("Ready", false);
 }
 
@@ -1180,7 +1196,31 @@ function updateSliderFills() {
   });
 }
 
+function runPostProcessChain(src) {
+  const grain = parseFloat(controls.grainStrength.value) / 100 * 0.15;
+  src = grainPass.apply(src, grain, grainSeed);
+
+  const bloom = parseFloat(controls.bloomStrength.value) / 100;
+  src = bloomPass.apply(src, bloom);
+
+  const crt = parseFloat(controls.crtStrength.value) / 100;
+  src = crtPass.apply(src, crt);
+
+  return src;
+}
+
+function applyPostProcess(ctx, canvas) {
+  const result = runPostProcessChain(canvas);
+  if (result !== canvas) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(result, 0, 0);
+  }
+}
+
 function updateOutputs() {
+  controls.grainOut.textContent = `${numberValue(controls.grainStrength, 0)}%`;
+  controls.bloomOut.textContent = `${numberValue(controls.bloomStrength, 0)}%`;
+  controls.crtOut.textContent = `${numberValue(controls.crtStrength, 0)}%`;
   controls.cellSizeOut.textContent = `${numberValue(controls.cellSize, 8)} px`;
   controls.contrastOut.textContent = numberValue(controls.contrast, 1.1).toFixed(2);
   controls.gammaOut.textContent = numberValue(controls.gamma, 1).toFixed(2);
@@ -1239,7 +1279,8 @@ function exportPng() {
   settings.cellSize = Math.max(1, settings.cellSize * pixelScale);
   renderHalftoneOnMain(exportCtx, exportCanvas.width, exportCanvas.height, settings);
 
-  const url = exportCanvas.toDataURL("image/png");
+  const exportSource = runPostProcessChain(exportCanvas);
+  const url = exportSource.toDataURL("image/png");
   const link = document.createElement("a");
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   link.href = url;
@@ -1342,8 +1383,12 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
-controls.regenerateBtn.addEventListener("click", requestRender);
+controls.regenerateBtn.addEventListener("click", () => { grainSeed = Math.random(); requestRender(); });
 controls.exportBtn.addEventListener("click", exportPng);
+
+controls.grainStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
+controls.bloomStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
+controls.crtStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
 
 // ── Theme toggle ──────────────────────────────────────────────────────────
 const themeToggle = document.getElementById("themeToggle");
