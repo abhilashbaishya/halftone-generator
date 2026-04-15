@@ -1,93 +1,105 @@
 /* ── Dark theme (exact oklch.fyi values) ── */
 :root {
-  --body-bg: #101010;
-  --rail-bg: #191919;
-  --rail-border: #2a2a2a;
-  --panel-border: #2a2a2a;
-  --preview-bg: #0b0b0b;
-  --toolbar-bg: #191919;
-  --toolbar-border: #2a2a2a;
+  --body-bg: #080808;
+  --rail-bg: #1212168c;
+  --rail-border: #ffffff1a;
+  --panel-border: #ffffff1a;
+  --preview-bg: #080808;
+  --toolbar-bg: #1212168c;
+  --toolbar-border: #ffffff12;
+  --glass-blur: blur(24px) saturate(1.4);
 
-  --text: #eeeeee;
-  --muted: #7b7b7b;
-  --heading: #b5b5b5;
+  --text: #ffffffe6;
+  --label: #ffffff80;
+  --muted: #ffffff40;
+  --heading: #ffffff59;
 
-  --input-bg: #222222;
-  --input-border: #2a2a2a;
-  --track: #313131;
-  --slider-fill: #eeeeee;
+  --input-bg: #ffffff0f;
+  --input-border: #ffffff12;
+  --track: #ffffff12;
+  --slider-fill: #ffffffe6;
   --focus-color: #eeeeee;
   --thumb-bg: #ffffff;
 
-  --btn-border: #313131;
-  --btn-bg: #222222;
-  --btn-color: #eeeeee;
-  --btn-hover-border: #3a3a3a;
-  --btn-hover-bg: #2a2a2a;
-  --btn-primary-bg: #eeeeee;
-  --btn-primary-color: #101010;
-  --btn-primary-hover: #b5b5b5;
+  --btn-border: #ffffff1a;
+  --btn-bg: #ffffff0f;
+  --btn-color: #ffffffe6;
+  --btn-hover-border: #ffffff1f;
+  --btn-hover-bg: #ffffff14;
+  --btn-primary-bg: #ffffffe6;
+  --btn-primary-color: #080808;
+  --btn-primary-hover: #ffffffcc;
   --btn-shadow: 0 0 0 1px #ffffff1f;
   --btn-primary-shadow: 0 0 0 1px #ffffff1f;
 
-  --divider: #313131;
+  --divider: #ffffff12;
   --status-idle: #7b7b7b;
   --status-busy: oklch(65% 0.12 165);
 
-  --csel-trigger-bg: #222222;
-  --csel-panel-bg: #191919;
+  --csel-trigger-bg: #ffffff0f;
+  --csel-panel-bg: #121216;
+  --csel-item-hover: #ffffff14;
+  --csel-item-active: #ffffff1a;
   --csel-border: 0 0 0 1px #ffffff26;
   --csel-panel-shadow: 0 0 0 1px #ffffff26, 0 8px 32px rgba(0,0,0,0.6);
   --csel-item-hover: #303030;
   --csel-item-active: #363636;
 
   --radius: 8px;
-  --panel-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --panel-shadow: 0 8px 32px #0006;
 }
 
-/* ── Light theme (exact oklch.fyi values) ── */
+/* ── Light theme ── */
 html.light {
-  --body-bg: #f6f6f6;
+  --body-bg: #efefef;
   --rail-bg: #ffffff;
-  --rail-border: #e8e8e8;
-  --panel-border: #e8e8e8;
+  --rail-border: transparent;
+  --panel-border: transparent;
   --preview-bg: #ffffff;
   --toolbar-bg: #ffffff;
-  --toolbar-border: #e8e8e8;
+  --toolbar-border: #e3e3e3;
+  --glass-blur: none;
 
-  --text: #202020;
-  --muted: #8d8d8d;
-  --heading: #646464;
+  --text: #111111;
+  --label: #666666;
+  --muted: #aaaaaa;
+  --heading: #aaaaaa;
 
-  --input-bg: #ffffff;
-  --input-border: #e8e8e8;
-  --track: #e0e0e0;
-  --slider-fill: #202020;
-  --focus-color: #202020;
+  --input-bg: #f5f5f5;
+  --input-border: #e3e3e3;
+  --track: #d8d8d8;
+  --slider-fill: #111111;
+  --focus-color: #111111;
   --thumb-bg: #ffffff;
 
-  --btn-border: #e8e8e8;
-  --btn-bg: #ffffff;
-  --btn-color: #202020;
-  --btn-hover-border: #d9d9d9;
-  --btn-hover-bg: #f6f6f6;
-  --btn-primary-bg: #202020;
+  --btn-border: #e3e3e3;
+  --btn-bg: #f5f5f5;
+  --btn-color: #111111;
+  --btn-hover-border: #d0d0d0;
+  --btn-hover-bg: #ececec;
+  --btn-primary-bg: #111111;
   --btn-primary-color: #ffffff;
-  --btn-primary-hover: #424242;
+  --btn-primary-hover: #333333;
   --btn-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
   --btn-primary-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
 
-  --divider: #e0e0e0;
-  --status-idle: #8d8d8d;
+  --divider: #e8e8e8;
+  --status-idle: #999999;
   --status-busy: oklch(50% 0.12 165);
 
-  --csel-trigger-bg: #ffffff;
+  --csel-trigger-bg: #f5f5f5;
   --csel-panel-bg: #ffffff;
   --csel-border: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
-  --csel-panel-shadow: 0px 0px 0px 1px #00000014, 0px 1px 2px -1px #00000014, 0px 8px 24px rgba(0,0,0,0.12);
+  --csel-panel-shadow: 0px 0px 0px 1px #00000014, 0px 8px 24px rgba(0,0,0,0.1);
   --csel-item-hover: #f0f0f0;
-  --csel-item-active: #f0f0f0;
-  --panel-shadow: none;
+  --csel-item-active: #e8e8e8;
+  --panel-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.06);
+}
+
+html.light .control-rail,
+html.light .preview-stage {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 * {
@@ -123,6 +135,7 @@ body {
   overflow: hidden;
 }
 
+
 h1, h2, p {
   margin: 0;
 }
@@ -139,6 +152,8 @@ h1, h2, p {
 /* ── Control Rail ── */
 .control-rail {
   background: var(--rail-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--rail-border);
   border-radius: var(--radius);
   padding: 16px;
@@ -199,7 +214,7 @@ h2 {
 .zoom-control {
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 0.75rem;
-  color: var(--heading);
+  color: var(--label);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -347,7 +362,7 @@ html.light .csel-item {
 input[type="range"] {
   --val: 0;
   appearance: none;
-  height: 3px;
+  height: 2px;
   background: linear-gradient(
     to right,
     var(--slider-fill) 0%,
@@ -367,26 +382,26 @@ input[type="range"]:focus-visible {
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
   border: none;
   background: var(--thumb-bg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7);
   cursor: pointer;
 }
 
 html.light input[type="range"]::-webkit-slider-thumb {
-  box-shadow: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.2);
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
   border: none;
   background: var(--thumb-bg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7);
   cursor: pointer;
 }
 
@@ -632,6 +647,8 @@ output {
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   background: var(--preview-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   min-height: calc(100vh - 24px);
   overflow: hidden;
   display: grid;
