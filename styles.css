@@ -226,6 +226,9 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Dragging a slider shouldn't leave the readout text selected. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .file-field input,
@@ -283,6 +286,8 @@ input[type="range"] {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* Pinned so the "Edited" badge can never change the row's height. */
+  min-height: 36px;
   padding: 10px 14px;
   background: var(--csel-trigger-bg);
   border: none;
@@ -310,14 +315,17 @@ input[type="range"] {
   text-overflow: ellipsis;
 }
 
-.csel-badge {
+/* Scoped past `.field span`, which otherwise wins on specificity and drags
+   the badge up to the label's 12px — tall enough to stretch the trigger. */
+.csel-trigger .csel-badge {
   flex-shrink: 0;
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
+  line-height: 1;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--label);
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--input-border);
@@ -397,10 +405,10 @@ input[type="range"] {
   outline: none;
 }
 
+/* A 2px outline offset around a 2px track drew a big empty capsule. Ring the
+   thumb instead — it points at the thing you actually move. */
 input[type="range"]:focus-visible {
-  outline: 2px solid var(--focus-color);
-  outline-offset: 3px;
-  border-radius: 999px;
+  outline: none;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -418,6 +426,14 @@ html.light input[type="range"]::-webkit-slider-thumb {
   box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.2);
 }
 
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7), 0 0 0 4px var(--focus-ring);
+}
+
+html.light input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.2), 0 0 0 4px var(--focus-ring);
+}
+
 input[type="range"]::-moz-range-thumb {
   width: 12px;
   height: 12px;
@@ -426,6 +442,10 @@ input[type="range"]::-moz-range-thumb {
   background: var(--thumb-bg);
   box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7);
   cursor: pointer;
+}
+
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7), 0 0 0 4px var(--focus-ring);
 }
 
 /* ── Color Picker ── */
