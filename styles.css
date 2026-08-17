@@ -48,6 +48,10 @@
 
   --radius: 8px;
   --panel-shadow: 0 8px 32px #0006;
+
+  /* Every interactive control in the rail sits on this height. */
+  --control-h: 36px;
+  --control-font: 0.8rem;
 }
 
 /* ── Light theme ── */
@@ -107,6 +111,12 @@ html.light .preview-stage {
 * {
   box-sizing: border-box;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Any class setting `display` outranks the UA's [hidden] rule, so the
+   attribute silently stops working. Pin it once, globally. */
+[hidden] {
+  display: none !important;
 }
 
 .sr-only {
@@ -246,10 +256,12 @@ input[type="range"] {
   color: var(--btn-color);
   border-radius: var(--radius);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.875rem;
+  font-size: var(--control-font);
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  padding: 10px 16px;
+  min-height: var(--control-h);
+  padding: 0 16px;
   cursor: pointer;
   box-shadow: var(--btn-shadow);
   transition: background-color 0.16s ease;
@@ -263,7 +275,8 @@ input[type="range"] {
 
 .file-field span {
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.8rem;
+  font-size: var(--control-font);
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   color: var(--btn-color);
@@ -287,8 +300,8 @@ input[type="range"] {
   justify-content: space-between;
   gap: 8px;
   /* Pinned so the "Edited" badge can never change the row's height. */
-  min-height: 36px;
-  padding: 10px 14px;
+  min-height: var(--control-h);
+  padding: 0 14px;
   background: var(--csel-trigger-bg);
   border: none;
   border-radius: var(--radius);
@@ -461,7 +474,8 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   border: none;
   border-radius: var(--radius);
   background: var(--input-bg);
-  padding: 10px 14px;
+  min-height: var(--control-h);
+  padding: 0 14px;
   cursor: pointer;
   box-shadow: var(--csel-border);
 }
@@ -609,12 +623,17 @@ output {
 }
 
 /* ── Preset save / delete ── */
+/* Flex, not grid: a `1fr auto` template keeps the empty column's gap when
+   Delete is hidden, which left Save Preset 8px short of the other buttons. */
 .preset-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   gap: 8px;
   margin-top: 8px;
   margin-bottom: 0;
+}
+
+#savePresetBtn {
+  flex: 1;
 }
 
 /* Naming swaps in place of the action row, so the rail never grows a
@@ -626,21 +645,18 @@ output {
   margin-top: 8px;
 }
 
-.preset-actions[hidden],
-.preset-namer[hidden] {
-  display: none;
-}
 
 .preset-namer input {
   min-width: 0;
-  padding: 10px 14px;
+  min-height: var(--control-h);
+  padding: 0 14px;
   background: var(--csel-trigger-bg);
   border: none;
   border-radius: var(--radius);
   box-shadow: var(--csel-border);
   color: var(--text);
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--control-font);
   appearance: none;
   -webkit-appearance: none;
   outline: none;
@@ -655,10 +671,8 @@ output {
 }
 
 .preset-cancel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 10px;
+  width: var(--control-h);
+  padding: 0;
   color: var(--label);
 }
 
@@ -687,24 +701,22 @@ output {
   border-top: 1px dashed var(--divider);
 }
 
-#regenerateBtn,
-#exportBtn {
-  padding: 11px 16px;
-  font-size: 0.75rem;
-}
-
 /* ── Buttons ── */
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: var(--btn-bg);
   color: var(--btn-color);
   border-radius: var(--radius);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.875rem;
+  font-size: var(--control-font);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  padding: 10px 16px;
+  min-height: var(--control-h);
+  padding: 0 16px;
   cursor: pointer;
   box-shadow: var(--btn-shadow);
   transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
@@ -727,7 +739,6 @@ output {
   background: var(--btn-primary-bg);
   color: var(--btn-primary-color);
   border-color: var(--btn-primary-bg);
-  font-weight: 600;
   box-shadow: var(--btn-primary-shadow);
 }
 
@@ -736,14 +747,17 @@ output {
   border-color: var(--btn-primary-hover);
 }
 
+/* Toolbar-only. Rail buttons all use the full .button size. */
 .button-small {
-  padding: 8px 10px;
-  font-size: 0.66rem;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.72rem;
 }
 
 .theme-toggle {
   width: 32px;
   height: 32px;
+  min-height: 32px;
   padding: 0;
   border-radius: 50%;
   display: flex;
@@ -950,6 +964,11 @@ canvas {
 }
 
 @media (max-width: 640px) {
+  /* One token lifts every control to a comfortable touch target. */
+  :root {
+    --control-h: 42px;
+  }
+
   .workspace {
     padding: 8px;
     gap: 8px;
@@ -960,16 +979,14 @@ canvas {
     gap: 10px;
   }
 
+  /* Side padding here would inset section content narrower than the
+     rail's action buttons, which sit outside any group. */
   .control-group {
-    padding: 10px;
+    padding: 10px 0 0;
   }
 
   .split {
     grid-template-columns: 1fr;
-  }
-
-  .button {
-    padding: 11px 12px;
   }
 
   .preview-stage {
