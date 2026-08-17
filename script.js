@@ -60,6 +60,15 @@ const PRESET_FIELDS = [
   "paperColor"
 ];
 
+// Post-processing was added after the preset format, so these are optional on
+// disk. Applying a preset always writes them — falling back to 0 — so built-in
+// presets reset any effects the user had dialled in.
+const POSTFX_DEFAULTS = {
+  grainStrength: 0,
+  bloomStrength: 0,
+  crtStrength: 0
+};
+
 const PRESET_LABELS = {
   red: "Crimson Poster",
   orange: "Amber Press",
@@ -124,6 +133,13 @@ const controls = {
   paperColor: document.getElementById("paperColor"),
   regenerateBtn: document.getElementById("regenerateBtn"),
   exportBtn: document.getElementById("exportBtn"),
+  savePresetBtn: document.getElementById("savePresetBtn"),
+  deletePresetBtn: document.getElementById("deletePresetBtn"),
+  presetNamer: document.getElementById("presetNamer"),
+  presetNameInput: document.getElementById("presetNameInput"),
+  presetNameSave: document.getElementById("presetNameSave"),
+  presetNameCancel: document.getElementById("presetNameCancel"),
+  presetNote: document.getElementById("presetNote"),
   zoomRange: document.getElementById("zoomRange"),
   resetViewBtn: document.getElementById("resetViewBtn"),
   renderStatus: document.getElementById("renderStatus"),
@@ -286,6 +302,12 @@ function sanitizePreset(rawPreset) {
     inkColor: typeof rawPreset.inkColor === "string" ? rawPreset.inkColor : "#111111",
     paperColor: typeof rawPreset.paperColor === "string" ? rawPreset.paperColor : "#f5f5f5"
   };
+
+  // Optional so presets saved before post-processing existed still load.
+  Object.entries(POSTFX_DEFAULTS).forEach(([key, fallback]) => {
+    const parsed = Number(rawPreset[key]);
+    sanitized[key] = Number.isFinite(parsed) ? parsed : fallback;
+  });
 
   if (!QUALITY_MODES[sanitized.quality]) {
     sanitized.quality = DEFAULT_QUALITY;
@@ -674,7 +696,7 @@ function getPresetByName(name) {
 }
 
 function captureCurrentPreset() {
-  return {
+  const captured = {
     quality: controls.quality.value,
     cellSize: numberValue(controls.cellSize, 8),
     contrast: numberValue(controls.contrast, 1.1),
@@ -688,45 +710,74 @@ function captureCurrentPreset() {
     inkColor: controls.inkColor.value,
     paperColor: controls.paperColor.value
   };
+
+  Object.entries(POSTFX_DEFAULTS).forEach(([key, fallback]) => {
+    captured[key] = numberValue(controls[key], fallback);
+  });
+
+  return captured;
+}
+
+function setPresetNote(message) {
+  controls.presetNote.textContent = message;
+}
+
+function syncPresetActions() {
+  const selected = controls.presetSelect.value;
+  const isCustom = Object.prototype.hasOwnProperty.call(customPresets, selected);
+  controls.deletePresetBtn.disabled = !isCustom;
+  controls.deletePresetBtn.title = isCustom
+    ? `Delete "${selected}"`
+    : "Built-in presets can't be deleted";
+}
+
+function openPresetNamer() {
+  const active = controls.presetSelect.value;
+  controls.presetNameInput.value = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
+  controls.presetNamer.hidden = false;
+  setPresetNote("");
+  controls.presetNameInput.focus();
+  controls.presetNameInput.select();
+}
+
+function closePresetNamer() {
+  controls.presetNamer.hidden = true;
+  setPresetNote("");
 }
 
 function saveCurrentPreset() {
-  const active = controls.presetSelect.value;
-  const suggested = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
-  const providedName = window.prompt("Save preset as:", suggested);
-  if (providedName === null) return;
+  const name = controls.presetNameInput.value.trim();
 
-  const name = providedName.trim();
   if (!name) {
-    window.alert("Preset name cannot be empty.");
+    setPresetNote("Give the preset a name.");
+    controls.presetNameInput.focus();
     return;
   }
 
   if (Object.prototype.hasOwnProperty.call(builtInPresets, name)) {
-    window.alert("That name is reserved by a built-in preset.");
+    setPresetNote("That name belongs to a built-in preset.");
+    controls.presetNameInput.focus();
     return;
   }
 
   customPresets[name] = captureCurrentPreset();
   persistCustomPresets();
   rebuildPresetSelect(name);
-  controls.presetSelect.value = name;
+  syncPresetActions();
+  closePresetNamer();
 }
 
 function deleteCurrentPreset() {
   const selected = controls.presetSelect.value;
-  if (!Object.prototype.hasOwnProperty.call(customPresets, selected)) {
-    window.alert("Select a saved preset to delete.");
-    return;
-  }
-
-  const confirmed = window.confirm(`Delete preset "${selected}"?`);
-  if (!confirmed) return;
+  if (!Object.prototype.hasOwnProperty.call(customPresets, selected)) return;
+  if (!window.confirm(`Delete preset "${selected}"?`)) return;
 
   delete customPresets[selected];
   persistCustomPresets();
+  closePresetNamer();
   rebuildPresetSelect(DEFAULT_PRESET);
   applyPreset(DEFAULT_PRESET);
+  syncPresetActions();
 }
 
 function updateZoomOutput() {
@@ -1174,6 +1225,10 @@ function applyPreset(name) {
     controls[key].value = String(preset[key]);
   });
 
+  Object.entries(POSTFX_DEFAULTS).forEach(([key, fallback]) => {
+    controls[key].value = String(preset[key] ?? fallback);
+  });
+
   if (preset.jitter !== undefined) hiddenJitter = preset.jitter;
   if (preset.microDot !== undefined) hiddenMicroDot = preset.microDot;
   if (preset.seed !== undefined) hiddenSeed = preset.seed;
@@ -1329,7 +1384,36 @@ document.addEventListener("paste", (event) => {
 
 controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
+  syncPresetActions();
+  closePresetNamer();
 });
+
+controls.savePresetBtn.addEventListener("click", () => {
+  if (controls.presetNamer.hidden) {
+    openPresetNamer();
+    return;
+  }
+  saveCurrentPreset();
+});
+
+controls.presetNameSave.addEventListener("click", saveCurrentPreset);
+controls.presetNameCancel.addEventListener("click", closePresetNamer);
+controls.deletePresetBtn.addEventListener("click", deleteCurrentPreset);
+
+controls.presetNameInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveCurrentPreset();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closePresetNamer();
+  }
+});
+
+controls.presetNameInput.addEventListener("input", () => setPresetNote(""));
 
 controls.quality.addEventListener("change", requestRender);
 
@@ -1419,6 +1503,7 @@ const paperCP = new ColorPicker(controls.paperColor);
 
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
+syncPresetActions();
 initializeWorker();
 resetView();
 updateSplitPreview();

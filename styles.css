@@ -565,11 +565,64 @@ output {
   gap: 8px;
 }
 
-/* ── Rail Actions ── */
+/* ── Preset save / delete ── */
 .preset-actions {
-  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
   margin-bottom: 0;
 }
+
+.preset-namer {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.preset-namer[hidden] {
+  display: none;
+}
+
+.preset-namer input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--input-bg);
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: var(--csel-border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.preset-namer input::placeholder {
+  color: var(--muted);
+}
+
+.preset-namer input:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+}
+
+.preset-namer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preset-note {
+  font-size: 0.72rem;
+  color: var(--label);
+  min-height: 0;
+}
+
+.preset-note:empty {
+  display: none;
+}
+
+/* ── Rail Actions ── */
 
 .rail-actions {
   display: grid;
@@ -605,6 +658,15 @@ output {
 
 .button:hover {
   background: var(--btn-hover-bg);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button:disabled:hover {
+  background: var(--btn-bg);
 }
 
 .button-primary {

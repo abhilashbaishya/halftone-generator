@@ -31,6 +31,26 @@
             </div>
             <select id="presetSelect"></select>
           </label>
+          <div class="preset-actions">
+            <button id="savePresetBtn" class="button button-small" type="button">Save Preset</button>
+            <button id="deletePresetBtn" class="button button-small" type="button">Delete</button>
+          </div>
+          <div class="preset-namer" id="presetNamer" hidden>
+            <input
+              id="presetNameInput"
+              type="text"
+              placeholder="Preset name"
+              maxlength="40"
+              spellcheck="false"
+              autocomplete="off"
+              aria-label="Preset name"
+            />
+            <div class="preset-namer-actions">
+              <button id="presetNameCancel" class="button button-small" type="button">Cancel</button>
+              <button id="presetNameSave" class="button button-small button-primary" type="button">Save</button>
+            </div>
+            <p id="presetNote" class="preset-note" role="status" aria-live="polite"></p>
+          </div>
         </section>
 
         <section class="control-group">
