@@ -670,14 +670,21 @@ output {
   box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
-.preset-cancel {
+/* Scoped past `.button`, declared later at equal specificity, which would
+   otherwise win on padding and colour and crush the icon to a 4px sliver. */
+.button.preset-cancel {
   width: var(--control-h);
+  flex-shrink: 0;
   padding: 0;
   color: var(--label);
 }
 
-.preset-cancel:hover {
+.button.preset-cancel:hover {
   color: var(--text);
+}
+
+.preset-cancel svg {
+  flex-shrink: 0;
 }
 
 .preset-note {
