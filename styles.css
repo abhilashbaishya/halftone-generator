@@ -780,12 +780,13 @@ output {
 }
 
 /* ── Preview Stage ── */
+/* No backdrop-filter here: --preview-bg is fully opaque so it blurs nothing,
+   but it forces a compositing layer around an overflow-hidden ancestor of a
+   transformed canvas — a combination iOS WebKit renders blank. */
 .preview-stage {
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   background: var(--preview-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   min-height: calc(100vh - 24px);
   overflow: hidden;
   display: grid;
@@ -810,11 +811,17 @@ output {
 .render-status {
   display: none;
   justify-self: end;
+  align-self: center;
   font-size: 0.72rem;
   letter-spacing: 0;
   text-transform: none;
   color: var(--status-idle);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Shown only for states worth interrupting for: loading, empty, failure. */
+.render-status[data-visible="true"] {
+  display: block;
 }
 
 .render-status[data-busy="true"] {
@@ -870,6 +877,8 @@ canvas {
   border: none;
   background: transparent;
   cursor: ew-resize;
+  /* Without this a touch drag pans the page and Safari fires pointercancel. */
+  touch-action: none;
   padding: 0;
   transform: translateX(-50%);
   z-index: 3;

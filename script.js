@@ -5,12 +5,26 @@ let grainSeed = Math.random();
 
 // ── Image persistence via IndexedDB ──
 const DB_NAME = "halftone", DB_STORE = "image", DB_KEY = "last";
+
+// iOS Safari can leave indexedDB.open() pending forever — private browsing,
+// restored tabs, evicted storage — firing neither success nor error. Nothing
+// on the boot path may wait on it unconditionally or the canvas never paints.
+const DB_TIMEOUT_MS = 1500;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms))
+  ]);
+}
+
 function openDb() {
   return new Promise((res, rej) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
+    req.onblocked = () => rej(new Error("IndexedDB blocked"));
   });
 }
 function saveImageToDb(dataUrl) {
@@ -252,6 +266,31 @@ let qualityCS = null;
 let renderWorker = null;
 let workerEnabled = false;
 let renderRequestId = 0;
+let workerBusy = false;
+let renderQueued = false;
+
+let scaledSource = null;
+let scaledSourceKey = "";
+let sourceToken = 0;
+
+// Phones and tablets: cap the backing store well below the desktop budget and
+// clamp DPR, or an `ultra` preset at DPR 3 asks for ~10M pixels per render.
+const COMPACT_MAX_PIXELS = 2_500_000;
+
+function isCompactDevice() {
+  return window.matchMedia("(max-width: 980px), (pointer: coarse)").matches;
+}
+
+function isIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function setSourceImage(image) {
+  sourceImage = image;
+  sourceToken += 1;
+  scaledSourceKey = "";
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -281,9 +320,13 @@ function getQualityConfig() {
   return QUALITY_MODES[controls.quality.value] || QUALITY_MODES[DEFAULT_QUALITY];
 }
 
-function setRenderStatus(text, busy = false) {
+// `visible` is opt-in: routine Rendering/Ready churn stays hidden, but states
+// the user needs to see — loading, empty, failure — are shown. Without this a
+// stalled boot is indistinguishable from a black image.
+function setRenderStatus(text, busy = false, visible = false) {
   controls.renderStatus.textContent = text;
   controls.renderStatus.dataset.busy = busy ? "true" : "false";
+  controls.renderStatus.dataset.visible = visible ? "true" : "false";
 }
 
 function sanitizePreset(rawPreset) {
@@ -899,11 +942,14 @@ function fitCanvasToStage() {
     cssWidth = Math.floor(cssHeight * aspect);
   }
 
-  const dpr = window.devicePixelRatio || 1;
+  const compact = isCompactDevice();
+  const dpr = Math.min(window.devicePixelRatio || 1, compact ? 2 : 3);
   let backingWidth = Math.max(1, Math.floor(cssWidth * dpr));
   let backingHeight = Math.max(1, Math.floor(cssHeight * dpr));
 
-  const maxPixels = getQualityConfig().maxPixels;
+  const maxPixels = compact
+    ? Math.min(getQualityConfig().maxPixels, COMPACT_MAX_PIXELS)
+    : getQualityConfig().maxPixels;
   const pixels = backingWidth * backingHeight;
   if (pixels > maxPixels) {
     const scale = Math.sqrt(maxPixels / pixels);
@@ -950,7 +996,7 @@ function drawSourcePreview() {
   }
 
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-  sourceCtx.drawImage(sourceImage, 0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.drawImage(getScaledSource(sourceCanvas.width, sourceCanvas.height), 0, 0);
 }
 
 function adjustedLuma(r, g, b, contrast, gamma) {
@@ -1117,24 +1163,47 @@ function renderHalftoneOnMain(targetCtx, width, height, settings) {
   }
 }
 
-async function createScaledBitmap(image, width, height) {
-  try {
-    return await createImageBitmap(image, {
-      resizeWidth: width,
-      resizeHeight: height,
-      resizeQuality: "high"
-    });
-  } catch {
-    return createImageBitmap(image);
-  }
+// The source was re-scaled from full resolution on every render, including
+// every frame of a slider drag. Hold the scaled copy and rebuild it only when
+// the image or the canvas size actually changes.
+function getScaledSource(width, height) {
+  const key = `${sourceToken}:${width}x${height}`;
+  if (scaledSource && scaledSourceKey === key) return scaledSource;
+
+  if (!scaledSource) scaledSource = document.createElement("canvas");
+  scaledSource.width = width;
+  scaledSource.height = height;
+
+  const ctx = scaledSource.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(sourceImage, 0, 0, width, height);
+
+  scaledSourceKey = key;
+  return scaledSource;
+}
+
+function createScaledBitmap(width, height) {
+  return createImageBitmap(getScaledSource(width, height));
 }
 
 function disableWorker() {
   workerEnabled = false;
+  workerBusy = false;
   if (renderWorker) {
     renderWorker.terminate();
     renderWorker = null;
   }
+}
+
+// One render in flight at a time. A drag fires input per pixel; without this
+// every frame posts more work than the worker can retire and the UI locks up.
+function finishWorkerRender() {
+  workerBusy = false;
+  if (!renderQueued) return;
+  renderQueued = false;
+  requestRender();
 }
 
 function initializeWorker() {
@@ -1158,6 +1227,7 @@ function initializeWorker() {
           applyPostProcess(previewCtx, previewCanvas);
           setRenderStatus("Ready", false);
         }
+        finishWorkerRender();
         return;
       }
 
@@ -1165,6 +1235,7 @@ function initializeWorker() {
 
       if (requestId !== renderRequestId) {
         if (bitmap && typeof bitmap.close === "function") bitmap.close();
+        finishWorkerRender();
         return;
       }
 
@@ -1173,6 +1244,7 @@ function initializeWorker() {
       if (bitmap && typeof bitmap.close === "function") bitmap.close();
       applyPostProcess(previewCtx, previewCanvas);
       setRenderStatus("Ready", false);
+      finishWorkerRender();
     });
 
     renderWorker.addEventListener("error", () => {
@@ -1187,13 +1259,21 @@ function initializeWorker() {
 function renderWithWorker(width, height, settings) {
   if (!renderWorker || !workerEnabled || !sourceImage) return;
 
+  // Coalesce: hold the latest request until the in-flight one lands.
+  if (workerBusy) {
+    renderQueued = true;
+    return;
+  }
+
   const requestId = ++renderRequestId;
+  workerBusy = true;
   setRenderStatus("Rendering...", true);
 
-  createScaledBitmap(sourceImage, width, height)
+  createScaledBitmap(width, height)
     .then((sourceBitmap) => {
       if (requestId !== renderRequestId) {
         if (typeof sourceBitmap.close === "function") sourceBitmap.close();
+        finishWorkerRender();
         return;
       }
 
@@ -1202,6 +1282,7 @@ function renderWithWorker(width, height, settings) {
         renderHalftoneOnMain(previewCtx, width, height, settings);
         applyPostProcess(previewCtx, previewCanvas);
         setRenderStatus("Ready", false);
+        finishWorkerRender();
         return;
       }
 
@@ -1218,11 +1299,13 @@ function renderWithWorker(width, height, settings) {
       );
     })
     .catch(() => {
-      if (requestId !== renderRequestId) return;
       disableWorker();
-      renderHalftoneOnMain(previewCtx, width, height, settings);
-      applyPostProcess(previewCtx, previewCanvas);
-      setRenderStatus("Ready", false);
+      if (requestId === renderRequestId) {
+        renderHalftoneOnMain(previewCtx, width, height, settings);
+        applyPostProcess(previewCtx, previewCanvas);
+        setRenderStatus("Ready", false);
+      }
+      finishWorkerRender();
     });
 }
 
@@ -1343,7 +1426,7 @@ function loadImageFromFile(file) {
 
     const img = new Image();
     img.onload = () => {
-      sourceImage = img;
+      setSourceImage(img);
       saveImageToDb(reader.result);
       resetView();
       requestRender();
@@ -1359,7 +1442,9 @@ function exportPng() {
 
   const quality = getQualityConfig();
   const scale = quality.exportScale;
-  const maxExportPixels = 48_000_000;
+  // iOS caps canvas area at 16,777,216px; past that the canvas silently
+  // yields nothing, so a large export came back blank.
+  const maxExportPixels = isIOS() ? 16_000_000 : 48_000_000;
 
   let exportWidth = previewCanvas.width * scale;
   let exportHeight = previewCanvas.height * scale;
@@ -1384,11 +1469,36 @@ function exportPng() {
   renderHalftoneOnMain(exportCtx, exportCanvas.width, exportCanvas.height, settings);
 
   const exportSource = runPostProcessChain(exportCanvas);
-  const url = exportSource.toDataURL("image/png");
-  const link = document.createElement("a");
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
-  link.href = url;
-  link.download = `halftone-${timestamp}.png`;
+  const filename = `halftone-${timestamp}.png`;
+
+  // A blob URL instead of a data URL: toDataURL materialises the whole PNG as
+  // a base64 string, tens of megabytes at export sizes, which is exactly what
+  // a memory-tight phone cannot spare.
+  const save = (blob) => {
+    if (!blob) {
+      setRenderStatus("Export failed", false, true);
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  if (typeof exportSource.toBlob === "function") {
+    exportSource.toBlob(save, "image/png");
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = exportSource.toDataURL("image/png");
+  link.download = filename;
   link.click();
 }
 
@@ -1510,10 +1620,15 @@ splitHandle.addEventListener("pointermove", handleSplitPointerMove);
 splitHandle.addEventListener("pointerup", handleSplitPointerUp);
 splitHandle.addEventListener("pointercancel", handleSplitPointerUp);
 
+// iOS fires resize every time the URL bar slides in or out, i.e. on every
+// scroll of the mobile layout. Only re-render if the backing store actually
+// changed size — fitCanvasToStage already reports that.
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    requestRender();
+    const resized = fitCanvasToStage();
+    updateSplitPreview();
+    if (resized) requestRender();
   }, 120);
 });
 
@@ -1560,15 +1675,36 @@ updateSplitPreview();
 updateOutputs();
 applyPreset(DEFAULT_PRESET);
 
-if (!sourceImage) {
-  loadImageFromDb().then(dataUrl => {
-    const src = dataUrl || "placeholder.jpg";
-    const img = new Image();
-    img.onload = () => { sourceImage = img; resetView(); requestRender(); };
-    img.onerror = () => { drawPlaceholder(); setRenderStatus("Upload an image", false); };
-    img.src = src;
-  }).catch(() => {
+// Boot image. Every path here must terminate: previously a stalled
+// indexedDB.open() left both handlers unreached, so the placeholder never
+// loaded and the canvas sat on drawPlaceholder()'s black fill forever.
+function loadInitialImage() {
+  const giveUp = () => {
     drawPlaceholder();
-    setRenderStatus("Upload an image", false);
+    setRenderStatus("Upload an image", false, true);
+  };
+
+  const tryLoad = (src, onError) => {
+    const img = new Image();
+    img.onload = () => {
+      setSourceImage(img);
+      setRenderStatus("Ready", false);
+      resetView();
+      requestRender();
+    };
+    img.onerror = onError;
+    img.src = src;
+  };
+
+  setRenderStatus("Loading image...", true, true);
+
+  withTimeout(loadImageFromDb().catch(() => null), DB_TIMEOUT_MS).then((dataUrl) => {
+    if (dataUrl) {
+      tryLoad(dataUrl, () => tryLoad("placeholder.jpg", giveUp));
+      return;
+    }
+    tryLoad("placeholder.jpg", giveUp);
   });
 }
+
+if (!sourceImage) loadInitialImage();
