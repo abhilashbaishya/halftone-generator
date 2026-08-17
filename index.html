@@ -31,9 +31,9 @@
             </div>
             <select id="presetSelect"></select>
           </label>
-          <div class="preset-actions">
+          <div class="preset-actions" id="presetActions">
             <button id="savePresetBtn" class="button button-small" type="button">Save Preset</button>
-            <button id="deletePresetBtn" class="button button-small" type="button">Delete</button>
+            <button id="deletePresetBtn" class="button button-small" type="button" hidden>Delete</button>
           </div>
           <div class="preset-namer" id="presetNamer" hidden>
             <input
@@ -45,12 +45,14 @@
               autocomplete="off"
               aria-label="Preset name"
             />
-            <div class="preset-namer-actions">
-              <button id="presetNameCancel" class="button button-small" type="button">Cancel</button>
-              <button id="presetNameSave" class="button button-small button-primary" type="button">Save</button>
-            </div>
-            <p id="presetNote" class="preset-note" role="status" aria-live="polite"></p>
+            <button id="presetNameSave" class="button button-small button-primary" type="button">Save</button>
+            <button id="presetNameCancel" class="button button-small preset-cancel" type="button" aria-label="Cancel">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
           </div>
+          <p id="presetNote" class="preset-note" role="status" aria-live="polite"></p>
         </section>
 
         <section class="control-group">

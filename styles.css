@@ -19,6 +19,7 @@
   --track: #ffffff12;
   --slider-fill: #ffffffe6;
   --focus-color: #eeeeee;
+  --focus-ring: #ffffff4d;
   --thumb-bg: #ffffff;
 
   --btn-border: #ffffff1a;
@@ -70,6 +71,7 @@ html.light {
   --track: #d8d8d8;
   --slider-fill: #111111;
   --focus-color: #111111;
+  --focus-ring: #00000038;
   --thumb-bg: #ffffff;
 
   --btn-border: #e3e3e3;
@@ -574,26 +576,32 @@ output {
   margin-bottom: 0;
 }
 
+/* Naming swaps in place of the action row, so the rail never grows a
+   three-row block just to name a preset. */
 .preset-namer {
   display: grid;
-  gap: 8px;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
   margin-top: 8px;
 }
 
+.preset-actions[hidden],
 .preset-namer[hidden] {
   display: none;
 }
 
 .preset-namer input {
-  width: 100%;
+  min-width: 0;
   padding: 10px 14px;
-  background: var(--input-bg);
+  background: var(--csel-trigger-bg);
   border: none;
   border-radius: var(--radius);
   box-shadow: var(--csel-border);
   color: var(--text);
   font-family: inherit;
   font-size: 0.875rem;
+  appearance: none;
+  -webkit-appearance: none;
   outline: none;
 }
 
@@ -601,21 +609,26 @@ output {
   color: var(--muted);
 }
 
-.preset-namer input:focus-visible {
-  outline: 2px solid var(--focus-color);
-  outline-offset: 1px;
+.preset-namer input:focus {
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
-.preset-namer-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.preset-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  color: var(--label);
+}
+
+.preset-cancel:hover {
+  color: var(--text);
 }
 
 .preset-note {
+  margin-top: 8px;
   font-size: 0.72rem;
   color: var(--label);
-  min-height: 0;
 }
 
 .preset-note:empty {
@@ -928,6 +941,11 @@ canvas {
 
   .cpick-canvas {
     height: 160px;
+  }
+
+  /* 16px keeps iOS Safari from zooming the page on focus. */
+  .preset-namer input {
+    font-size: 16px;
   }
 
   .preview-toolbar {

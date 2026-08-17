@@ -135,6 +135,7 @@ const controls = {
   exportBtn: document.getElementById("exportBtn"),
   savePresetBtn: document.getElementById("savePresetBtn"),
   deletePresetBtn: document.getElementById("deletePresetBtn"),
+  presetActions: document.getElementById("presetActions"),
   presetNamer: document.getElementById("presetNamer"),
   presetNameInput: document.getElementById("presetNameInput"),
   presetNameSave: document.getElementById("presetNameSave"),
@@ -725,15 +726,14 @@ function setPresetNote(message) {
 function syncPresetActions() {
   const selected = controls.presetSelect.value;
   const isCustom = Object.prototype.hasOwnProperty.call(customPresets, selected);
-  controls.deletePresetBtn.disabled = !isCustom;
-  controls.deletePresetBtn.title = isCustom
-    ? `Delete "${selected}"`
-    : "Built-in presets can't be deleted";
+  controls.deletePresetBtn.hidden = !isCustom;
+  controls.deletePresetBtn.title = isCustom ? `Delete "${selected}"` : "";
 }
 
 function openPresetNamer() {
   const active = controls.presetSelect.value;
   controls.presetNameInput.value = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
+  controls.presetActions.hidden = true;
   controls.presetNamer.hidden = false;
   setPresetNote("");
   controls.presetNameInput.focus();
@@ -742,6 +742,7 @@ function openPresetNamer() {
 
 function closePresetNamer() {
   controls.presetNamer.hidden = true;
+  controls.presetActions.hidden = false;
   setPresetNote("");
 }
 
@@ -1388,13 +1389,7 @@ controls.presetSelect.addEventListener("change", () => {
   closePresetNamer();
 });
 
-controls.savePresetBtn.addEventListener("click", () => {
-  if (controls.presetNamer.hidden) {
-    openPresetNamer();
-    return;
-  }
-  saveCurrentPreset();
-});
+controls.savePresetBtn.addEventListener("click", openPresetNamer);
 
 controls.presetNameSave.addEventListener("click", saveCurrentPreset);
 controls.presetNameCancel.addEventListener("click", closePresetNamer);
