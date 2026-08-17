@@ -178,7 +178,7 @@ const builtInPresets = {
     quality: "high",
     cellSize: 6,
     contrast: 1.65,
-    gamma: 0.78,
+    gamma: 0.8,
     minDot: 7,
     screenAngle: 15,
     toneCurve: 0.72,
@@ -192,7 +192,7 @@ const builtInPresets = {
     quality: "ultra",
     cellSize: 6,
     contrast: 1.8,
-    gamma: 0.74,
+    gamma: 0.75,
     minDot: 6,
     screenAngle: 30,
     toneCurve: 0.62,
@@ -206,7 +206,7 @@ const builtInPresets = {
     quality: "high",
     cellSize: 10,
     contrast: 1.7,
-    gamma: 0.78,
+    gamma: 0.8,
     minDot: 10,
     screenAngle: 45,
     toneCurve: 0.65,
@@ -607,7 +607,15 @@ class CustomSelect {
   syncTrigger() {
     const opt = this.native.options[this.native.selectedIndex];
     const label = opt ? opt.text : "";
-    this.trigger.innerHTML = `<span>${label}</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const badge = this._dirty ? `<span class="csel-badge">Edited</span>` : "";
+    this.trigger.innerHTML = `<span>${label}</span>${badge}<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  // Marks the trigger as no longer matching the selected preset.
+  setDirty(flag) {
+    if (this._dirty === flag) return;
+    this._dirty = flag;
+    this.syncTrigger();
   }
 
   _buildPanel() {
@@ -723,11 +731,49 @@ function setPresetNote(message) {
   controls.presetNote.textContent = message;
 }
 
+// Fields the user can actually reach from the rail. microDot/jitter/seed come
+// from the preset and have no control, so they can never diverge.
+const PRESET_COMPARE_FIELDS = [
+  "quality",
+  "cellSize",
+  "contrast",
+  "gamma",
+  "minDot",
+  "screenAngle",
+  "toneCurve",
+  "inkColor",
+  "paperColor",
+  ...Object.keys(POSTFX_DEFAULTS)
+];
+
+function isPresetModified() {
+  const preset = getPresetByName(controls.presetSelect.value);
+  if (!preset) return false;
+
+  const current = captureCurrentPreset();
+
+  return PRESET_COMPARE_FIELDS.some((key) => {
+    const mine = current[key];
+    const theirs = key in POSTFX_DEFAULTS ? preset[key] ?? POSTFX_DEFAULTS[key] : preset[key];
+
+    return typeof mine === "number"
+      ? mine !== Number(theirs)
+      : String(mine).toLowerCase() !== String(theirs).toLowerCase();
+  });
+}
+
 function syncPresetActions() {
   const selected = controls.presetSelect.value;
   const isCustom = Object.prototype.hasOwnProperty.call(customPresets, selected);
+  const modified = isPresetModified();
+
   controls.deletePresetBtn.hidden = !isCustom;
   controls.deletePresetBtn.title = isCustom ? `Delete "${selected}"` : "";
+
+  // Emphasise saving only when there are changes worth keeping.
+  controls.savePresetBtn.classList.toggle("button-primary", modified);
+  controls.savePresetBtn.textContent = modified && isCustom ? "Update Preset" : "Save Preset";
+  presetCS?.setDirty(modified);
 }
 
 function openPresetNamer() {
@@ -1235,11 +1281,13 @@ function applyPreset(name) {
   if (preset.seed !== undefined) hiddenSeed = preset.seed;
 
   controls.presetSelect.value = name;
+  presetCS?.setDirty(false);
   presetCS?.syncTrigger();
   qualityCS?.syncTrigger();
   inkCP.syncFromNative();
   paperCP.syncFromNative();
   updateOutputs();
+  syncPresetActions();
   requestRender();
 }
 
@@ -1385,9 +1433,16 @@ document.addEventListener("paste", (event) => {
 
 controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
-  syncPresetActions();
   closePresetNamer();
 });
+
+// Any control in the rail can take the settings away from the selected preset.
+// Delegating covers the colour pickers, which dispatch synthetic input events.
+document.querySelector(".control-rail").addEventListener("input", (event) => {
+  if (event.target === controls.presetNameInput) return;
+  syncPresetActions();
+});
+document.querySelector(".control-rail").addEventListener("change", syncPresetActions);
 
 controls.savePresetBtn.addEventListener("click", openPresetNamer);
 
