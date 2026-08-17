@@ -145,7 +145,6 @@ const controls = {
   toneCurve: document.getElementById("toneCurve"),
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
-  regenerateBtn: document.getElementById("regenerateBtn"),
   exportBtn: document.getElementById("exportBtn"),
   savePresetBtn: document.getElementById("savePresetBtn"),
   deletePresetBtn: document.getElementById("deletePresetBtn"),
@@ -1632,7 +1631,6 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
-controls.regenerateBtn.addEventListener("click", () => { grainSeed = Math.random(); requestRender(); });
 controls.exportBtn.addEventListener("click", exportPng);
 
 controls.grainStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
