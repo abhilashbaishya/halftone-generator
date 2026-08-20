@@ -50,6 +50,11 @@ html {
   --divider: #ffffff12;
   --status-idle: #7b7b7b;
   --status-busy: oklch(65% 0.12 165);
+  --error-surface: #2a1718;
+  --error-ring: #ff71694d;
+  --error-text: #ffe2df;
+  --error-muted: #ffaaa5;
+  --error-icon: #ff817a;
 
   --csel-trigger-bg: var(--control-surface);
   --csel-panel-bg: #121216;
@@ -113,6 +118,11 @@ html.light {
   --divider: #e8e8e8;
   --status-idle: #999999;
   --status-busy: oklch(50% 0.12 165);
+  --error-surface: #fff0ef;
+  --error-ring: #b423183d;
+  --error-text: #7b1713;
+  --error-muted: #9f302b;
+  --error-icon: #b42318;
 
   --csel-trigger-bg: var(--control-surface);
   --csel-panel-bg: #ffffff;

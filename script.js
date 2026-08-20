@@ -328,6 +328,7 @@ let scaledSource = null;
 let scaledSourceKey = "";
 let sourceToken = 0;
 let imageLoadToken = 0;
+let uploadError = "";
 
 // Phones and tablets: cap the backing store well below the desktop budget and
 // clamp DPR, or an `ultra` preset at DPR 3 asks for ~10M pixels per render.
@@ -409,6 +410,20 @@ function setRenderStatus(text, busy = false, visible = false) {
   controls.renderStatus.textContent = text;
   controls.renderStatus.dataset.busy = busy ? "true" : "false";
   controls.renderStatus.dataset.visible = visible ? "true" : "false";
+}
+
+function setUploadError(message = "") {
+  uploadError = message;
+  emitStudioState();
+}
+
+function getUploadErrorMessage(message, file) {
+  const looksLikeHeic = /\.(heic|heif)$/i.test(file?.name || "")
+    || /^image\/hei[cf]$/i.test(file?.type || "");
+  if (looksLikeHeic) {
+    return "HEIC isn’t supported yet. Export it as a static JPEG, PNG, or WebP and try again.";
+  }
+  return message;
 }
 
 function sanitizePreset(rawPreset) {
@@ -1104,13 +1119,15 @@ function updateOutputs() {
 
 async function loadImageFromFile(file) {
   const token = ++imageLoadToken;
+  setUploadError();
   setRenderStatus("Checking image…", true, true);
 
   try {
     const inspection = await inspectImageBlob(file);
     if (token !== imageLoadToken) return;
     if (!inspection.ok) {
-      setRenderStatus(inspection.message, false, true);
+      setUploadError(getUploadErrorMessage(inspection.message, file));
+      setRenderStatus("Ready", false);
       controls.imageInput.value = "";
       return;
     }
@@ -1120,6 +1137,7 @@ async function loadImageFromFile(file) {
     loadImageSource(safeBlob, {
       token,
       onLoad: () => {
+        setUploadError();
         saveImageToDb(safeBlob);
         resetView();
         requestRender();
@@ -1127,13 +1145,18 @@ async function loadImageFromFile(file) {
         controls.imageInput.value = "";
       },
       onError: (error) => {
-        setRenderStatus(error?.message || "Could not open that image", false, true);
+        setUploadError(getUploadErrorMessage(
+          error?.message || "This image couldn’t be opened. Try a static JPEG, PNG, or WebP.",
+          file
+        ));
+        setRenderStatus("Ready", false);
         controls.imageInput.value = "";
       }
     });
   } catch {
     if (token !== imageLoadToken) return;
-    setRenderStatus("Could not inspect that image", false, true);
+    setUploadError("This image couldn’t be checked safely. Try a static JPEG, PNG, or WebP.");
+    setRenderStatus("Ready", false);
     controls.imageInput.value = "";
   }
 }
@@ -1683,7 +1706,8 @@ function getStudioState() {
     export: {
       format: exportFormat,
       exporting: Boolean(activeExport)
-    }
+    },
+    uploadError
   };
 }
 

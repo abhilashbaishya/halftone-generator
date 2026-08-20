@@ -473,6 +473,19 @@ function SourceControls({ state }) {
   return (
     <>
       <ButtonGroup buttons={uploadButtons} />
+      {state.uploadError ? (
+        <div className="dialkit-upload-error" role="alert" aria-live="assertive" aria-atomic="true">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 2.75 18 17H2L10 2.75Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d="M10 7.25v4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <circle cx="10" cy="14.25" r=".9" fill="currentColor" />
+          </svg>
+          <div>
+            <strong>Image not uploaded</strong>
+            <p>{state.uploadError}</p>
+          </div>
+        </div>
+      ) : null}
       <SelectControl
         label={state.presetModified ? "Preset · Edited" : "Preset"}
         value={state.selectedPreset}

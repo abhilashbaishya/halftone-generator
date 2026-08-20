@@ -172,6 +172,55 @@
   text-wrap: pretty;
 }
 
+.dialkit-upload-error {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 11px 12px;
+  border-radius: var(--dial-radius);
+  background: var(--error-surface);
+  color: var(--error-text);
+  box-shadow: inset 0 0 0 1px var(--error-ring);
+  overflow: hidden;
+}
+
+.dialkit-upload-error > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--error-icon);
+  margin-top: 1px;
+}
+
+.dialkit-upload-error strong,
+.dialkit-upload-error p {
+  display: block;
+  margin: 0;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+.dialkit-upload-error > div {
+  min-width: 0;
+}
+
+.dialkit-upload-error strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.dialkit-upload-error p {
+  margin-top: 2px;
+  color: var(--error-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .dial-panel-loading {
   padding: 20px;
   color: var(--label);

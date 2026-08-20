@@ -47,7 +47,7 @@ test("image inspection rejects animated inputs", async () => {
   animatedBytes.set([0x61, 0x63, 0x54, 0x4c], 37);
   const result = await inspectImageBlob(new Blob([animatedBytes]));
   assert.equal(result.ok, false);
-  assert.equal(result.message, "Animated images are not supported");
+  assert.equal(result.message, "Animated images aren’t supported. Upload a static JPEG, PNG, or WebP.");
 });
 
 test("animation checks continue past a large PNG metadata chunk", async () => {
@@ -67,7 +67,7 @@ test("animation checks continue past a large PNG metadata chunk", async () => {
 
   const result = await inspectImageBlob(new Blob([bytes]));
   assert.equal(result.ok, false);
-  assert.equal(result.message, "Animated images are not supported");
+  assert.equal(result.message, "Animated images aren’t supported. Upload a static JPEG, PNG, or WebP.");
 });
 
 test("image uploads have a bounded byte length", () => {

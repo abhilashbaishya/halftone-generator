@@ -139,27 +139,27 @@ function getDimensions(bytes, mimeType) {
 
 export function validateImageDimensions(width, height) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
-    return { ok: false, message: "Could not read that image's dimensions" };
+    return { ok: false, message: "This image’s dimensions couldn’t be read. Try a static JPEG, PNG, or WebP." };
   }
   if (width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
-    return { ok: false, message: "That image is too large to process safely" };
+    return { ok: false, message: "This image is too large. Choose one under 60 megapixels." };
   }
   return { ok: true };
 }
 
 export function validateImageByteLength(size) {
   if (!Number.isFinite(size) || size < 10) {
-    return { ok: false, message: "Choose a supported image file" };
+    return { ok: false, message: "This doesn’t appear to be a supported image." };
   }
   if (size > MAX_IMAGE_BYTES) {
-    return { ok: false, message: "Choose an image smaller than 40 MB" };
+    return { ok: false, message: "This image is over 40 MB. Choose a smaller JPEG, PNG, or WebP." };
   }
   return { ok: true };
 }
 
 export async function inspectImageBlob(blob) {
   if (!(blob instanceof Blob)) {
-    return { ok: false, message: "Choose a supported image file" };
+    return { ok: false, message: "This doesn’t appear to be a supported image." };
   }
   const byteLengthValidation = validateImageByteLength(blob.size);
   if (!byteLengthValidation.ok) return byteLengthValidation;
@@ -169,7 +169,7 @@ export async function inspectImageBlob(blob) {
   );
   const mimeType = detectMimeType(bytes);
   if (!mimeType) {
-    return { ok: false, message: "Use a JPEG, PNG, or WebP image" };
+    return { ok: false, message: "This file type isn’t supported. Upload a static JPEG, PNG, or WebP." };
   }
   let animationState = isAnimatedImage(bytes, mimeType);
   if (animationState === null && mimeType === "image/png" && bytes.length < blob.size) {
@@ -177,15 +177,15 @@ export async function inspectImageBlob(blob) {
     animationState = isAnimatedImage(fullBytes, mimeType);
   }
   if (animationState === null) {
-    return { ok: false, message: "Could not verify that image safely" };
+    return { ok: false, message: "This image couldn’t be checked safely. Try a static JPEG, PNG, or WebP." };
   }
   if (animationState) {
-    return { ok: false, message: "Animated images are not supported" };
+    return { ok: false, message: "Animated images aren’t supported. Upload a static JPEG, PNG, or WebP." };
   }
 
   const dimensions = getDimensions(bytes, mimeType);
   if (!dimensions) {
-    return { ok: false, message: "Could not verify that image safely" };
+    return { ok: false, message: "This image couldn’t be checked safely. Try a static JPEG, PNG, or WebP." };
   }
   const validation = validateImageDimensions(dimensions.width, dimensions.height);
   if (!validation.ok) return validation;
