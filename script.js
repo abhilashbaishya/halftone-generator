@@ -709,6 +709,59 @@ class CustomSelect {
   }
 }
 
+// Renders a <select> as a row of tabs. The native element stays as the source
+// of truth and still emits change, so preset apply/capture and the dirty check
+// keep reading it exactly as before.
+class SegmentedControl {
+  constructor(native) {
+    this.native = native;
+    this._build();
+  }
+
+  _build() {
+    this.native.hidden = true;
+
+    this.wrapper = document.createElement("div");
+    this.wrapper.className = "segmented";
+    this.wrapper.setAttribute("role", "tablist");
+    this.native.parentNode.insertBefore(this.wrapper, this.native);
+    this.wrapper.appendChild(this.native);
+
+    this.thumb = document.createElement("span");
+    this.thumb.className = "segmented-thumb";
+    this.thumb.setAttribute("aria-hidden", "true");
+    this.wrapper.appendChild(this.thumb);
+
+    this.buttons = Array.from(this.native.options).map((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "segmented-item";
+      button.dataset.value = option.value;
+      button.textContent = option.text;
+      button.setAttribute("role", "tab");
+
+      button.addEventListener("click", () => {
+        if (this.native.value === option.value) return;
+        this.native.value = option.value;
+        this.syncTrigger();
+        this.native.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
+      this.wrapper.appendChild(button);
+      return button;
+    });
+
+    this.wrapper.style.setProperty("--segments", this.buttons.length);
+    this.syncTrigger();
+  }
+
+  syncTrigger() {
+    const index = Math.max(0, this.buttons.findIndex((b) => b.dataset.value === this.native.value));
+    this.buttons.forEach((button, i) => button.setAttribute("aria-selected", String(i === index)));
+    this.thumb.style.transform = `translateX(${index * 100}%)`;
+  }
+}
+
 function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
   controls.presetSelect.textContent = "";
 
@@ -1660,7 +1713,7 @@ themeToggle.addEventListener("click", () => {
 applyTheme(localStorage.getItem(THEME_KEY) || "dark");
 
 presetCS = new CustomSelect(controls.presetSelect);
-qualityCS = new CustomSelect(controls.quality);
+qualityCS = new SegmentedControl(controls.quality);
 const inkCP = new ColorPicker(controls.inkColor);
 const paperCP = new ColorPicker(controls.paperColor);
 

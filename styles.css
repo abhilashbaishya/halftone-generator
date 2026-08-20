@@ -218,7 +218,7 @@ h2 {
 .field {
   display: grid;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
 }
 
 .field:last-child {
@@ -624,6 +624,66 @@ output {
 .split label {
   display: grid;
   gap: 8px;
+}
+
+/* ── Segmented control (Quality) ── */
+.segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--segments, 4), 1fr);
+  min-height: var(--control-h);
+  padding: 3px;
+  background: var(--input-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--csel-border);
+}
+
+.segmented-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--segments, 4));
+  background: var(--csel-trigger-bg);
+  border-radius: calc(var(--radius) - 3px);
+  box-shadow: 0 1px 2px #00000038;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.light .segmented-thumb {
+  background: #ffffff;
+  box-shadow: 0 1px 2px #0000001f;
+}
+
+.segmented-item {
+  position: relative;
+  z-index: 1;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--radius) - 3px);
+  font-family: inherit;
+  font-size: var(--control-font);
+  font-weight: 500;
+  color: var(--label);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.segmented-item:hover,
+.segmented-item[aria-selected="true"] {
+  color: var(--text);
+}
+
+.segmented-item:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented-thumb {
+    transition: none;
+  }
 }
 
 /* ── Preset save / delete ── */
