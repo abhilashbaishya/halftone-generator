@@ -1,4 +1,4 @@
-class CRTPass {
+export class CRTPass {
   constructor() {
     this._canvas = document.createElement("canvas");
     const gl = this._canvas.getContext("webgl");

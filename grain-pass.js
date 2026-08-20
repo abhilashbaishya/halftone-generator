@@ -1,4 +1,4 @@
-class GrainPass {
+export class GrainPass {
   constructor() {
     this._canvas = document.createElement("canvas");
     const gl = this._canvas.getContext("webgl");

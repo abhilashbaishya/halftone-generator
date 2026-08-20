@@ -18,26 +18,33 @@ A browser-based halftone image generator for brand design and print-style graphi
 
 The engine converts images to a luminance map using an integral image for O(1) box sampling, then places dots on a rotated grid. Each dot's size is driven by local darkness, Sobel edge detection, and 8x8 Bayer dithering. Stratified micro-dots fill in highlight detail.
 
-## Local preview
+## Local development
 
 ```bash
-python3 -m http.server 8000
+npm ci
+npm run dev
 ```
 
-Then open `http://localhost:8000`.
+Vite prints the desktop and local-network URLs when it starts.
+
+Create a production build with:
+
+```bash
+npm run build
+```
 
 ## Deployment (GitHub Pages)
 
-1. Push this project to the `main` branch of a GitHub repo.
-2. In the repo, open **Settings > Pages**.
-3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-4. Push to `main` and wait for the `Deploy static site to GitHub Pages` workflow to finish.
-5. Your public URL will be `https://<username>.github.io/<repo-name>/`.
+Pushes to `main` run the GitHub Pages workflow. It installs the locked dependencies,
+builds the Vite app, and publishes the `dist` directory.
 
 ## Files
 
-- `index.html` — UI layout and controls
+- `index.html` — Vite entry point and native rendering controls
+- `src/main.jsx` — React application shell and DialKit control panel
+- `src/dial-panel.css` — DialKit-specific styling
 - `script.js` — Application logic, presets, and main-thread rendering fallback
 - `renderer-worker.js` — Web Worker for off-thread halftone rendering
 - `styles.css` — Responsive dark-themed styles
+- `vite.config.js` — Production and development build configuration
 - `.github/workflows/deploy-pages.yml` — GitHub Pages deployment

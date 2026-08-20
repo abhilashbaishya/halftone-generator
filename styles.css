@@ -1,7 +1,13 @@
 /* ── Dark theme (exact oklch.fyi values) ── */
+html {
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   --body-bg: #080808;
-  --rail-bg: #1212168c;
+  --rail-bg: #080808;
   --rail-border: #ffffff1a;
   --panel-border: #ffffff1a;
   --preview-bg: #080808;
@@ -10,14 +16,17 @@
   --glass-blur: blur(24px) saturate(1.4);
 
   --text: #ffffffe6;
-  --label: #ffffff80;
+  --label: oklch(1 0 0 / 0.58);
   /* --muted is for decorative glyphs (chevrons, ticks); anything that is
      actually read uses --muted-text, which is held above 4.5:1. */
   --muted: #ffffff40;
-  --muted-text: #ffffff8c;
-  --heading: #ffffff80;
+  --muted-text: oklch(1 0 0 / 0.64);
+  --heading: oklch(1 0 0 / 0.64);
 
-  --input-bg: #ffffff0f;
+  --control-surface: #1d1d20;
+  --control-surface-hover: #242428;
+  --control-surface-active: #29292d;
+  --input-bg: var(--control-surface);
   --input-border: #ffffff12;
   --track: #ffffff12;
   --slider-fill: #ffffffe6;
@@ -26,21 +35,21 @@
   --thumb-bg: #ffffff;
 
   --btn-border: #ffffff1a;
-  --btn-bg: #ffffff0f;
+  --btn-bg: var(--control-surface);
   --btn-color: #ffffffe6;
   --btn-hover-border: #ffffff1f;
-  --btn-hover-bg: #ffffff14;
+  --btn-hover-bg: var(--control-surface-hover);
   --btn-primary-bg: #ffffffe6;
   --btn-primary-color: #080808;
   --btn-primary-hover: #ffffffcc;
-  --btn-shadow: 0 0 0 1px #ffffff1f;
-  --btn-primary-shadow: 0 0 0 1px #ffffff1f;
+  --btn-shadow: none;
+  --btn-primary-shadow: none;
 
   --divider: #ffffff12;
   --status-idle: #7b7b7b;
   --status-busy: oklch(65% 0.12 165);
 
-  --csel-trigger-bg: #ffffff0f;
+  --csel-trigger-bg: var(--control-surface);
   --csel-panel-bg: #121216;
   --csel-item-hover: #ffffff14;
   --csel-item-active: #ffffff1a;
@@ -53,12 +62,13 @@
   --panel-shadow: 0 8px 32px #0006;
 
   /* Every interactive control in the rail sits on this height. */
-  --control-h: 36px;
+  --control-h: 40px;
   --control-font: 0.8rem;
 }
 
 /* ── Light theme ── */
 html.light {
+  color-scheme: light;
   --body-bg: #efefef;
   --rail-bg: #ffffff;
   --rail-border: transparent;
@@ -74,7 +84,10 @@ html.light {
   --muted-text: #707070;
   --heading: #707070;
 
-  --input-bg: #f5f5f5;
+  --control-surface: #f5f5f5;
+  --control-surface-hover: #ececec;
+  --control-surface-active: #e7e7e7;
+  --input-bg: var(--control-surface);
   --input-border: #e3e3e3;
   --track: #d8d8d8;
   --slider-fill: #111111;
@@ -83,21 +96,21 @@ html.light {
   --thumb-bg: #ffffff;
 
   --btn-border: #e3e3e3;
-  --btn-bg: #f5f5f5;
+  --btn-bg: var(--control-surface);
   --btn-color: #111111;
   --btn-hover-border: #d0d0d0;
-  --btn-hover-bg: #ececec;
+  --btn-hover-bg: var(--control-surface-hover);
   --btn-primary-bg: #111111;
   --btn-primary-color: #ffffff;
   --btn-primary-hover: #333333;
-  --btn-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
-  --btn-primary-shadow: 0px 0px 0px 1px #0000001a, 0px 1px 2px 0px #0000000a;
+  --btn-shadow: none;
+  --btn-primary-shadow: none;
 
   --divider: #e8e8e8;
   --status-idle: #999999;
   --status-busy: oklch(50% 0.12 165);
 
-  --csel-trigger-bg: #f5f5f5;
+  --csel-trigger-bg: var(--control-surface);
   --csel-panel-bg: #ffffff;
   --csel-border: 0px 0px 0px 1px #0000000f, 0px 1px 2px -1px #0000000f, 0px 2px 4px 0px #0000000a;
   --csel-panel-shadow: 0px 0px 0px 1px #00000014, 0px 8px 24px rgba(0,0,0,0.1);
@@ -177,13 +190,27 @@ h1, h2, p {
   flex-direction: column;
   gap: 0;
   height: calc(100vh - 24px);
-  overflow: auto;
-  scrollbar-width: none;
+  overflow: hidden;
   box-shadow: var(--panel-shadow);
 }
 
-.control-rail::-webkit-scrollbar {
-  display: none;
+.control-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--divider) transparent;
+}
+
+.control-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.control-scroll::-webkit-scrollbar-thumb {
+  background: var(--divider);
+  border-radius: 999px;
 }
 
 /* ── Section groups with dotted dividers ── */
@@ -225,6 +252,64 @@ h2 {
   margin-bottom: 0;
 }
 
+/* Keep the frequent tone controls visible and let desktop users opt into the
+   less common effects without losing them from the tab order when expanded. */
+.advanced-controls {
+  border-top: none;
+  margin-top: 4px;
+}
+
+.advanced-controls summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  background: var(--input-bg);
+  color: var(--text);
+  box-shadow: var(--csel-border);
+  font-size: var(--control-font);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  list-style: none;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.advanced-controls summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-controls summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.16s ease;
+}
+
+.advanced-controls[open] summary::after {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.advanced-controls summary:hover {
+  background: var(--btn-hover-bg);
+}
+
+.advanced-controls summary:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.advanced-fields {
+  padding-top: 14px;
+}
+
 .field span,
 .field-title,
 .zoom-control {
@@ -252,6 +337,7 @@ input[type="range"] {
 
 /* ── Upload button ── */
 .file-field {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,6 +363,10 @@ input[type="range"] {
   background: var(--btn-hover-bg);
 }
 
+.file-field:focus-within {
+  box-shadow: var(--btn-shadow), 0 0 0 3px var(--focus-ring);
+}
+
 .file-field span {
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: var(--control-font);
@@ -288,7 +378,11 @@ input[type="range"] {
 }
 
 .file-field input[type="file"] {
-  display: none;
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* ── Custom Select ── */
@@ -316,6 +410,12 @@ input[type="range"] {
   cursor: pointer;
   text-align: left;
   outline: none;
+}
+
+.csel-trigger:focus-visible,
+.csel-item:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 .csel-trigger svg {
@@ -392,10 +492,20 @@ input[type="range"] {
   font-size: 0.875rem;
   cursor: pointer;
   text-align: left;
+  min-height: 40px;
 }
 
 .csel-item:hover {
   background: var(--csel-item-hover);
+}
+
+.button,
+.csel-trigger,
+.csel-item,
+.segmented-item,
+.cpick-swatch-button,
+.file-field {
+  touch-action: manipulation;
 }
 
 .csel-item--active svg {
@@ -417,7 +527,7 @@ input[type="range"] {
     var(--slider-fill) calc(var(--val) * 100%),
     var(--track) calc(var(--val) * 100%),
     var(--track) 100%
-  );
+  ) center / 100% 2px no-repeat;
   border-radius: 999px;
   outline: none;
 }
@@ -461,6 +571,49 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* The toolbar's standalone zoom control uses DialKit's native slider
+   anatomy so it belongs to the same control family as the left rail. */
+#zoomRange {
+  height: var(--control-h);
+  background: linear-gradient(
+    to right,
+    var(--control-surface-active) 0%,
+    var(--control-surface-active) calc(var(--val) * 100%),
+    var(--control-surface) calc(var(--val) * 100%),
+    var(--control-surface) 100%
+  );
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+#zoomRange:focus-visible {
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+#zoomRange::-webkit-slider-thumb {
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: none;
+}
+
+#zoomRange:focus-visible::-webkit-slider-thumb {
+  box-shadow: none;
+}
+
+#zoomRange::-moz-range-thumb {
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: none;
+}
+
+#zoomRange:focus-visible::-moz-range-thumb {
+  box-shadow: none;
+}
+
 input[type="range"]:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7), 0 0 0 4px var(--focus-ring);
 }
@@ -474,18 +627,42 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 .cpick-trigger {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   border: none;
   border-radius: var(--radius);
   background: var(--input-bg);
   min-height: var(--control-h);
-  padding: 0 14px;
-  cursor: pointer;
+  padding: 0 10px 0 0;
   box-shadow: var(--csel-border);
 }
 
-.cpick-trigger:hover {
+.cpick-trigger:focus-within {
   background: var(--btn-hover-bg);
+}
+
+.cpick-swatch-button {
+  width: var(--control-h);
+  height: var(--control-h);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cpick-swatch-button:hover {
+  background: var(--btn-hover-bg);
+}
+
+.cpick-swatch-button:focus-visible,
+.cpick-canvas:focus-visible,
+input.cpick-hue:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: -2px;
 }
 
 .cpick-swatch {
@@ -505,7 +682,14 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   font-size: 0.78rem;
   width: 100%;
   letter-spacing: 0.02em;
-  cursor: pointer;
+  cursor: text;
+  min-width: 0;
+}
+
+.cpick-hex:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .cpick-panel {
@@ -518,7 +702,22 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   padding: 0;
   z-index: 9999;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.studio-color-panel {
+  display: block;
+}
+
+.studio-color-saturation {
+  position: relative;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, hsl(var(--picker-hue) 100% 50%));
+  cursor: crosshair;
 }
 
 html:not(.light) .cpick-panel {
@@ -535,6 +734,7 @@ html:not(.light) .cpick-panel {
   display: block;
   width: 100%;
   height: 220px;
+  touch-action: none;
 }
 
 .cpick-thumb {
@@ -603,7 +803,7 @@ input.cpick-hue::-moz-range-thumb {
   cursor: pointer;
 }
 
-input[type="color"] {
+#nativeControls input[type="color"] {
   display: none !important;
 }
 
@@ -613,6 +813,7 @@ output {
   color: var(--text);
   font-size: 0.78rem;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Split color row ── */
@@ -671,7 +872,7 @@ html.light .segmented-thumb {
 }
 
 .segmented-item:hover,
-.segmented-item[aria-selected="true"] {
+.segmented-item[aria-checked="true"] {
   color: var(--text);
 }
 
@@ -730,7 +931,7 @@ html.light .segmented-thumb {
   color: var(--muted-text);
 }
 
-.preset-namer input:focus {
+.preset-namer input:focus-visible {
   box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
@@ -770,6 +971,7 @@ html.light .segmented-thumb {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px dashed var(--divider);
+  flex-shrink: 0;
 }
 
 /* ── Buttons ── */
@@ -790,11 +992,22 @@ html.light .segmented-thumb {
   padding: 0 16px;
   cursor: pointer;
   box-shadow: var(--btn-shadow);
-  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
 }
 
 .button:hover {
   background: var(--btn-hover-bg);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .button:disabled {
@@ -826,9 +1039,9 @@ html.light .segmented-thumb {
 }
 
 .theme-toggle {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   padding: 0;
   border-radius: 50%;
   display: flex;
@@ -936,7 +1149,7 @@ canvas {
   position: absolute;
   top: 0;
   bottom: auto;
-  width: 30px;
+  width: 40px;
   height: 100%;
   border: none;
   background: transparent;
@@ -1017,10 +1230,37 @@ canvas {
     order: 2;
     border-radius: var(--radius);
     padding: 14px;
+    overflow: visible;
+  }
+
+  .control-scroll {
+    flex: none;
+    overflow: visible;
+    padding-right: 0;
+    margin-right: 0;
+  }
+
+  .advanced-controls {
+    border-top: none;
+    margin-top: 0;
+  }
+
+  .advanced-controls summary {
+    display: none;
+  }
+
+  .advanced-controls:not([open]) > .advanced-fields {
+    display: block;
+  }
+
+  .advanced-fields {
+    padding-top: 0;
   }
 
   .preview-stage {
     order: 1;
+    position: relative;
+    grid-template-rows: 1fr;
     border-radius: var(--radius);
     min-height: 62vh;
   }
@@ -1030,25 +1270,71 @@ canvas {
   }
 
   .preview-toolbar {
-    grid-template-columns: 1fr;
-    align-items: stretch;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .preview-toolbar .zoom-control,
+  .preview-toolbar #zoomRange,
+  .preview-toolbar #resetViewBtn {
+    display: none;
+  }
+
+  .preview-toolbar .theme-toggle {
+    display: none;
   }
 
   .render-status {
-    justify-self: start;
+    pointer-events: none;
+  }
+
+  .preview-toolbar .render-status[data-visible="true"] {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    background: var(--toolbar-bg);
+    box-shadow: var(--csel-border);
   }
 
   .rail-actions {
     grid-template-columns: 1fr;
   }
+
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+  }
+
+  input[type="range"] {
+    min-height: 32px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 @media (max-width: 640px) {
-  /* One token lifts every control to a comfortable touch target. */
-  :root {
-    --control-h: 42px;
-  }
-
   .workspace {
     padding: 8px;
     gap: 8px;
@@ -1086,30 +1372,12 @@ canvas {
     font-size: 16px;
   }
 
-  .preview-toolbar {
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto auto;
+  .preset-namer input::placeholder {
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: var(--control-font);
+    font-weight: 400;
+    letter-spacing: 0;
+    opacity: 1;
   }
 
-  .zoom-control {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: center;
-  }
-
-  .theme-toggle {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-  }
-
-  #zoomRange {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  #resetViewBtn {
-    grid-column: 1 / -1;
-    grid-row: 3;
-  }
 }

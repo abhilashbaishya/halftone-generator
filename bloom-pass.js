@@ -1,4 +1,4 @@
-class BloomPass {
+export class BloomPass {
   constructor() {
     this._canvas = document.createElement("canvas");
   }

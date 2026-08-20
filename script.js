@@ -1,3 +1,9 @@
+import { GrainPass } from "./grain-pass.js";
+import { BloomPass } from "./bloom-pass.js";
+import { CRTPass } from "./crt-pass.js";
+
+const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
+
 const grainPass = new GrainPass();
 const bloomPass = new BloomPass();
 const crtPass = new CRTPass();
@@ -251,6 +257,10 @@ const compareState = {
   draggingSplit: false
 };
 
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 4;
+const ZOOM_SLIDER_MIDPOINT = 50;
+
 let sourceImage = null;
 let resizeTimer = null;
 let renderFrame = null;
@@ -258,9 +268,6 @@ let hiddenJitter = 6;
 let hiddenMicroDot = 24;
 let hiddenSeed = 0;
 let customPresets = {};
-
-let presetCS = null;
-let qualityCS = null;
 
 let renderWorker = null;
 let workerEnabled = false;
@@ -398,370 +405,6 @@ function formatPresetLabel(name) {
   return PRESET_LABELS[name] || name;
 }
 
-class ColorPicker {
-  static _registry = [];
-
-  constructor(native) {
-    this.native = native;
-    this.h = 0; this.s = 0; this.v = 1;
-    this._open = false;
-    this._build();
-    this._fromHex(native.value);
-    ColorPicker._registry.push(this);
-  }
-
-  _rgbToHsv(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-    let h = 0;
-    const s = max === 0 ? 0 : d / max, v = max;
-    if (d !== 0) {
-      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-      else if (max === g) h = ((b - r) / d + 2) / 6;
-      else h = ((r - g) / d + 4) / 6;
-    }
-    return [h, s, v];
-  }
-
-  _hsvToRgb(h, s, v) {
-    const i = Math.floor(h * 6), f = h * 6 - i;
-    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
-    const cases = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]];
-    const [r, g, b] = cases[i % 6];
-    return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
-  }
-
-  _toHex() {
-    const { r, g, b } = this._hsvToRgb(this.h, this.s, this.v);
-    return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
-  }
-
-  _fromHex(hex) {
-    const rgb = hexToRgb(hex);
-    if (!rgb) return;
-    [this.h, this.s, this.v] = this._rgbToHsv(rgb.r, rgb.g, rgb.b);
-  }
-
-  _build() {
-    this.native.hidden = true;
-    this.native.disabled = true;
-
-    this.wrap = document.createElement("div");
-    this.wrap.className = "cpick";
-    this.native.parentNode.insertBefore(this.wrap, this.native);
-    this.wrap.appendChild(this.native);
-
-    // Trigger: swatch + hex
-    this.trigger = document.createElement("div");
-    this.trigger.className = "cpick-trigger";
-    this.swatch = document.createElement("div");
-    this.swatch.className = "cpick-swatch";
-    this.hexIn = document.createElement("input");
-    this.hexIn.type = "text";
-    this.hexIn.className = "cpick-hex";
-    this.hexIn.maxLength = 7;
-    this.hexIn.spellcheck = false;
-    this.trigger.append(this.swatch, this.hexIn);
-    this.wrap.appendChild(this.trigger);
-
-    // Panel
-    this.panel = document.createElement("div");
-    this.panel.className = "cpick-panel";
-
-    // Gradient area (SV picker)
-    this.gradWrap = document.createElement("div");
-    this.gradWrap.className = "cpick-grad";
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "cpick-canvas";
-    this.canvas.width = 560;
-    this.canvas.height = 440;
-    this.thumb = document.createElement("div");
-    this.thumb.className = "cpick-thumb";
-    this.gradWrap.append(this.canvas, this.thumb);
-
-    // Hue row: color dot + slider
-    this.hueRow = document.createElement("div");
-    this.hueRow.className = "cpick-hue-row";
-    this.hueSlider = document.createElement("input");
-    this.hueSlider.type = "range";
-    this.hueSlider.className = "cpick-hue";
-    this.hueSlider.min = "0";
-    this.hueSlider.max = "360";
-    this.hueSlider.step = "1";
-    this.hueRow.append(this.hueSlider);
-
-    this.panel.append(this.gradWrap, this.hueRow);
-    document.body.appendChild(this.panel);
-
-    // Events
-    this.trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this._open ? this.close() : this.open();
-    });
-    document.addEventListener("click", (e) => {
-      if (this._open && !this.panel.contains(e.target)) this.close();
-    });
-
-    this.canvas.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      this._pickSV(e);
-      const move = (e) => this._pickSV(e);
-      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-    });
-
-    this.canvas.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      this._pickSV(e.touches[0]);
-      const move = (e) => this._pickSV(e.touches[0]);
-      const up = () => { window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); };
-      window.addEventListener("touchmove", move, { passive: false });
-      window.addEventListener("touchend", up);
-    }, { passive: false });
-
-    this.hueSlider.addEventListener("input", () => {
-      this.h = Number(this.hueSlider.value) / 360;
-      this._drawCanvas();
-      this._emit();
-    });
-
-    this.hexIn.addEventListener("change", () => {
-      let v = this.hexIn.value.trim();
-      if (!v.startsWith("#")) v = "#" + v;
-      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-        this._fromHex(v);
-        this.hueSlider.value = Math.round(this.h * 360);
-        this._drawCanvas();
-        this._emit();
-      }
-    });
-  }
-
-  _pickSV(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    this.s = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-    this.v = clamp(1 - (e.clientY - rect.top) / rect.height, 0, 1);
-    this._updateThumb();
-    this._emit();
-  }
-
-  _drawCanvas() {
-    const ctx = this.canvas.getContext("2d");
-    const w = this.canvas.width, h = this.canvas.height;
-    const { r, g, b } = this._hsvToRgb(this.h, 1, 1);
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.fillRect(0, 0, w, h);
-    const wg = ctx.createLinearGradient(0, 0, w, 0);
-    wg.addColorStop(0, "rgba(255,255,255,1)");
-    wg.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = wg;
-    ctx.fillRect(0, 0, w, h);
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, "rgba(0,0,0,0)");
-    bg.addColorStop(1, "rgba(0,0,0,1)");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  _updateThumb() {
-    this.thumb.style.left = (this.s * 100) + "%";
-    this.thumb.style.top = ((1 - this.v) * 100) + "%";
-  }
-
-  _emit() {
-    const hex = this._toHex();
-    this.native.value = hex;
-    this.swatch.style.background = hex;
-    this.hexIn.value = hex.toUpperCase();
-    this._updateThumb();
-    this.native.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-
-  syncFromNative() {
-    this._fromHex(this.native.value);
-    this.hueSlider.value = Math.round(this.h * 360);
-    const hex = this.native.value;
-    this.swatch.style.background = hex;
-    this.hexIn.value = hex.toUpperCase();
-    if (this._open) { this._drawCanvas(); this._updateThumb(); }
-  }
-
-  open() {
-    ColorPicker._registry.forEach(cp => { if (cp !== this) cp.close(); });
-    this._open = true;
-    this.syncFromNative();
-    this._drawCanvas();
-    this._updateThumb();
-    this.panel.style.display = "block";
-    requestAnimationFrame(() => this._reposition());
-  }
-
-  _reposition() {
-    const rect = this.trigger.getBoundingClientRect();
-    const panelW = this.panel.offsetWidth;
-    let left = rect.left;
-    if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
-    if (left < 8) left = 8;
-    this.panel.style.left = left + "px";
-    this.panel.style.top = (rect.bottom + 6) + "px";
-  }
-
-  close() {
-    if (!this._open) return;
-    this._open = false;
-    this.panel.style.display = "none";
-  }
-}
-
-class CustomSelect {
-  constructor(native) {
-    this.native = native;
-    this._open = false;
-    this._init();
-  }
-
-  _init() {
-    this.native.hidden = true;
-    this.wrapper = document.createElement("div");
-    this.wrapper.className = "csel";
-    this.native.parentNode.insertBefore(this.wrapper, this.native);
-    this.wrapper.appendChild(this.native);
-
-    this.trigger = document.createElement("button");
-    this.trigger.type = "button";
-    this.trigger.className = "csel-trigger";
-    this.wrapper.appendChild(this.trigger);
-
-    this.panel = document.createElement("div");
-    this.panel.className = "csel-panel";
-    this.wrapper.appendChild(this.panel);
-
-    this.trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this._open ? this.close() : this.open();
-    });
-    document.addEventListener("click", () => this.close());
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") this.close(); });
-    this.syncTrigger();
-  }
-
-  syncTrigger() {
-    const opt = this.native.options[this.native.selectedIndex];
-    const label = opt ? opt.text : "";
-    const badge = this._dirty ? `<span class="csel-badge">Edited</span>` : "";
-    this.trigger.innerHTML = `<span>${label}</span>${badge}<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  }
-
-  // Marks the trigger as no longer matching the selected preset.
-  setDirty(flag) {
-    if (this._dirty === flag) return;
-    this._dirty = flag;
-    this.syncTrigger();
-  }
-
-  _buildPanel() {
-    this.panel.innerHTML = "";
-    const cur = this.native.value;
-    Array.from(this.native.children).forEach((child) => {
-      if (child.tagName === "OPTGROUP") {
-        const lbl = document.createElement("div");
-        lbl.className = "csel-group-label";
-        lbl.textContent = child.label;
-        this.panel.appendChild(lbl);
-        Array.from(child.children).forEach((opt) => this.panel.appendChild(this._makeItem(opt, cur)));
-      } else if (child.tagName === "OPTION") {
-        this.panel.appendChild(this._makeItem(child, cur));
-      }
-    });
-  }
-
-  _makeItem(opt, cur) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "csel-item" + (opt.value === cur ? " csel-item--active" : "");
-    btn.innerHTML = `<span>${opt.text}</span>${opt.value === cur ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ""}`;
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.native.value = opt.value;
-      this.native.dispatchEvent(new Event("change", { bubbles: true }));
-      this.close();
-      this.syncTrigger();
-    });
-    return btn;
-  }
-
-  open() {
-    this._open = true;
-    this._buildPanel();
-    this.wrapper.classList.add("csel--open");
-  }
-
-  close() {
-    if (!this._open) return;
-    this._open = false;
-    this.wrapper.classList.remove("csel--open");
-  }
-
-  refresh() {
-    this.syncTrigger();
-    if (this._open) this._buildPanel();
-  }
-}
-
-// Renders a <select> as a row of tabs. The native element stays as the source
-// of truth and still emits change, so preset apply/capture and the dirty check
-// keep reading it exactly as before.
-class SegmentedControl {
-  constructor(native) {
-    this.native = native;
-    this._build();
-  }
-
-  _build() {
-    this.native.hidden = true;
-
-    this.wrapper = document.createElement("div");
-    this.wrapper.className = "segmented";
-    this.wrapper.setAttribute("role", "tablist");
-    this.native.parentNode.insertBefore(this.wrapper, this.native);
-    this.wrapper.appendChild(this.native);
-
-    this.thumb = document.createElement("span");
-    this.thumb.className = "segmented-thumb";
-    this.thumb.setAttribute("aria-hidden", "true");
-    this.wrapper.appendChild(this.thumb);
-
-    this.buttons = Array.from(this.native.options).map((option) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "segmented-item";
-      button.dataset.value = option.value;
-      button.textContent = option.text;
-      button.setAttribute("role", "tab");
-
-      button.addEventListener("click", () => {
-        if (this.native.value === option.value) return;
-        this.native.value = option.value;
-        this.syncTrigger();
-        this.native.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-
-      this.wrapper.appendChild(button);
-      return button;
-    });
-
-    this.wrapper.style.setProperty("--segments", this.buttons.length);
-    this.syncTrigger();
-  }
-
-  syncTrigger() {
-    const index = Math.max(0, this.buttons.findIndex((b) => b.dataset.value === this.native.value));
-    this.buttons.forEach((button, i) => button.setAttribute("aria-selected", String(i === index)));
-    this.thumb.style.transform = `translateX(${index * 100}%)`;
-  }
-}
-
 function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
   controls.presetSelect.textContent = "";
 
@@ -792,7 +435,6 @@ function rebuildPresetSelect(selectedName = DEFAULT_PRESET) {
     Object.prototype.hasOwnProperty.call(builtInPresets, selectedName) ||
     Object.prototype.hasOwnProperty.call(customPresets, selectedName);
   controls.presetSelect.value = hasSelected ? selectedName : DEFAULT_PRESET;
-  presetCS?.refresh();
 }
 
 function getPresetByName(name) {
@@ -865,13 +507,15 @@ function syncPresetActions() {
   controls.deletePresetBtn.hidden = !isCustom;
   controls.deletePresetBtn.title = isCustom ? `Delete "${selected}"` : "";
 
-  // Emphasise saving only when there are changes worth keeping.
+  // Saving is meaningful only after the selected preset has been edited.
+  controls.savePresetBtn.disabled = !modified;
+  controls.savePresetBtn.title = modified ? "" : "Adjust a setting to enable saving.";
   controls.savePresetBtn.classList.toggle("button-primary", modified);
   controls.savePresetBtn.textContent = modified && isCustom ? "Update Preset" : "Save Preset";
-  presetCS?.setDirty(modified);
 }
 
 function openPresetNamer() {
+  if (controls.savePresetBtn.disabled) return;
   const active = controls.presetSelect.value;
   controls.presetNameInput.value = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
   controls.presetActions.hidden = true;
@@ -887,26 +531,33 @@ function closePresetNamer() {
   setPresetNote("");
 }
 
-function saveCurrentPreset() {
-  const name = controls.presetNameInput.value.trim();
-
+function savePresetByName(rawName) {
+  const name = rawName.trim();
   if (!name) {
-    setPresetNote("Give the preset a name.");
-    controls.presetNameInput.focus();
-    return;
+    return { ok: false, message: "Give the preset a name." };
   }
 
   if (Object.prototype.hasOwnProperty.call(builtInPresets, name)) {
-    setPresetNote("That name belongs to a built-in preset.");
-    controls.presetNameInput.focus();
-    return;
+    return { ok: false, message: "That name belongs to a built-in preset." };
   }
 
   customPresets[name] = captureCurrentPreset();
   persistCustomPresets();
   rebuildPresetSelect(name);
   syncPresetActions();
+  return { ok: true, name };
+}
+
+function saveCurrentPreset() {
+  const result = savePresetByName(controls.presetNameInput.value);
+  if (!result.ok) {
+    setPresetNote(result.message);
+    controls.presetNameInput.focus();
+    return;
+  }
+
   closePresetNamer();
+  emitStudioState();
 }
 
 function deleteCurrentPreset() {
@@ -920,11 +571,37 @@ function deleteCurrentPreset() {
   rebuildPresetSelect(DEFAULT_PRESET);
   applyPreset(DEFAULT_PRESET);
   syncPresetActions();
+  emitStudioState();
 }
 
 function updateZoomOutput() {
-  controls.zoomOut.textContent = `${Math.round(compareState.zoom * 100)}%`;
-  controls.zoomRange.value = compareState.zoom.toFixed(2);
+  const zoomPercent = Math.round(compareState.zoom * 100);
+  controls.zoomOut.textContent = `${zoomPercent}%`;
+  controls.zoomRange.value = zoomToSliderValue(compareState.zoom).toFixed(2);
+  controls.zoomRange.setAttribute("aria-valuenow", String(zoomPercent));
+  controls.zoomRange.setAttribute("aria-valuetext", `${zoomPercent}%`);
+  updateSliderFill(controls.zoomRange);
+}
+
+function zoomToSliderValue(zoom) {
+  const safeZoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+
+  if (safeZoom <= 1) {
+    return ZOOM_SLIDER_MIDPOINT * Math.log(safeZoom / MIN_ZOOM) / Math.log(1 / MIN_ZOOM);
+  }
+
+  return ZOOM_SLIDER_MIDPOINT
+    + ZOOM_SLIDER_MIDPOINT * Math.log(safeZoom) / Math.log(MAX_ZOOM);
+}
+
+function sliderValueToZoom(value) {
+  const position = clamp(value, 0, 100);
+
+  if (position <= ZOOM_SLIDER_MIDPOINT) {
+    return MIN_ZOOM * Math.pow(1 / MIN_ZOOM, position / ZOOM_SLIDER_MIDPOINT);
+  }
+
+  return Math.pow(MAX_ZOOM, (position - ZOOM_SLIDER_MIDPOINT) / ZOOM_SLIDER_MIDPOINT);
 }
 
 function applyViewTransform() {
@@ -939,13 +616,17 @@ function resetView() {
 }
 
 function setZoom(nextZoom) {
-  compareState.zoom = clamp(nextZoom, 0.5, 4);
+  compareState.zoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
   applyViewTransform();
 }
 
 function updateSplitPreview() {
   const split = clamp(compareState.split, 0, 1);
   compareState.split = split;
+  const splitPercent = Math.round(split * 100);
+
+  splitHandle.setAttribute("aria-valuenow", String(splitPercent));
+  splitHandle.setAttribute("aria-valuetext", `${splitPercent}% halftone and ${100 - splitPercent}% source`);
 
   const rightInset = (1 - split) * 100;
   halftoneOverlay.style.clipPath = `inset(0 ${rightInset}% 0 0)`;
@@ -1265,7 +946,7 @@ function initializeWorker() {
   }
 
   try {
-    renderWorker = new Worker("renderer-worker.js");
+    renderWorker = new Worker(new URL("./renderer-worker.js", import.meta.url));
     workerEnabled = true;
 
     renderWorker.addEventListener("message", (event) => {
@@ -1319,7 +1000,7 @@ function renderWithWorker(width, height, settings) {
 
   const requestId = ++renderRequestId;
   workerBusy = true;
-  setRenderStatus("Rendering...", true);
+  setRenderStatus("Rendering…", true);
 
   createScaledBitmap(width, height)
     .then((sourceBitmap) => {
@@ -1382,7 +1063,7 @@ function generateHalftone() {
     return;
   }
 
-  setRenderStatus("Rendering...", true);
+  setRenderStatus("Rendering…", true);
   renderHalftoneOnMain(previewCtx, width, height, settings);
   applyPostProcess(previewCtx, previewCanvas);
   setRenderStatus("Ready", false);
@@ -1416,23 +1097,20 @@ function applyPreset(name) {
   if (preset.seed !== undefined) hiddenSeed = preset.seed;
 
   controls.presetSelect.value = name;
-  presetCS?.setDirty(false);
-  presetCS?.syncTrigger();
-  qualityCS?.syncTrigger();
-  inkCP.syncFromNative();
-  paperCP.syncFromNative();
   updateOutputs();
   syncPresetActions();
   requestRender();
 }
 
+function updateSliderFill(input) {
+  const min = parseFloat(input.min) || 0;
+  const max = parseFloat(input.max) || 100;
+  const val = parseFloat(input.value) || 0;
+  input.style.setProperty("--val", (val - min) / (max - min));
+}
+
 function updateSliderFills() {
-  document.querySelectorAll('input[type="range"]').forEach((input) => {
-    const min = parseFloat(input.min) || 0;
-    const max = parseFloat(input.max) || 100;
-    const val = parseFloat(input.value) || 0;
-    input.style.setProperty("--val", (val - min) / (max - min));
-  });
+  document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
 }
 
 function runPostProcessChain(src) {
@@ -1573,6 +1251,65 @@ function handleSplitPointerUp(event) {
   }
 }
 
+// ── React inspector bridge ───────────────────────────────────────────────
+// DialKit owns the visible controls. The renderer continues to read the
+// native inputs, keeping the proven image pipeline independent from React.
+const STUDIO_STATE_EVENT = "halftone:state";
+const PANEL_SETTING_FIELDS = new Set(PRESET_COMPARE_FIELDS);
+
+function getStudioState() {
+  const selectedPreset = controls.presetSelect.value || DEFAULT_PRESET;
+  return {
+    theme: document.documentElement.classList.contains("light") ? "light" : "dark",
+    selectedPreset,
+    presetModified: isPresetModified(),
+    isCustomPreset: Object.prototype.hasOwnProperty.call(customPresets, selectedPreset),
+    presets: [
+      ...Object.keys(builtInPresets).map((value) => ({ value, label: formatPresetLabel(value) })),
+      ...Object.keys(customPresets)
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value }))
+    ],
+    settings: captureCurrentPreset()
+  };
+}
+
+function emitStudioState() {
+  window.dispatchEvent(new CustomEvent(STUDIO_STATE_EVENT, { detail: getStudioState() }));
+}
+
+function setPanelSetting(key, value) {
+  if (!PANEL_SETTING_FIELDS.has(key) || !(key in controls)) return;
+  controls[key].value = String(value);
+  updateOutputs();
+  syncPresetActions();
+  requestRender();
+  emitStudioState();
+}
+
+window.halftoneStudio = Object.freeze({
+  eventName: STUDIO_STATE_EVENT,
+  getState: getStudioState,
+  setSetting: setPanelSetting,
+  selectPreset(name) {
+    applyPreset(name);
+    closePresetNamer();
+    emitStudioState();
+  },
+  uploadImage() {
+    controls.imageInput.click();
+  },
+  savePreset(name) {
+    const result = savePresetByName(name);
+    if (result.ok) emitStudioState();
+    return result;
+  },
+  deletePreset() {
+    deleteCurrentPreset();
+  },
+  exportImage: exportPng
+});
+
 controls.imageInput.addEventListener("change", () => {
   const file = controls.imageInput.files?.[0];
   if (!file) return;
@@ -1597,14 +1334,6 @@ controls.presetSelect.addEventListener("change", () => {
   applyPreset(controls.presetSelect.value);
   closePresetNamer();
 });
-
-// Any control in the rail can take the settings away from the selected preset.
-// Delegating covers the colour pickers, which dispatch synthetic input events.
-document.querySelector(".control-rail").addEventListener("input", (event) => {
-  if (event.target === controls.presetNameInput) return;
-  syncPresetActions();
-});
-document.querySelector(".control-rail").addEventListener("change", syncPresetActions);
 
 controls.savePresetBtn.addEventListener("click", openPresetNamer);
 
@@ -1648,7 +1377,7 @@ controls.quality.addEventListener("change", requestRender);
 });
 
 controls.zoomRange.addEventListener("input", () => {
-  setZoom(numberValue(controls.zoomRange, 1));
+  setZoom(sliderValueToZoom(numberValue(controls.zoomRange, ZOOM_SLIDER_MIDPOINT)));
   updateSliderFills();
 });
 
@@ -1656,13 +1385,22 @@ controls.resetViewBtn.addEventListener("click", resetView);
 
 splitHandle.addEventListener("keydown", (event) => {
   if (event.key === "ArrowLeft") {
+    event.preventDefault();
     compareState.split -= 0.02;
     updateSplitPreview();
     return;
   }
 
   if (event.key === "ArrowRight") {
+    event.preventDefault();
     compareState.split += 0.02;
+    updateSplitPreview();
+    return;
+  }
+
+  if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    compareState.split = event.key === "Home" ? 0 : 1;
     updateSplitPreview();
   }
 });
@@ -1702,6 +1440,7 @@ function applyTheme(theme) {
   iconSun.style.display = isLight ? "none" : "";
   iconMoon.style.display = isLight ? "" : "none";
   themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+  emitStudioState();
 }
 
 themeToggle.addEventListener("click", () => {
@@ -1712,11 +1451,6 @@ themeToggle.addEventListener("click", () => {
 
 applyTheme(localStorage.getItem(THEME_KEY) || "dark");
 
-presetCS = new CustomSelect(controls.presetSelect);
-qualityCS = new SegmentedControl(controls.quality);
-const inkCP = new ColorPicker(controls.inkColor);
-const paperCP = new ColorPicker(controls.paperColor);
-
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
 syncPresetActions();
@@ -1725,6 +1459,7 @@ resetView();
 updateSplitPreview();
 updateOutputs();
 applyPreset(DEFAULT_PRESET);
+emitStudioState();
 
 // Boot image. Every path here must terminate: previously a stalled
 // indexedDB.open() left both handlers unreached, so the placeholder never
@@ -1747,14 +1482,14 @@ function loadInitialImage() {
     img.src = src;
   };
 
-  setRenderStatus("Loading image...", true, true);
+  setRenderStatus("Loading image…", true, true);
 
   withTimeout(loadImageFromDb().catch(() => null), DB_TIMEOUT_MS).then((dataUrl) => {
     if (dataUrl) {
-      tryLoad(dataUrl, () => tryLoad("placeholder.jpg", giveUp));
+      tryLoad(dataUrl, () => tryLoad(PLACEHOLDER_URL, giveUp));
       return;
     }
-    tryLoad("placeholder.jpg", giveUp);
+    tryLoad(PLACEHOLDER_URL, giveUp);
   });
 }
 

@@ -14,17 +14,17 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-<h1 class="sr-only">Halftone Studio</h1>
+    <h1 class="sr-only">Halftone Studio</h1>
     <main class="workspace">
       <aside class="control-rail">
+        <input id="imageInput" class="sr-only" type="file" accept="image/*" aria-label="Upload image" />
+        <div id="dialPanelRoot" class="dial-panel-mount"></div>
+
+        <div id="nativeControls" class="control-scroll" hidden aria-hidden="true">
         <section class="control-group">
           <div class="group-head">
             <h2>Source</h2>
           </div>
-          <label class="field file-field" for="imageInput">
-            <span>Upload Image</span>
-            <input id="imageInput" type="file" accept="image/*" />
-          </label>
           <label class="field">
             <div class="field-title">
               <span>Preset</span>
@@ -32,14 +32,14 @@
             <select id="presetSelect"></select>
           </label>
           <div class="preset-actions" id="presetActions">
-            <button id="savePresetBtn" class="button" type="button">Save Preset</button>
+            <button id="savePresetBtn" class="button" type="button" disabled>Save Preset</button>
             <button id="deletePresetBtn" class="button" type="button" hidden>Delete</button>
           </div>
           <div class="preset-namer" id="presetNamer" hidden>
             <input
               id="presetNameInput"
               type="text"
-              placeholder="Preset name"
+              placeholder="Preset name…"
               maxlength="40"
               spellcheck="false"
               autocomplete="off"
@@ -62,14 +62,14 @@
           <label class="field">
             <div class="field-title">
               <span>Cell Size</span>
-              <output id="cellSizeOut">8 px</output>
+              <output id="cellSizeOut" for="cellSize">8 px</output>
             </div>
             <input id="cellSize" type="range" min="3" max="20" value="8" />
           </label>
           <label class="field">
             <div class="field-title">
               <span>Screen Angle</span>
-              <output id="angleOut">28 deg</output>
+              <output id="angleOut" for="screenAngle">28 deg</output>
             </div>
             <input id="screenAngle" type="range" min="-75" max="75" value="28" />
           </label>
@@ -93,52 +93,57 @@
           <label class="field">
             <div class="field-title">
               <span>Contrast</span>
-              <output id="contrastOut">1.10</output>
+              <output id="contrastOut" for="contrast">1.10</output>
             </div>
             <input id="contrast" type="range" min="0.5" max="2.5" step="0.05" value="1.1" />
           </label>
-          <label class="field">
-            <div class="field-title">
-              <span>Gamma</span>
-              <output id="gammaOut">1.00</output>
+          <details class="advanced-controls">
+            <summary>Advanced controls</summary>
+            <div class="advanced-fields">
+              <label class="field">
+                <div class="field-title">
+                  <span>Gamma</span>
+                  <output id="gammaOut" for="gamma">1.00</output>
+                </div>
+                <input id="gamma" type="range" min="0.4" max="2.4" step="0.01" value="1" />
+              </label>
+              <label class="field">
+                <div class="field-title">
+                  <span>Tone Curve</span>
+                  <output id="toneCurveOut" for="toneCurve">0.88</output>
+                </div>
+                <input id="toneCurve" type="range" min="0.45" max="2.2" step="0.01" value="0.88" />
+              </label>
+              <label class="field">
+                <div class="field-title">
+                  <span>Minimum Dot</span>
+                  <output id="minDotOut" for="minDot">0%</output>
+                </div>
+                <input id="minDot" type="range" min="0" max="60" value="0" />
+              </label>
+              <label class="field">
+                <div class="field-title">
+                  <span>Grain</span>
+                  <output id="grainOut" for="grainStrength">0%</output>
+                </div>
+                <input id="grainStrength" type="range" min="0" max="100" step="1" value="0" />
+              </label>
+              <label class="field">
+                <div class="field-title">
+                  <span>Bloom</span>
+                  <output id="bloomOut" for="bloomStrength">0%</output>
+                </div>
+                <input id="bloomStrength" type="range" min="0" max="100" step="1" value="0" />
+              </label>
+              <label class="field">
+                <div class="field-title">
+                  <span>CRT</span>
+                  <output id="crtOut" for="crtStrength">0%</output>
+                </div>
+                <input id="crtStrength" type="range" min="0" max="100" step="1" value="0" />
+              </label>
             </div>
-            <input id="gamma" type="range" min="0.4" max="2.4" step="0.01" value="1" />
-          </label>
-          <label class="field">
-            <div class="field-title">
-              <span>Tone Curve</span>
-              <output id="toneCurveOut">0.88</output>
-            </div>
-            <input id="toneCurve" type="range" min="0.45" max="2.2" step="0.01" value="0.88" />
-          </label>
-          <label class="field">
-            <div class="field-title">
-              <span>Minimum Dot</span>
-              <output id="minDotOut">0%</output>
-            </div>
-            <input id="minDot" type="range" min="0" max="60" value="0" />
-          </label>
-          <label class="field">
-            <div class="field-title">
-              <span>Grain</span>
-              <output id="grainOut">0%</output>
-            </div>
-            <input id="grainStrength" type="range" min="0" max="100" step="1" value="0" />
-          </label>
-          <label class="field">
-            <div class="field-title">
-              <span>Bloom</span>
-              <output id="bloomOut">0%</output>
-            </div>
-            <input id="bloomStrength" type="range" min="0" max="100" step="1" value="0" />
-          </label>
-          <label class="field">
-            <div class="field-title">
-              <span>CRT</span>
-              <output id="crtOut">0%</output>
-            </div>
-            <input id="crtStrength" type="range" min="0" max="100" step="1" value="0" />
-          </label>
+          </details>
         </section>
 
         <section class="control-group">
@@ -156,6 +161,7 @@
             </label>
           </div>
         </section>
+        </div>
 
         <div class="rail-actions">
           <button id="exportBtn" class="button button-primary">Export PNG</button>
@@ -166,12 +172,23 @@
         <div class="preview-toolbar">
           <label class="zoom-control" for="zoomRange">
             <span>Zoom</span>
-            <output id="zoomOut">100%</output>
+            <output id="zoomOut" for="zoomRange">100%</output>
           </label>
-          <input id="zoomRange" type="range" min="0.5" max="4" step="0.05" value="1" />
-          <button id="resetViewBtn" class="button button-small" type="button">Reset View</button>
+          <input
+            id="zoomRange"
+            type="range"
+            min="0"
+            max="100"
+            step="0.5"
+            value="50"
+            aria-valuemin="50"
+            aria-valuemax="400"
+            aria-valuenow="100"
+            aria-valuetext="100%"
+          />
+          <button id="resetViewBtn" class="button" type="button">Reset Zoom</button>
           <button id="themeToggle" class="button button-small theme-toggle" type="button" aria-label="Switch to light mode">
-            <svg id="iconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <svg id="iconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
               <circle cx="8" cy="8" r="3"/>
               <line x1="8" y1="1" x2="8" y2="2.5"/>
               <line x1="8" y1="13.5" x2="8" y2="15"/>
@@ -182,7 +199,7 @@
               <line x1="12.95" y1="3.05" x2="11.9" y2="4.1"/>
               <line x1="4.1" y1="11.9" x2="3.05" y2="12.95"/>
             </svg>
-            <svg id="iconMoon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none">
+            <svg id="iconMoon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none" aria-hidden="true">
               <path d="M13.5 10A6 6 0 0 1 6 2.5a6 6 0 1 0 7.5 7.5z"/>
             </svg>
           </button>
@@ -190,19 +207,24 @@
         </div>
         <div class="canvas-wrap" id="compareStage">
           <div class="canvas-plane" id="canvasPlane">
-            <canvas id="sourceCanvas" width="1200" height="800" aria-label="Source image"></canvas>
+            <canvas id="sourceCanvas" width="1200" height="800" role="img" aria-label="Source image preview"></canvas>
             <div class="halftone-overlay" id="halftoneOverlay">
-              <canvas id="previewCanvas" width="1200" height="800" aria-label="Halftone preview"></canvas>
+              <canvas id="previewCanvas" width="1200" height="800" role="img" aria-label="Processed halftone preview"></canvas>
             </div>
           </div>
           <button
             id="splitHandle"
             class="split-handle"
             type="button"
+            role="slider"
             aria-label="Adjust split preview"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="50"
+            aria-valuetext="50% halftone and 50% source"
             title="Drag to compare source and halftone"
           >
-            <svg class="split-arrows" width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="split-arrows" width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M22 22L28 16L22 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M10 22L4 16L10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -211,9 +233,6 @@
       </section>
     </main>
 
-    <script src="grain-pass.js"></script>
-    <script src="bloom-pass.js"></script>
-    <script src="crt-pass.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
