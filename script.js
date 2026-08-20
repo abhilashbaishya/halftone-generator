@@ -1,12 +1,21 @@
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
+import { renderHalftoneAsync, renderHalftoneSync } from "./renderer-core.js";
+import { calculateExportDimensions, getExportPixelBudget } from "./export-policy.js";
 
 const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
 
-const grainPass = new GrainPass();
-const bloomPass = new BloomPass();
-const crtPass = new CRTPass();
+const previewPasses = {
+  grain: new GrainPass(),
+  bloom: new BloomPass(),
+  crt: new CRTPass()
+};
+const exportPasses = {
+  grain: new GrainPass(),
+  bloom: new BloomPass(),
+  crt: new CRTPass()
+};
 let grainSeed = Math.random();
 
 // ── Image persistence via IndexedDB ──
@@ -102,42 +111,27 @@ const QUALITY_MODES = {
     sampleRadius: 0.4,
     edgeBoost: 0.12,
     ditherAmount: 0.06,
-    exportScale: 1,
     maxPixels: 5_000_000
   },
   high: {
     sampleRadius: 0.58,
     edgeBoost: 0.22,
     ditherAmount: 0.1,
-    exportScale: 2,
     maxPixels: 8_000_000
   },
   ultra: {
     sampleRadius: 0.7,
     edgeBoost: 0.3,
     ditherAmount: 0.14,
-    exportScale: 3,
     maxPixels: 10_500_000
   },
   print: {
     sampleRadius: 1.0,
     edgeBoost: 0.1,
     ditherAmount: 0,
-    exportScale: 4,
     maxPixels: 10_500_000
   }
 };
-
-const BAYER_8X8 = [
-   0 / 64, 32 / 64,  8 / 64, 40 / 64,  2 / 64, 34 / 64, 10 / 64, 42 / 64,
-  48 / 64, 16 / 64, 56 / 64, 24 / 64, 50 / 64, 18 / 64, 58 / 64, 26 / 64,
-  12 / 64, 44 / 64,  4 / 64, 36 / 64, 14 / 64, 46 / 64,  6 / 64, 38 / 64,
-  60 / 64, 28 / 64, 52 / 64, 20 / 64, 62 / 64, 30 / 64, 54 / 64, 22 / 64,
-   3 / 64, 35 / 64, 11 / 64, 43 / 64,  1 / 64, 33 / 64,  9 / 64, 41 / 64,
-  51 / 64, 19 / 64, 59 / 64, 27 / 64, 49 / 64, 17 / 64, 57 / 64, 25 / 64,
-  15 / 64, 47 / 64,  7 / 64, 39 / 64, 13 / 64, 45 / 64,  5 / 64, 37 / 64,
-  63 / 64, 31 / 64, 55 / 64, 23 / 64, 61 / 64, 29 / 64, 53 / 64, 21 / 64
-];
 
 const controls = {
   imageInput: document.getElementById("imageInput"),
@@ -274,6 +268,9 @@ let workerEnabled = false;
 let renderRequestId = 0;
 let workerBusy = false;
 let renderQueued = false;
+let exportRequestId = 0;
+let activeExport = null;
+let exportFeedbackTimer = null;
 
 let scaledSource = null;
 let scaledSourceKey = "";
@@ -315,11 +312,6 @@ function hexToRgb(hex) {
     g: (parsed >> 8) & 255,
     b: parsed & 255
   };
-}
-
-function hash2d(x, y, salt, seed) {
-  const v = Math.sin((x + seed * 0.137) * 127.1 + (y + seed * 0.311) * 311.7 + (salt + seed * 0.017) * 17.13) * 43758.5453123;
-  return v - Math.floor(v);
 }
 
 function getQualityConfig() {
@@ -732,69 +724,6 @@ function drawSourcePreview() {
   sourceCtx.drawImage(getScaledSource(sourceCanvas.width, sourceCanvas.height), 0, 0);
 }
 
-function adjustedLuma(r, g, b, contrast, gamma) {
-  let value = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  value = Math.pow(value, gamma);
-  value = (value - 0.5) * contrast + 0.5;
-  return clamp(value, 0, 1);
-}
-
-function buildLumaBuffers(data, width, height, contrast, gamma) {
-  const integral = new Float32Array((width + 1) * (height + 1));
-
-  for (let y = 0; y < height; y += 1) {
-    let row = 0;
-    const integralRow = (y + 1) * (width + 1);
-    const integralPrevRow = y * (width + 1);
-
-    for (let x = 0; x < width; x += 1) {
-      const pixelIndex = (y * width + x) * 4;
-      const l = adjustedLuma(data[pixelIndex], data[pixelIndex + 1], data[pixelIndex + 2], contrast, gamma);
-      row += l;
-      integral[integralRow + x + 1] = integral[integralPrevRow + x + 1] + row;
-    }
-  }
-
-  return { integral };
-}
-
-function sampleBoxAverage(integral, width, height, cx, cy, radius) {
-  const x0 = clamp(Math.floor(cx - radius), 0, width - 1);
-  const y0 = clamp(Math.floor(cy - radius), 0, height - 1);
-  const x1 = clamp(Math.floor(cx + radius), 0, width - 1);
-  const y1 = clamp(Math.floor(cy + radius), 0, height - 1);
-
-  if (x1 < x0 || y1 < y0) return 1;
-
-  const stride = width + 1;
-  const sum =
-    integral[(y1 + 1) * stride + (x1 + 1)] -
-    integral[y0 * stride + (x1 + 1)] -
-    integral[(y1 + 1) * stride + x0] +
-    integral[y0 * stride + x0];
-
-  const area = (x1 - x0 + 1) * (y1 - y0 + 1);
-  return area > 0 ? sum / area : 1;
-}
-
-function sampleEdgeStrength(integral, width, height, cx, cy, radius) {
-  const r = Math.max(1, radius * 0.7);
-
-  const tl = sampleBoxAverage(integral, width, height, cx - r, cy - r, r);
-  const tc = sampleBoxAverage(integral, width, height, cx,     cy - r, r);
-  const tr = sampleBoxAverage(integral, width, height, cx + r, cy - r, r);
-  const ml = sampleBoxAverage(integral, width, height, cx - r, cy,     r);
-  const mr = sampleBoxAverage(integral, width, height, cx + r, cy,     r);
-  const bl = sampleBoxAverage(integral, width, height, cx - r, cy + r, r);
-  const bc = sampleBoxAverage(integral, width, height, cx,     cy + r, r);
-  const br = sampleBoxAverage(integral, width, height, cx + r, cy + r, r);
-
-  const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
-  const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
-
-  return clamp(Math.hypot(gx, gy) * 1.4, 0, 1);
-}
-
 function getRenderSettings() {
   return {
     cellSize: Math.max(1, numberValue(controls.cellSize, 8)),
@@ -813,87 +742,12 @@ function getRenderSettings() {
 }
 
 function renderHalftoneOnMain(targetCtx, width, height, settings) {
-  const { cellSize, contrast, gamma, minDot, angle, toneCurve, microDotAmount, jitter, seed, quality, ink, paper } = settings;
-
   hiddenCanvas.width = width;
   hiddenCanvas.height = height;
   hiddenCtx.clearRect(0, 0, width, height);
   hiddenCtx.drawImage(sourceImage, 0, 0, width, height);
-
   const imageData = hiddenCtx.getImageData(0, 0, width, height);
-  const { integral } = buildLumaBuffers(imageData.data, width, height, contrast, gamma);
-
-  targetCtx.clearRect(0, 0, width, height);
-  targetCtx.fillStyle = `rgb(${paper.r} ${paper.g} ${paper.b})`;
-  targetCtx.fillRect(0, 0, width, height);
-  targetCtx.fillStyle = `rgb(${ink.r} ${ink.g} ${ink.b})`;
-
-  const centerX = width * 0.5;
-  const centerY = height * 0.5;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const diagonal = Math.sqrt(width * width + height * height);
-  const radiusScale = cellSize * 0.5;
-  const samplingRadius = Math.max(1, cellSize * quality.sampleRadius);
-
-  for (let gy = -diagonal; gy <= diagonal; gy += cellSize) {
-    for (let gx = -diagonal; gx <= diagonal; gx += cellSize) {
-      const x = centerX + gx * cos - gy * sin;
-      const y = centerY + gx * sin + gy * cos;
-
-      if (x < 0 || y < 0 || x >= width || y >= height) continue;
-
-      const gridX = Math.round((gx + diagonal) / cellSize);
-      const gridY = Math.round((gy + diagonal) / cellSize);
-
-      const baseLuma = sampleBoxAverage(integral, width, height, x, y, samplingRadius);
-      const edgeStrength = sampleEdgeStrength(integral, width, height, x, y, samplingRadius);
-
-      let darkness = Math.pow(1 - baseLuma, toneCurve);
-      darkness = clamp(darkness + edgeStrength * quality.edgeBoost * (1 - darkness), 0, 1);
-
-      const bayer = BAYER_8X8[((gridY & 7) * 8) + (gridX & 7)] - 0.5;
-      darkness = clamp(darkness + bayer * quality.ditherAmount * (1 - darkness * 0.55), 0, 1);
-
-      if (darkness < 0.003) continue;
-
-      const dotStrength = minDot + (1 - minDot) * darkness;
-      const radius = clamp(dotStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
-
-      const jx = (hash2d(gridX, gridY, 0.1, seed) - 0.5) * cellSize * 0.5 * jitter;
-      const jy = (hash2d(gridX, gridY, 0.9, seed) - 0.5) * cellSize * 0.5 * jitter;
-
-      targetCtx.beginPath();
-      targetCtx.arc(x + jx, y + jy, radius, 0, Math.PI * 2);
-      targetCtx.fill();
-
-      if (microDotAmount <= 0 || darkness >= 0.6) continue;
-
-      const microBase = microDotAmount * (1 - darkness);
-      const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
-      const maxMicro = Math.min(3, Math.ceil(microBase * 3));
-      const quadrantOffsets = [
-        [-0.25, -0.25],
-        [ 0.25,  0.25],
-        [-0.25,  0.25]
-      ];
-
-      for (let mi = 0; mi < maxMicro; mi++) {
-        const salt = 2.4 + mi * 1.7;
-        const chance = microBase * (0.65 - mi * 0.15);
-        if (hash2d(gridX, gridY, salt, seed) > chance) continue;
-
-        const qx = quadrantOffsets[mi][0];
-        const qy = quadrantOffsets[mi][1];
-        const mx = x + (qx + (hash2d(gridX, gridY, salt + 1.2, seed) - 0.5) * 0.2) * cellSize;
-        const my = y + (qy + (hash2d(gridX, gridY, salt + 2.4, seed) - 0.5) * 0.2) * cellSize;
-
-        targetCtx.beginPath();
-        targetCtx.arc(mx, my, microRadius, 0, Math.PI * 2);
-        targetCtx.fill();
-      }
-    }
-  }
+  renderHalftoneSync(targetCtx, imageData.data, width, height, settings);
 }
 
 // The source was re-scaled from full resolution on every render, including
@@ -946,7 +800,7 @@ function initializeWorker() {
   }
 
   try {
-    renderWorker = new Worker(new URL("./renderer-worker.js", import.meta.url));
+    renderWorker = new Worker(new URL("./renderer-worker.js", import.meta.url), { type: "module" });
     workerEnabled = true;
 
     renderWorker.addEventListener("message", (event) => {
@@ -1113,15 +967,15 @@ function updateSliderFills() {
   document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
 }
 
-function runPostProcessChain(src) {
+function runPostProcessChain(src, passes = previewPasses) {
   const grain = parseFloat(controls.grainStrength.value) / 100 * 0.15;
-  src = grainPass.apply(src, grain, grainSeed);
+  src = passes.grain.apply(src, grain, grainSeed);
 
   const bloom = parseFloat(controls.bloomStrength.value) / 100;
-  src = bloomPass.apply(src, bloom);
+  src = passes.bloom.apply(src, bloom);
 
   const crt = parseFloat(controls.crtStrength.value) / 100;
-  src = crtPass.apply(src, crt);
+  src = passes.crt.apply(src, crt);
 
   return src;
 }
@@ -1167,69 +1021,285 @@ function loadImageFromFile(file) {
   reader.readAsDataURL(file);
 }
 
-function exportPng() {
-  if (!sourceImage) return;
+function hasPostEffects() {
+  return numberValue(controls.grainStrength, 0) > 0
+    || numberValue(controls.bloomStrength, 0) > 0
+    || numberValue(controls.crtStrength, 0) > 0;
+}
 
-  const quality = getQualityConfig();
-  const scale = quality.exportScale;
-  // iOS caps canvas area at 16,777,216px; past that the canvas silently
-  // yields nothing, so a large export came back blank.
-  const maxExportPixels = isIOS() ? 16_000_000 : 48_000_000;
+function getSourceDimensions() {
+  return {
+    width: sourceImage.naturalWidth || sourceImage.videoWidth || sourceImage.width,
+    height: sourceImage.naturalHeight || sourceImage.videoHeight || sourceImage.height
+  };
+}
 
-  let exportWidth = previewCanvas.width * scale;
-  let exportHeight = previewCanvas.height * scale;
-  const exportPixels = exportWidth * exportHeight;
+function setExportProgress(job, progress, label = "Cancel") {
+  if (activeExport !== job) return;
+  const percent = Math.min(100, Math.max(0, Math.round(progress)));
+  controls.exportBtn.textContent = `${label} · ${percent}%`;
+  controls.exportBtn.setAttribute("aria-label", `Cancel PNG export, ${percent}% complete`);
+  setRenderStatus(`Exporting… ${percent}%`, true, true);
+}
 
-  if (exportPixels > maxExportPixels) {
-    const factor = Math.sqrt(maxExportPixels / exportPixels);
-    exportWidth = Math.floor(exportWidth * factor);
-    exportHeight = Math.floor(exportHeight * factor);
-  }
+function setExportFeedback(text, resetDelay = 2200) {
+  clearTimeout(exportFeedbackTimer);
+  controls.exportBtn.textContent = text;
+  controls.exportBtn.removeAttribute("aria-busy");
+  controls.exportBtn.removeAttribute("aria-label");
+  controls.exportBtn.dataset.exporting = "false";
+  exportFeedbackTimer = setTimeout(() => {
+    if (activeExport) return;
+    controls.exportBtn.textContent = "Export PNG";
+  }, resetDelay);
+}
 
-  const exportCanvas = document.createElement("canvas");
-  exportCanvas.width = Math.max(1, exportWidth);
-  exportCanvas.height = Math.max(1, exportHeight);
+function formatFileSize(bytes) {
+  if (bytes < 1_000_000) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
+  return `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
+}
 
-  const exportCtx = exportCanvas.getContext("2d");
-  if (!exportCtx) return;
-
-  const settings = getRenderSettings();
-  const pixelScale = exportCanvas.width / Math.max(1, previewCanvas.width);
-  settings.cellSize = Math.max(1, settings.cellSize * pixelScale);
-  renderHalftoneOnMain(exportCtx, exportCanvas.width, exportCanvas.height, settings);
-
-  const exportSource = runPostProcessChain(exportCanvas);
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
-  const filename = `halftone-${timestamp}.png`;
-
-  // A blob URL instead of a data URL: toDataURL materialises the whole PNG as
-  // a base64 string, tens of megabytes at export sizes, which is exactly what
-  // a memory-tight phone cannot spare.
-  const save = (blob) => {
-    if (!blob) {
-      setRenderStatus("Export failed", false, true);
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob !== "function") {
+      reject(new Error("PNG export is not supported in this browser."));
       return;
     }
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  };
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("The browser could not encode this PNG."));
+    }, "image/png");
+  });
+}
 
-  if (typeof exportSource.toBlob === "function") {
-    exportSource.toBlob(save, "image/png");
+function downloadExport(blob) {
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `halftone-${timestamp}.png`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function canUseExportWorker() {
+  return Boolean(window.Worker && window.OffscreenCanvas && window.createImageBitmap);
+}
+
+function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
+  return new Promise(async (resolve, reject) => {
+    let settled = false;
+    const worker = new Worker(new URL("./export-worker.js", import.meta.url), { type: "module" });
+    job.worker = worker;
+
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(job.forceCancelTimer);
+      worker.terminate();
+      job.worker = null;
+      callback(value);
+    };
+
+    job.forceCancel = () => settle(resolve, { cancelled: true });
+
+    worker.addEventListener("message", (event) => {
+      const { type, requestId, progress, blob, bitmap, message } = event.data || {};
+      if (requestId !== job.id) {
+        if (bitmap && typeof bitmap.close === "function") bitmap.close();
+        return;
+      }
+
+      if (type === "export-progress") {
+        setExportProgress(job, progress);
+      } else if (type === "export-cancelled") {
+        settle(resolve, { cancelled: true });
+      } else if (type === "export-complete") {
+        settle(resolve, { blob });
+      } else if (type === "export-rendered") {
+        settle(resolve, { bitmap });
+      } else if (type === "export-error") {
+        settle(reject, new Error(message || "Export worker failed."));
+      }
+    });
+
+    worker.addEventListener("error", (event) => {
+      settle(reject, new Error(event.message || "Export worker failed."));
+    });
+
+    try {
+      const sourceBitmap = await createImageBitmap(sourceImage);
+      if (job.cancelled) {
+        if (typeof sourceBitmap.close === "function") sourceBitmap.close();
+        settle(resolve, { cancelled: true });
+        return;
+      }
+
+      worker.postMessage({
+        type: "export",
+        requestId: job.id,
+        width: dimensions.width,
+        height: dimensions.height,
+        settings,
+        needsPostEffects,
+        sourceBitmap
+      }, [sourceBitmap]);
+    } catch (error) {
+      settle(reject, error);
+    }
+  });
+}
+
+async function renderExportOnMain(job, dimensions, settings) {
+  const source = document.createElement("canvas");
+  source.width = dimensions.width;
+  source.height = dimensions.height;
+  const sourceContext = source.getContext("2d", { willReadFrequently: true });
+  if (!sourceContext) throw new Error("Canvas context is unavailable.");
+
+  sourceContext.imageSmoothingEnabled = true;
+  sourceContext.imageSmoothingQuality = "high";
+  sourceContext.drawImage(sourceImage, 0, 0, dimensions.width, dimensions.height);
+  const imageData = sourceContext.getImageData(0, 0, dimensions.width, dimensions.height);
+  source.width = 1;
+  source.height = 1;
+
+  const output = document.createElement("canvas");
+  output.width = dimensions.width;
+  output.height = dimensions.height;
+  const outputContext = output.getContext("2d");
+  if (!outputContext) throw new Error("Canvas context is unavailable.");
+
+  const result = await renderHalftoneAsync(
+    outputContext,
+    imageData.data,
+    dimensions.width,
+    dimensions.height,
+    settings,
+    {
+      shouldCancel: () => job.cancelled,
+      onProgress: (progress) => setExportProgress(job, 4 + progress * 84)
+    }
+  );
+
+  return result.cancelled ? { cancelled: true } : { canvas: output };
+}
+
+function cancelExport() {
+  const job = activeExport;
+  if (!job || job.cancelled) return;
+  job.cancelled = true;
+  controls.exportBtn.textContent = "Cancelling…";
+  controls.exportBtn.setAttribute("aria-label", "Cancelling PNG export");
+  setRenderStatus("Cancelling export…", true, true);
+
+  if (job.worker) {
+    job.worker.postMessage({ type: "cancel-export", requestId: job.id });
+    job.forceCancelTimer = setTimeout(() => job.forceCancel?.(), 1000);
+  }
+}
+
+async function exportPng() {
+  if (activeExport) {
+    cancelExport();
     return;
   }
+  if (!sourceImage) return;
 
-  const link = document.createElement("a");
-  link.href = exportSource.toDataURL("image/png");
-  link.download = filename;
-  link.click();
+  clearTimeout(exportFeedbackTimer);
+  const job = { id: ++exportRequestId, cancelled: false, worker: null };
+  activeExport = job;
+  controls.exportBtn.dataset.exporting = "true";
+  controls.exportBtn.setAttribute("aria-busy", "true");
+  setExportProgress(job, 0);
+
+  let outputCanvas = null;
+  let outputBitmap = null;
+
+  try {
+    const needsPostEffects = hasPostEffects();
+    const sourceDimensions = getSourceDimensions();
+    const maxPixels = getExportPixelBudget({
+      compact: isCompactDevice() || isIOS(),
+      hasPostEffects: needsPostEffects
+    });
+    const dimensions = calculateExportDimensions(
+      sourceDimensions.width,
+      sourceDimensions.height,
+      maxPixels
+    );
+    const settings = getRenderSettings();
+    settings.cellSize = Math.max(
+      1,
+      settings.cellSize * dimensions.width / Math.max(1, previewCanvas.width)
+    );
+
+    let result;
+    if (canUseExportWorker()) {
+      try {
+        result = await renderExportWithWorker(job, dimensions, settings, needsPostEffects);
+      } catch {
+        if (job.cancelled) result = { cancelled: true };
+        else result = await renderExportOnMain(job, dimensions, settings);
+      }
+    } else {
+      result = await renderExportOnMain(job, dimensions, settings);
+    }
+
+    if (result.cancelled || job.cancelled) return;
+
+    let blob = result.blob;
+    if (!blob) {
+      outputCanvas = result.canvas || document.createElement("canvas");
+      if (result.bitmap) {
+        outputBitmap = result.bitmap;
+        outputCanvas.width = dimensions.width;
+        outputCanvas.height = dimensions.height;
+        const context = outputCanvas.getContext("2d");
+        if (!context) throw new Error("Canvas context is unavailable.");
+        context.drawImage(outputBitmap, 0, 0);
+        outputBitmap.close?.();
+        outputBitmap = null;
+      }
+
+      setExportProgress(job, 92);
+      const exportSource = needsPostEffects
+        ? runPostProcessChain(outputCanvas, exportPasses)
+        : outputCanvas;
+      setExportProgress(job, 96);
+      blob = await canvasToBlob(exportSource);
+    }
+
+    if (job.cancelled) return;
+    setExportProgress(job, 100);
+    downloadExport(blob);
+    setRenderStatus("Export complete", false, true);
+    setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
+  } catch (error) {
+    if (!job.cancelled) {
+      console.error(error);
+      setRenderStatus("Export failed", false, true);
+      setExportFeedback("Export failed · Retry", 3000);
+    }
+  } finally {
+    clearTimeout(job.forceCancelTimer);
+    job.worker?.terminate();
+    outputBitmap?.close?.();
+    if (outputCanvas) {
+      outputCanvas.width = 1;
+      outputCanvas.height = 1;
+    }
+    Object.values(exportPasses).forEach((pass) => pass.release());
+
+    if (activeExport === job) activeExport = null;
+    if (job.cancelled) {
+      setRenderStatus("Export cancelled", false, true);
+      setExportFeedback("Export cancelled", 1600);
+    }
+  }
 }
 
 function handleSplitPointerDown(event) {

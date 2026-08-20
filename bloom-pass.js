@@ -30,4 +30,9 @@ export class BloomPass {
 
     return this._canvas;
   }
+
+  release() {
+    this._canvas.width = 1;
+    this._canvas.height = 1;
+  }
 }
