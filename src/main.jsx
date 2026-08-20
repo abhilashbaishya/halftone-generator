@@ -10,9 +10,10 @@ import {
 } from "dialkit";
 import "dialkit/styles.css";
 import "./dial-panel.css";
+import { EXPORT_FORMAT_OPTIONS, getExportFormat } from "../export-formats.js";
 import "../script.js";
 
-const QUALITY_OPTIONS = [
+const RENDER_PROFILE_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "high", label: "High" },
   { value: "ultra", label: "Ultra" },
@@ -463,6 +464,12 @@ function SourceControls({ state }) {
     window.halftoneStudio.deletePreset();
   }, []);
 
+  const revertPreset = useCallback(() => {
+    setNaming(false);
+    setError("");
+    window.halftoneStudio.revertPreset();
+  }, []);
+
   return (
     <>
       <ButtonGroup buttons={uploadButtons} />
@@ -492,13 +499,16 @@ function SourceControls({ state }) {
       ) : (
         <div className="dialkit-preset-actions">
           <button
-            className="dialkit-button"
+            className={`dialkit-button${state.presetModified ? " dialkit-button-primary" : ""}`}
             type="button"
             disabled={!state.presetModified}
             onClick={openNamer}
           >
             {state.isCustomPreset && state.presetModified ? "Update preset" : "Save preset"}
           </button>
+          {state.presetModified ? (
+            <button className="dialkit-button" type="button" onClick={revertPreset}>Revert</button>
+          ) : null}
           {state.isCustomPreset ? (
             <button className="dialkit-button dialkit-button-danger" type="button" onClick={deletePreset}>Delete</button>
           ) : null}
@@ -532,7 +542,12 @@ function DialPanel() {
           </Folder>
 
           <Folder title="Tone" defaultOpen>
-            <SettingSelect settingKey="quality" label="Quality" value={settings.quality} options={QUALITY_OPTIONS} />
+            <SettingSelect
+              settingKey="quality"
+              label="Render profile"
+              value={settings.quality}
+              options={RENDER_PROFILE_OPTIONS}
+            />
             <SettingSlider settingKey="contrast" label="Contrast" value={settings.contrast} min={0.5} max={2.5} step={0.05} />
             <Folder key={compact ? "advanced-mobile" : "advanced-desktop"} title="Advanced" defaultOpen={!compact}>
               <SettingSlider settingKey="gamma" label="Gamma" value={settings.gamma} min={0.4} max={2.4} step={0.01} />
@@ -554,4 +569,47 @@ function DialPanel() {
   );
 }
 
+function ExportControls() {
+  const state = useStudioState();
+
+  const setFormat = useCallback((format) => {
+    window.halftoneStudio.setExportFormat(format);
+  }, []);
+
+  if (!state) return null;
+
+  const format = getExportFormat(state.export.format);
+
+  return (
+    <div className="dialkit-root halftone-dialkit export-dialkit" data-mode="inline" data-theme={state.theme}>
+      <div className="export-controls" aria-label="Export settings">
+        <div className="export-format-grid" role="radiogroup" aria-label="Export format">
+          {EXPORT_FORMAT_OPTIONS.map((option) => {
+            const selected = option.value === format.value;
+            return (
+              <button
+                key={option.value}
+                className="export-format-option"
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                data-selected={selected}
+                disabled={state.export.exporting}
+                onClick={() => setFormat(option.value)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 createRoot(document.getElementById("dialPanelRoot")).render(<DialPanel />);
+
+const exportControlsRoot = document.getElementById("exportControlsRoot");
+if (exportControlsRoot) {
+  createRoot(exportControlsRoot).render(<ExportControls />);
+}

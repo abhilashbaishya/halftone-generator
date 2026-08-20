@@ -3,6 +3,18 @@ import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
 import { renderHalftoneAsync, renderHalftoneSync } from "./renderer-core.js";
 import { calculateExportDimensions, getExportPixelBudget } from "./export-policy.js";
+import { estimateEncodedSize } from "./export-estimator.js";
+import {
+  DEFAULT_EXPORT_FORMAT,
+  getEncoderQuality,
+  getExportFormat,
+  isExportFormat
+} from "./export-formats.js";
+import {
+  MAX_IMAGE_BYTES,
+  inspectImageBlob,
+  validateImageDimensions
+} from "./image-policy.js";
 
 const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
 
@@ -42,17 +54,34 @@ function openDb() {
     req.onblocked = () => rej(new Error("IndexedDB blocked"));
   });
 }
-function saveImageToDb(dataUrl) {
-  openDb().then(db => {
-    const tx = db.transaction(DB_STORE, "readwrite");
-    tx.objectStore(DB_STORE).put(dataUrl, DB_KEY);
-  }).catch(() => {});
+function saveImageToDb(imageBlob) {
+  if (!(imageBlob instanceof Blob)) return Promise.resolve();
+
+  return openDb().then((db) => new Promise((resolve, reject) => {
+    const transaction = db.transaction(DB_STORE, "readwrite");
+    transaction.objectStore(DB_STORE).put(imageBlob, DB_KEY);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+    transaction.onabort = transaction.onerror;
+  })).catch(() => {});
 }
 function loadImageFromDb() {
   return openDb().then(db => new Promise((res, rej) => {
     const req = db.transaction(DB_STORE).objectStore(DB_STORE).get(DB_KEY);
-    req.onsuccess = () => res(req.result || null);
-    req.onerror = () => rej(req.error);
+    req.onsuccess = () => {
+      db.close();
+      res(req.result || null);
+    };
+    req.onerror = () => {
+      db.close();
+      rej(req.error);
+    };
   }));
 }
 
@@ -76,6 +105,7 @@ if (!previewCtx || !sourceCtx || !hiddenCtx) {
 const DEFAULT_QUALITY = "high";
 const DEFAULT_PRESET = "red";
 const CUSTOM_PRESETS_KEY = "halftone.customPresets.v1";
+const EXPORT_PREFERENCES_KEY = "halftone.export.v1";
 
 const PRESET_FIELDS = [
   "quality",
@@ -146,6 +176,7 @@ const controls = {
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
   exportBtn: document.getElementById("exportBtn"),
+  exportMeta: document.getElementById("exportMeta"),
   savePresetBtn: document.getElementById("savePresetBtn"),
   deletePresetBtn: document.getElementById("deletePresetBtn"),
   presetActions: document.getElementById("presetActions"),
@@ -268,13 +299,35 @@ let workerEnabled = false;
 let renderRequestId = 0;
 let workerBusy = false;
 let renderQueued = false;
+let previewIsCurrent = false;
 let exportRequestId = 0;
 let activeExport = null;
 let exportFeedbackTimer = null;
+let exportEstimateTimer = null;
+let exportEstimateRequestId = 0;
+
+const exportEstimateCanvases = [document.createElement("canvas"), document.createElement("canvas")];
+const exportEstimateCache = new Map();
+const exactExportSizeCache = new Map();
+
+function loadExportPreferences() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(EXPORT_PREFERENCES_KEY) || "null");
+    return {
+      format: isExportFormat(stored?.format) ? stored.format : DEFAULT_EXPORT_FORMAT
+    };
+  } catch {
+    return { format: DEFAULT_EXPORT_FORMAT };
+  }
+}
+
+const initialExportPreferences = loadExportPreferences();
+let exportFormat = initialExportPreferences.format;
 
 let scaledSource = null;
 let scaledSourceKey = "";
 let sourceToken = 0;
+let imageLoadToken = 0;
 
 // Phones and tablets: cap the backing store well below the desktop budget and
 // clamp DPR, or an `ultra` preset at DPR 3 asks for ~10M pixels per render.
@@ -293,6 +346,37 @@ function setSourceImage(image) {
   sourceImage = image;
   sourceToken += 1;
   scaledSourceKey = "";
+  previewIsCurrent = false;
+  invalidateExportEstimate();
+  updateExportMeta();
+}
+
+function loadImageSource(source, { token = ++imageLoadToken, onLoad, onError } = {}) {
+  const isBlob = source instanceof Blob;
+  const sourceUrl = isBlob ? URL.createObjectURL(source) : source;
+  const image = new Image();
+  const releaseUrl = () => {
+    if (isBlob) URL.revokeObjectURL(sourceUrl);
+  };
+
+  image.onload = () => {
+    releaseUrl();
+    if (token !== imageLoadToken) return;
+    const validation = validateImageDimensions(image.naturalWidth, image.naturalHeight);
+    if (!validation.ok) {
+      onError?.(new Error(validation.message));
+      return;
+    }
+    setSourceImage(image);
+    onLoad?.(image);
+  };
+  image.onerror = () => {
+    releaseUrl();
+    if (token !== imageLoadToken) return;
+    onError?.();
+  };
+  image.src = sourceUrl;
+  return token;
 }
 
 function clamp(value, min, max) {
@@ -820,7 +904,9 @@ function initializeWorker() {
 
       if (type !== "rendered") return;
 
-      if (requestId !== renderRequestId) {
+      // A slider drag can queue newer settings while the worker is busy. Do
+      // not flash the obsolete bitmap before rendering the latest request.
+      if (requestId !== renderRequestId || renderQueued) {
         if (bitmap && typeof bitmap.close === "function") bitmap.close();
         finishWorkerRender();
         return;
@@ -924,6 +1010,9 @@ function generateHalftone() {
 }
 
 function requestRender() {
+  previewIsCurrent = false;
+  invalidateExportEstimate();
+  if (workerBusy) renderQueued = true;
   if (renderFrame !== null) return;
 
   renderFrame = window.requestAnimationFrame(() => {
@@ -967,15 +1056,21 @@ function updateSliderFills() {
   document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
 }
 
-function runPostProcessChain(src, passes = previewPasses) {
-  const grain = parseFloat(controls.grainStrength.value) / 100 * 0.15;
-  src = passes.grain.apply(src, grain, grainSeed);
+function getPostProcessSettings() {
+  return {
+    grain: numberValue(controls.grainStrength, 0) / 100 * 0.15,
+    bloom: numberValue(controls.bloomStrength, 0) / 100,
+    crt: numberValue(controls.crtStrength, 0) / 100,
+    seed: grainSeed
+  };
+}
 
-  const bloom = parseFloat(controls.bloomStrength.value) / 100;
-  src = passes.bloom.apply(src, bloom);
+function runPostProcessChain(src, passes = previewPasses, settings = getPostProcessSettings()) {
+  src = passes.grain.apply(src, settings.grain, settings.seed);
 
-  const crt = parseFloat(controls.crtStrength.value) / 100;
-  src = passes.crt.apply(src, crt);
+  src = passes.bloom.apply(src, settings.bloom);
+
+  src = passes.crt.apply(src, settings.crt);
 
   return src;
 }
@@ -985,6 +1080,10 @@ function applyPostProcess(ctx, canvas) {
   if (result !== canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(result, 0, 0);
+  }
+  if (canvas === previewCanvas) {
+    previewIsCurrent = true;
+    scheduleExportEstimate();
   }
 }
 
@@ -998,33 +1097,49 @@ function updateOutputs() {
   controls.minDotOut.textContent = `${numberValue(controls.minDot, 0)}%`;
   controls.angleOut.textContent = `${numberValue(controls.screenAngle, 0)} deg`;
   controls.toneCurveOut.textContent = numberValue(controls.toneCurve, 1).toFixed(2);
+  updateExportMeta();
   updateZoomOutput();
   updateSliderFills();
 }
 
-function loadImageFromFile(file) {
-  const reader = new FileReader();
+async function loadImageFromFile(file) {
+  const token = ++imageLoadToken;
+  setRenderStatus("Checking image…", true, true);
 
-  reader.onload = () => {
-    if (typeof reader.result !== "string") return;
+  try {
+    const inspection = await inspectImageBlob(file);
+    if (token !== imageLoadToken) return;
+    if (!inspection.ok) {
+      setRenderStatus(inspection.message, false, true);
+      controls.imageInput.value = "";
+      return;
+    }
 
-    const img = new Image();
-    img.onload = () => {
-      setSourceImage(img);
-      saveImageToDb(reader.result);
-      resetView();
-      requestRender();
-    };
-    img.src = reader.result;
-  };
-
-  reader.readAsDataURL(file);
+    const safeBlob = file.slice(0, file.size, inspection.mimeType);
+    setRenderStatus("Loading image…", true, true);
+    loadImageSource(safeBlob, {
+      token,
+      onLoad: () => {
+        saveImageToDb(safeBlob);
+        resetView();
+        requestRender();
+        setRenderStatus("Ready", false);
+        controls.imageInput.value = "";
+      },
+      onError: (error) => {
+        setRenderStatus(error?.message || "Could not open that image", false, true);
+        controls.imageInput.value = "";
+      }
+    });
+  } catch {
+    if (token !== imageLoadToken) return;
+    setRenderStatus("Could not inspect that image", false, true);
+    controls.imageInput.value = "";
+  }
 }
 
-function hasPostEffects() {
-  return numberValue(controls.grainStrength, 0) > 0
-    || numberValue(controls.bloomStrength, 0) > 0
-    || numberValue(controls.crtStrength, 0) > 0;
+function hasPostEffects(settings = getPostProcessSettings()) {
+  return settings.grain > 0 || settings.bloom > 0 || settings.crt > 0;
 }
 
 function getSourceDimensions() {
@@ -1034,11 +1149,208 @@ function getSourceDimensions() {
   };
 }
 
+function getExportPlan(postProcessSettings = getPostProcessSettings()) {
+  if (!sourceImage) return null;
+
+  const needsPostEffects = hasPostEffects(postProcessSettings);
+  const sourceDimensions = getSourceDimensions();
+  const maxPixels = getExportPixelBudget({
+    compact: isCompactDevice() || isIOS(),
+    hasPostEffects: needsPostEffects
+  });
+  const dimensions = calculateExportDimensions(
+    sourceDimensions.width,
+    sourceDimensions.height,
+    maxPixels
+  );
+
+  return { dimensions, needsPostEffects };
+}
+
+function persistExportPreferences() {
+  try {
+    localStorage.setItem(EXPORT_PREFERENCES_KEY, JSON.stringify({
+      format: exportFormat
+    }));
+  } catch {
+    // Export still works when storage is unavailable.
+  }
+}
+
+function getExportSignature(plan = getExportPlan(), format = getExportFormat(exportFormat)) {
+  if (!plan) return "";
+  return JSON.stringify({
+    sourceToken,
+    width: plan.dimensions.width,
+    height: plan.dimensions.height,
+    previewWidth: previewCanvas.width,
+    format: format.value,
+    encoderQuality: format.encoderQuality ?? null,
+    grainSeed,
+    settings: captureCurrentPreset()
+  });
+}
+
+function setCachedValue(cache, key, value, limit = 18) {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > limit) {
+    cache.delete(cache.keys().next().value);
+  }
+}
+
+function invalidateExportEstimate() {
+  clearTimeout(exportEstimateTimer);
+  exportEstimateTimer = null;
+  exportEstimateRequestId += 1;
+}
+
+function drawExportEstimateSample(targetCanvas, maxEdge) {
+  const scale = Math.min(1, maxEdge / Math.max(previewCanvas.width, previewCanvas.height));
+  const width = Math.max(1, Math.round(previewCanvas.width * scale));
+  const height = Math.max(1, Math.round(previewCanvas.height * scale));
+  targetCanvas.width = width;
+  targetCanvas.height = height;
+
+  const context = targetCanvas.getContext("2d");
+  if (!context) throw new Error("Canvas context is unavailable.");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.clearRect(0, 0, width, height);
+  context.drawImage(previewCanvas, 0, 0, width, height);
+
+  return { canvas: targetCanvas, pixels: width * height };
+}
+
+function getEstimateUncertainty(format) {
+  const base = format.value === "png" ? 0.34 : format.value === "jpeg" ? 0.27 : 0.24;
+  const effects = (
+    numberValue(controls.grainStrength, 0) +
+    numberValue(controls.bloomStrength, 0) * 0.3 +
+    numberValue(controls.crtStrength, 0) * 0.2
+  ) / 100;
+  return Math.min(0.5, base + effects * 0.12);
+}
+
+async function estimateCurrentExportSize(requestId) {
+  const plan = getExportPlan();
+  if (!plan || !previewCanvas.width || !previewCanvas.height) return;
+
+  const format = getExportFormat(exportFormat);
+  const signature = getExportSignature(plan, format);
+  if (exactExportSizeCache.has(signature) || exportEstimateCache.has(signature)) {
+    updateExportMeta();
+    return;
+  }
+
+  const small = drawExportEstimateSample(exportEstimateCanvases[0], 320);
+  const large = drawExportEstimateSample(exportEstimateCanvases[1], 640);
+  const encoderQuality = getEncoderQuality(format);
+  const [smallBlob, largeBlob] = await Promise.all([
+    canvasToBlob(small.canvas, format.mimeType, encoderQuality),
+    canvasToBlob(large.canvas, format.mimeType, encoderQuality)
+  ]);
+
+  if (requestId !== exportEstimateRequestId) return;
+  const currentPlan = getExportPlan();
+  if (!currentPlan || getExportSignature(currentPlan) !== signature) return;
+
+  const estimate = estimateEncodedSize({
+    smallBytes: smallBlob.size,
+    smallPixels: small.pixels,
+    largeBytes: largeBlob.size,
+    largePixels: large.pixels,
+    targetPixels: plan.dimensions.width * plan.dimensions.height,
+    uncertainty: getEstimateUncertainty(format)
+  });
+  setCachedValue(exportEstimateCache, signature, estimate);
+  updateExportMeta();
+}
+
+function scheduleExportEstimate(delay = 420) {
+  if (!sourceImage || !previewIsCurrent) return;
+  clearTimeout(exportEstimateTimer);
+  const requestId = ++exportEstimateRequestId;
+
+  exportEstimateTimer = setTimeout(() => {
+    exportEstimateTimer = null;
+    const run = () => {
+      estimateCurrentExportSize(requestId).catch(() => {});
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(run, { timeout: 900 });
+    } else {
+      setTimeout(run, 0);
+    }
+  }, delay);
+}
+
+function formatEstimatedFileSize(estimate) {
+  const lower = formatFileSize(estimate.minBytes);
+  const upper = formatFileSize(estimate.maxBytes);
+  return lower === upper ? `est. ${upper}` : `est. ${lower}–${upper}`;
+}
+
+function updateExportMeta() {
+  const format = getExportFormat(exportFormat);
+  const plan = getExportPlan();
+  if (!plan) {
+    controls.exportMeta.textContent = `${format.label} · Source resolution`;
+    controls.exportMeta.removeAttribute("title");
+    return;
+  }
+
+  const { width, height, capped } = plan.dimensions;
+  const signature = getExportSignature(plan, format);
+  const exactBytes = exactExportSizeCache.get(signature);
+  const estimate = exportEstimateCache.get(signature);
+  const size = exactBytes
+    ? formatFileSize(exactBytes)
+    : estimate
+      ? formatEstimatedFileSize(estimate)
+      : "";
+  controls.exportMeta.textContent = [
+    `${format.label} · ${width} × ${height}`,
+    size,
+    capped ? "optimized" : ""
+  ].filter(Boolean).join(" · ");
+
+  const title = [];
+  if (exactBytes) title.push("Exact size from the most recent export with these settings.");
+  else if (estimate) title.push("Estimated from two small encodes of the finished preview. Actual size may vary.");
+  if (capped) title.push("Dimensions were reduced to stay within this device's memory limit.");
+  if (format.value === "png") title.push("PNG is lossless and may be substantially larger.");
+  if (title.length > 0) controls.exportMeta.title = title.join(" ");
+  else controls.exportMeta.removeAttribute("title");
+}
+
+function getExportButtonLabel(format = getExportFormat(exportFormat)) {
+  return `Export ${format.label}`;
+}
+
+function syncExportButtonLabel() {
+  if (activeExport) return;
+  controls.exportBtn.textContent = getExportButtonLabel();
+}
+
+function setExportFormat(nextFormat) {
+  if (activeExport || !isExportFormat(nextFormat) || nextFormat === exportFormat) return;
+  exportFormat = nextFormat;
+  persistExportPreferences();
+  clearTimeout(exportFeedbackTimer);
+  invalidateExportEstimate();
+  updateExportMeta();
+  syncExportButtonLabel();
+  scheduleExportEstimate(160);
+  emitStudioState();
+}
+
 function setExportProgress(job, progress, label = "Cancel") {
   if (activeExport !== job) return;
   const percent = Math.min(100, Math.max(0, Math.round(progress)));
   controls.exportBtn.textContent = `${label} · ${percent}%`;
-  controls.exportBtn.setAttribute("aria-label", `Cancel PNG export, ${percent}% complete`);
+  controls.exportBtn.setAttribute("aria-label", `Cancel ${job.format.label} export, ${percent}% complete`);
   setRenderStatus(`Exporting… ${percent}%`, true, true);
 }
 
@@ -1050,7 +1362,7 @@ function setExportFeedback(text, resetDelay = 2200) {
   controls.exportBtn.dataset.exporting = "false";
   exportFeedbackTimer = setTimeout(() => {
     if (activeExport) return;
-    controls.exportBtn.textContent = "Export PNG";
+    syncExportButtonLabel();
   }, resetDelay);
 }
 
@@ -1059,26 +1371,33 @@ function formatFileSize(bytes) {
   return `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
 }
 
-function canvasToBlob(canvas) {
+function canvasToBlob(canvas, mimeType = "image/png", quality) {
   return new Promise((resolve, reject) => {
     if (typeof canvas.toBlob !== "function") {
-      reject(new Error("PNG export is not supported in this browser."));
+      reject(new Error("Image export is not supported in this browser."));
       return;
     }
 
     canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("The browser could not encode this PNG."));
-    }, "image/png");
+      if (!blob) {
+        reject(new Error("The browser could not encode this image."));
+        return;
+      }
+      if (blob.type && blob.type !== mimeType) {
+        reject(new Error(`${mimeType} export is not supported in this browser.`));
+        return;
+      }
+      resolve(blob);
+    }, mimeType, quality);
   });
 }
 
-function downloadExport(blob) {
+function downloadExport(blob, format) {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `halftone-${timestamp}.png`;
+  link.download = `halftone-${timestamp}.${format.extension}`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1131,7 +1450,7 @@ function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
     });
 
     try {
-      const sourceBitmap = await createImageBitmap(sourceImage);
+      const sourceBitmap = await createImageBitmap(job.sourceImage);
       if (job.cancelled) {
         if (typeof sourceBitmap.close === "function") sourceBitmap.close();
         settle(resolve, { cancelled: true });
@@ -1145,6 +1464,10 @@ function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
         height: dimensions.height,
         settings,
         needsPostEffects,
+        encoding: {
+          mimeType: job.format.mimeType,
+          quality: getEncoderQuality(job.format)
+        },
         sourceBitmap
       }, [sourceBitmap]);
     } catch (error) {
@@ -1162,7 +1485,7 @@ async function renderExportOnMain(job, dimensions, settings) {
 
   sourceContext.imageSmoothingEnabled = true;
   sourceContext.imageSmoothingQuality = "high";
-  sourceContext.drawImage(sourceImage, 0, 0, dimensions.width, dimensions.height);
+  sourceContext.drawImage(job.sourceImage, 0, 0, dimensions.width, dimensions.height);
   const imageData = sourceContext.getImageData(0, 0, dimensions.width, dimensions.height);
   source.width = 1;
   source.height = 1;
@@ -1193,7 +1516,7 @@ function cancelExport() {
   if (!job || job.cancelled) return;
   job.cancelled = true;
   controls.exportBtn.textContent = "Cancelling…";
-  controls.exportBtn.setAttribute("aria-label", "Cancelling PNG export");
+  controls.exportBtn.setAttribute("aria-label", `Cancelling ${job.format.label} export`);
   setRenderStatus("Cancelling export…", true, true);
 
   if (job.worker) {
@@ -1202,51 +1525,59 @@ function cancelExport() {
   }
 }
 
-async function exportPng() {
+async function exportImage() {
   if (activeExport) {
     cancelExport();
     return;
   }
   if (!sourceImage) return;
 
+  const postProcessSettings = getPostProcessSettings();
+  const plan = getExportPlan(postProcessSettings);
+  if (!plan) return;
+  const format = getExportFormat(exportFormat);
+  const settings = getRenderSettings();
+  const exportSignature = getExportSignature(plan, format);
+
   clearTimeout(exportFeedbackTimer);
-  const job = { id: ++exportRequestId, cancelled: false, worker: null };
+  const job = {
+    id: ++exportRequestId,
+    cancelled: false,
+    worker: null,
+    format,
+    plan,
+    sourceImage,
+    settings,
+    postProcessSettings,
+    exportSignature,
+    previewWidth: previewCanvas.width
+  };
   activeExport = job;
   controls.exportBtn.dataset.exporting = "true";
   controls.exportBtn.setAttribute("aria-busy", "true");
   setExportProgress(job, 0);
+  emitStudioState();
 
   let outputCanvas = null;
   let outputBitmap = null;
 
   try {
-    const needsPostEffects = hasPostEffects();
-    const sourceDimensions = getSourceDimensions();
-    const maxPixels = getExportPixelBudget({
-      compact: isCompactDevice() || isIOS(),
-      hasPostEffects: needsPostEffects
-    });
-    const dimensions = calculateExportDimensions(
-      sourceDimensions.width,
-      sourceDimensions.height,
-      maxPixels
-    );
-    const settings = getRenderSettings();
-    settings.cellSize = Math.max(
+    const { dimensions, needsPostEffects } = job.plan;
+    job.settings.cellSize = Math.max(
       1,
-      settings.cellSize * dimensions.width / Math.max(1, previewCanvas.width)
+      job.settings.cellSize * dimensions.width / Math.max(1, job.previewWidth)
     );
 
     let result;
     if (canUseExportWorker()) {
       try {
-        result = await renderExportWithWorker(job, dimensions, settings, needsPostEffects);
+        result = await renderExportWithWorker(job, dimensions, job.settings, needsPostEffects);
       } catch {
         if (job.cancelled) result = { cancelled: true };
-        else result = await renderExportOnMain(job, dimensions, settings);
+        else result = await renderExportOnMain(job, dimensions, job.settings);
       }
     } else {
-      result = await renderExportOnMain(job, dimensions, settings);
+      result = await renderExportOnMain(job, dimensions, job.settings);
     }
 
     if (result.cancelled || job.cancelled) return;
@@ -1267,15 +1598,21 @@ async function exportPng() {
 
       setExportProgress(job, 92);
       const exportSource = needsPostEffects
-        ? runPostProcessChain(outputCanvas, exportPasses)
+        ? runPostProcessChain(outputCanvas, exportPasses, job.postProcessSettings)
         : outputCanvas;
       setExportProgress(job, 96);
-      blob = await canvasToBlob(exportSource);
+      blob = await canvasToBlob(
+        exportSource,
+        job.format.mimeType,
+        getEncoderQuality(job.format)
+      );
     }
 
     if (job.cancelled) return;
     setExportProgress(job, 100);
-    downloadExport(blob);
+    setCachedValue(exactExportSizeCache, job.exportSignature, blob.size);
+    updateExportMeta();
+    downloadExport(blob, job.format);
     setRenderStatus("Export complete", false, true);
     setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
   } catch (error) {
@@ -1299,6 +1636,8 @@ async function exportPng() {
       setRenderStatus("Export cancelled", false, true);
       setExportFeedback("Export cancelled", 1600);
     }
+    updateExportMeta();
+    emitStudioState();
   }
 }
 
@@ -1340,7 +1679,11 @@ function getStudioState() {
         .sort((a, b) => a.localeCompare(b))
         .map((value) => ({ value, label: value }))
     ],
-    settings: captureCurrentPreset()
+    settings: captureCurrentPreset(),
+    export: {
+      format: exportFormat,
+      exporting: Boolean(activeExport)
+    }
   };
 }
 
@@ -1361,6 +1704,7 @@ window.halftoneStudio = Object.freeze({
   eventName: STUDIO_STATE_EVENT,
   getState: getStudioState,
   setSetting: setPanelSetting,
+  setExportFormat,
   selectPreset(name) {
     applyPreset(name);
     closePresetNamer();
@@ -1377,7 +1721,12 @@ window.halftoneStudio = Object.freeze({
   deletePreset() {
     deleteCurrentPreset();
   },
-  exportImage: exportPng
+  revertPreset() {
+    applyPreset(controls.presetSelect.value);
+    closePresetNamer();
+    emitStudioState();
+  },
+  exportImage
 });
 
 controls.imageInput.addEventListener("change", () => {
@@ -1487,12 +1836,14 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     const resized = fitCanvasToStage();
+    updateExportMeta();
     updateSplitPreview();
     if (resized) requestRender();
+    else scheduleExportEstimate(160);
   }, 120);
 });
 
-controls.exportBtn.addEventListener("click", exportPng);
+controls.exportBtn.addEventListener("click", exportImage);
 
 controls.grainStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
 controls.bloomStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
@@ -1524,6 +1875,7 @@ applyTheme(localStorage.getItem(THEME_KEY) || "dark");
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
 syncPresetActions();
+syncExportButtonLabel();
 initializeWorker();
 resetView();
 updateSplitPreview();
@@ -1535,28 +1887,48 @@ emitStudioState();
 // indexedDB.open() left both handlers unreached, so the placeholder never
 // loaded and the canvas sat on drawPlaceholder()'s black fill forever.
 function loadInitialImage() {
+  const token = ++imageLoadToken;
   const giveUp = () => {
     drawPlaceholder();
     setRenderStatus("Upload an image", false, true);
   };
 
-  const tryLoad = (src, onError) => {
-    const img = new Image();
-    img.onload = () => {
-      setSourceImage(img);
-      setRenderStatus("Ready", false);
-      resetView();
-      requestRender();
-    };
-    img.onerror = onError;
-    img.src = src;
+  const tryLoad = (source, onError) => {
+    loadImageSource(source, {
+      token,
+      onLoad: () => {
+        setRenderStatus("Ready", false);
+        resetView();
+        requestRender();
+      },
+      onError
+    });
   };
 
   setRenderStatus("Loading image…", true, true);
 
-  withTimeout(loadImageFromDb().catch(() => null), DB_TIMEOUT_MS).then((dataUrl) => {
-    if (dataUrl) {
-      tryLoad(dataUrl, () => tryLoad(PLACEHOLDER_URL, giveUp));
+  const normalizeStoredImage = async (storedImage) => {
+    let blob = storedImage;
+    if (typeof storedImage === "string") {
+      const maxDataUrlLength = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 256;
+      if (!storedImage.startsWith("data:image/") || storedImage.length > maxDataUrlLength) return null;
+      blob = await fetch(storedImage).then((response) => response.blob());
+    }
+    if (!(blob instanceof Blob)) return null;
+
+    const inspection = await inspectImageBlob(blob);
+    if (!inspection.ok) return null;
+    return blob.slice(0, blob.size, inspection.mimeType);
+  };
+
+  withTimeout(loadImageFromDb().catch(() => null), DB_TIMEOUT_MS).then(async (storedImage) => {
+    if (token !== imageLoadToken) return;
+    const safeStoredImage = storedImage
+      ? await normalizeStoredImage(storedImage).catch(() => null)
+      : null;
+    if (token !== imageLoadToken) return;
+    if (safeStoredImage) {
+      tryLoad(safeStoredImage, () => tryLoad(PLACEHOLDER_URL, giveUp));
       return;
     }
     tryLoad(PLACEHOLDER_URL, giveUp);

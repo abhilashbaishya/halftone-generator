@@ -11,7 +11,7 @@ function isCancelled(requestId) {
 }
 
 async function renderExport(message) {
-  const { requestId, width, height, settings, sourceBitmap, needsPostEffects } = message;
+  const { requestId, width, height, settings, sourceBitmap, needsPostEffects, encoding } = message;
   let lastProgress = -1;
   const postProgress = (value) => {
     const percent = Math.min(100, Math.max(0, Math.round(value * 100)));
@@ -52,7 +52,14 @@ async function renderExport(message) {
     }
 
     postProgress(0.92);
-    const blob = await outputCanvas.convertToBlob({ type: "image/png" });
+    const mimeType = encoding?.mimeType || "image/png";
+    const blob = await outputCanvas.convertToBlob({
+      type: mimeType,
+      quality: encoding?.quality
+    });
+    if (blob.type && blob.type !== mimeType) {
+      throw new Error(`${mimeType} export is not supported in this browser.`);
+    }
     if (isCancelled(requestId)) {
       self.postMessage({ type: "export-cancelled", requestId });
       return;

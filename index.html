@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and PNG export." />
+    <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
     <title>Halftone Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -81,7 +81,7 @@
           </div>
           <label class="field">
             <div class="field-title">
-              <span>Quality</span>
+              <span>Render Profile</span>
             </div>
             <select id="quality">
               <option value="draft">Draft</option>
@@ -164,7 +164,9 @@
         </div>
 
         <div class="rail-actions">
-          <button id="exportBtn" class="button button-primary">Export PNG</button>
+          <div id="exportControlsRoot" class="export-controls-mount"></div>
+          <p id="exportMeta" class="export-meta">WebP · Source resolution</p>
+          <button id="exportBtn" class="button button-primary">Export WebP</button>
         </div>
       </aside>
 
