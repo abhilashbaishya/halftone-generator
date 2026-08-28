@@ -1250,6 +1250,8 @@ canvas {
   }
 
   .control-rail {
+    position: relative;
+    z-index: 2;
     height: auto;
     order: 2;
     border-radius: var(--radius);
@@ -1284,6 +1286,7 @@ canvas {
   .preview-stage {
     order: 1;
     position: relative;
+    z-index: 1;
     grid-template-rows: 1fr;
     border-radius: var(--radius);
     min-height: 62vh;

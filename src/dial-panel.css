@@ -97,6 +97,10 @@
   -webkit-appearance: none;
 }
 
+.halftone-dialkit .dialkit-select-dropdown {
+  border: 0;
+}
+
 .studio-color-hex-button {
   padding: 0;
   border: 0;
