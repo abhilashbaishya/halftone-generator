@@ -334,10 +334,6 @@
   line-height: 1.4;
 }
 
-.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-content {
-  overflow: hidden;
-}
-
 .dial-panel-loading {
   padding: 20px;
   color: var(--label);

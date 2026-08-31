@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
 import {
   Folder,
   SelectControl,
@@ -745,46 +744,14 @@ function isMobileShell() {
   return window.matchMedia(MOBILE_SHELL).matches;
 }
 
-const REDUCE_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(() => window.matchMedia(REDUCE_MOTION_QUERY).matches);
-
-  useEffect(() => {
-    const query = window.matchMedia(REDUCE_MOTION_QUERY);
-    const update = () => setReduced(query.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return reduced;
-}
-
-function ReducedMotionRoot({ children }) {
-  const reduced = usePrefersReducedMotion();
-  return (
-    <MotionConfig reducedMotion={reduced ? "always" : "never"}>
-      {children}
-    </MotionConfig>
-  );
-}
-
 async function bootDesktopStudio() {
   if (desktopBooted) return;
   desktopBooted = true;
   await import("../script.js");
-  createRoot(document.getElementById("dialPanelRoot")).render(
-    <ReducedMotionRoot>
-      <DialPanel />
-    </ReducedMotionRoot>
-  );
+  createRoot(document.getElementById("dialPanelRoot")).render(<DialPanel />);
   const exportControlsRoot = document.getElementById("exportControlsRoot");
   if (exportControlsRoot) {
-    createRoot(exportControlsRoot).render(
-      <ReducedMotionRoot>
-        <ExportControls />
-      </ReducedMotionRoot>
-    );
+    createRoot(exportControlsRoot).render(<ExportControls />);
   }
 }
 
