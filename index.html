@@ -4,20 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
+    <meta name="theme-color" content="#1e1d1e" />
     <title>Halftone Studio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="preload" href="./fonts/ABCDiatype-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/ABCDiatype-Medium.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <h1 class="sr-only">Halftone Studio</h1>
+    <div class="phone-gate">
+      <p class="phone-gate-brand" translate="no">Halftone Studio</p>
+      <h1>Open this on a computer</h1>
+      <p>This editor isn’t built for phones. Use a desktop or laptop browser.</p>
+    </div>
+    <h1 class="sr-only app-title">Halftone Studio</h1>
     <main class="workspace">
       <aside class="control-rail">
-        <input id="imageInput" class="sr-only" type="file" accept="image/*" aria-label="Upload image" />
+        <input id="imageInput" class="sr-only" type="file" accept="image/*" tabindex="-1" aria-hidden="true" />
         <div id="dialPanelRoot" class="dial-panel-mount"></div>
 
         <div id="nativeControls" class="control-scroll" hidden aria-hidden="true">
@@ -166,7 +168,7 @@
         <div class="rail-actions">
           <div id="exportControlsRoot" class="export-controls-mount"></div>
           <p id="exportMeta" class="export-meta">WebP · Source resolution</p>
-          <button id="exportBtn" class="button button-primary">Export WebP</button>
+          <button id="exportBtn" class="button">Export WebP</button>
         </div>
       </aside>
 

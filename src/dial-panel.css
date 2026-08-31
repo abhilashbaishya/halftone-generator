@@ -1,41 +1,23 @@
+/* The rail hugs its content and is the only scroll container, so the panel must
+   size to its content rather than stretch, and must not clip dropdowns. */
 .dial-panel-mount {
-  flex: 1;
+  flex: none;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .halftone-dialkit {
-  height: 100%;
-  font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
-  --ref-row: rgb(35, 35, 33);
-  --ref-row-hover: rgb(43, 43, 40);
-  --ref-fill: rgb(50, 50, 46);
-  --ref-fill-active: rgb(62, 62, 57);
-  --ref-label: rgb(198, 196, 189);
-  --ref-value: rgb(241, 239, 232);
-  --ref-section: rgb(126, 124, 117);
-  --ref-dropdown: rgb(38, 38, 35);
-  --ref-hairline: rgba(255, 255, 255, 0.07);
-  --ref-dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  height: auto;
+  font-family: var(--font-sans);
 }
 
-.halftone-dialkit[data-theme="light"] {
-  --ref-row: rgb(238, 237, 231);
-  --ref-row-hover: rgb(230, 229, 222);
-  --ref-fill: rgb(220, 218, 210);
-  --ref-fill-active: rgb(206, 204, 195);
-  --ref-label: rgb(94, 92, 86);
-  --ref-value: rgb(28, 27, 25);
-  --ref-section: rgb(140, 137, 129);
-  --ref-dropdown: rgb(252, 251, 248);
-  --ref-hairline: rgba(0, 0, 0, 0.08);
-  --ref-dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-/* Matches DialKit's own [data-theme] specificity so these win in both themes. */
+/* The --ref-* palette lives in styles.css so the rail chrome and this panel
+   share one source of truth. Matches DialKit's own [data-theme] specificity
+   so these mappings win in both themes. */
 .dialkit-root.halftone-dialkit {
-  --dial-glass-bg: transparent;
+  /* Backs both .dialkit-panel-inner and .dialkit-select-dropdown, so it must
+     stay opaque; the panel is made transparent on its own element below. */
+  --dial-glass-bg: var(--ref-dropdown);
   --dial-dropdown-bg: var(--ref-dropdown);
   --dial-surface: var(--ref-row);
   --dial-surface-hover: var(--ref-row-hover);
@@ -50,7 +32,8 @@
   --dial-text-tertiary: var(--ref-section);
   --dial-border: var(--ref-hairline);
   --dial-border-hover: var(--ref-fill-active);
-  --dial-row-height: 31px;
+  --dial-row-height: 34px;
+  --dial-section-pad: 10px;
   --dial-radius: 8px;
   --dial-shadow-dropdown: var(--ref-dropdown-shadow);
 }
@@ -58,35 +41,54 @@
 .halftone-dialkit .dialkit-panel,
 .halftone-dialkit .dialkit-panel-inline,
 .halftone-dialkit .dialkit-folder-root {
-  height: 100%;
+  height: auto;
   max-height: none;
+}
+
+.halftone-dialkit .dialkit-panel-inline,
+.halftone-dialkit .dialkit-panel-inner {
+  background: transparent;
 }
 
 .halftone-dialkit .dialkit-panel-inline {
   padding: 0;
-  background: transparent;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
 }
 
 .halftone-dialkit .dialkit-panel-header {
-  margin-bottom: 8px;
+  /* The first section supplies its own top padding, matching every other one. */
+  margin-bottom: 0;
   padding-bottom: 10px;
 }
 
 .halftone-dialkit .dialkit-folder-title-root {
-  font-size: 14px;
   letter-spacing: -0.015em;
 }
 
-.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) {
+/* Section rhythm comes from padding alone: each section pads its header by
+   --dial-section-pad on both sides, so a collapsed header sits centred between
+   the divider above it and the one below. DialKit instead builds this out of
+   4px/-10px margins plus a flex gap so neighbours share a divider, which fights
+   fixed padding and wins on specificity, so both are neutralised here. */
+.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root),
+.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) + .dialkit-folder:not(.dialkit-folder-root) {
   margin-block: 0;
-  padding-block: 10px;
+  padding-top: var(--dial-section-pad);
+  padding-bottom: var(--dial-section-pad);
+}
+
+.halftone-dialkit .dialkit-folder-root > .dialkit-folder-content > .dialkit-folder-inner {
+  gap: 0;
+}
+
+/* A nested section has no divider of its own beneath it, so the gap below it is
+   already supplied by the parent section's padding. */
+.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-inner > .dialkit-folder {
+  padding-bottom: 0;
 }
 
 .halftone-dialkit .dialkit-folder:not(.dialkit-folder-root):first-child {
   border-top: none;
-  padding-top: 0;
 }
 
 .halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header {
@@ -107,33 +109,63 @@
 
 .halftone-dialkit .dialkit-folder-inner {
   gap: 7px;
+  /* The section's own padding sets the gap before its divider; DialKit's inner
+     padding would stack on top of it and double the space under open sections. */
+  padding-bottom: 0;
+}
+
+@media (pointer: coarse) {
+  /* DialKit sets touch-action: none so it can own the drag. On a phone that
+     also swallows the vertical pan that scrolls to the preview. */
+  .halftone-dialkit .dialkit-slider {
+    touch-action: pan-y;
+  }
 }
 
 .halftone-dialkit .dialkit-folder-title,
 .halftone-dialkit .dialkit-slider-label,
 .halftone-dialkit .dialkit-slider-value,
+.halftone-dialkit .dialkit-select-trigger,
 .halftone-dialkit .dialkit-select-label,
 .halftone-dialkit .dialkit-select-value,
+.halftone-dialkit .dialkit-select-option,
+.halftone-dialkit .dialkit-color-control,
 .halftone-dialkit .dialkit-color-label,
 .halftone-dialkit .dialkit-color-hex,
+/* The edit input is a separate element from the display span; without it here
+   the hex text jumps when you click to edit. */
+.halftone-dialkit .dialkit-color-hex-input,
+.halftone-dialkit .dialkit-text-control,
+.halftone-dialkit .dialkit-text-label,
+.halftone-dialkit .dialkit-text-input,
 .halftone-dialkit .dialkit-button {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .halftone-dialkit .dialkit-folder-title-root {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .halftone-dialkit .dialkit-slider-label,
 .halftone-dialkit .dialkit-select-label,
-.halftone-dialkit .dialkit-color-label {
+.halftone-dialkit .dialkit-color-label,
+.halftone-dialkit .dialkit-text-label {
   font-weight: 400;
 }
 
-.halftone-dialkit .dialkit-slider-value {
+.halftone-dialkit .dialkit-slider-label,
+.halftone-dialkit .dialkit-slider-value,
+.halftone-dialkit .dialkit-slider-input,
+.halftone-dialkit .dialkit-slider-active .dialkit-slider-value {
   font-family: inherit;
   font-variant-numeric: tabular-nums;
-  color: var(--ref-value);
+  color: var(--ref-label);
+}
+
+.halftone-dialkit .dialkit-color-hex,
+.halftone-dialkit .dialkit-color-hex-input {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The reference renders a bare fill: no handle, no hashmarks. */
@@ -148,7 +180,7 @@
 .halftone-dialkit .dialkit-text-control,
 .halftone-dialkit .dialkit-button {
   border-radius: var(--dial-radius);
-  box-shadow: none;
+  box-shadow: var(--control-ring);
 }
 
 .halftone-dialkit .dialkit-select-trigger,
@@ -178,7 +210,7 @@
 .halftone-dialkit .dialkit-color-control:hover,
 .halftone-dialkit .dialkit-text-control:focus-within,
 .halftone-dialkit .dialkit-button:hover {
-  box-shadow: none;
+  box-shadow: var(--control-ring);
 }
 
 .halftone-dialkit .dialkit-button {
@@ -191,17 +223,40 @@
   transform: scale(0.96);
 }
 
+/* Desktop: a real button. Phone: a file input covers the button so iOS gets
+   a direct tap (synthetic input.click() is what adds the ~1s cooldown). */
+.halftone-dialkit .studio-upload-button {
+  width: 100%;
+  touch-action: manipulation;
+}
+
+.halftone-dialkit .dialkit-button:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .halftone-dialkit .dialkit-button-primary:not(:disabled):hover {
+    background: var(--btn-primary-hover);
+    color: var(--btn-primary-color);
+  }
+}
+
+/* Reverting drops the primary class and unmounts the sibling Revert button in
+   the same commit. The grid re-columns instantly, so fading the near-white
+   primary background would flash a full-width white bar. */
 .halftone-dialkit .dialkit-button:disabled {
   color: var(--dial-text-tertiary);
   background: var(--dial-surface);
   opacity: 1;
   cursor: not-allowed;
+  transition: none;
 }
 
 .halftone-dialkit .dialkit-button:disabled:hover {
   color: var(--dial-text-tertiary);
   background: var(--dial-surface);
-  box-shadow: none;
+  box-shadow: var(--control-ring);
 }
 
 .halftone-dialkit .dialkit-button-primary {
@@ -232,7 +287,7 @@
 .dialkit-inline-error {
   margin: 0;
   color: #ff8d85;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
   text-wrap: pretty;
 }
@@ -274,7 +329,7 @@
 }
 
 .dialkit-upload-error strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -282,14 +337,14 @@
 .dialkit-upload-error p {
   margin-top: 2px;
   color: var(--error-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
 }
 
 .dial-panel-loading {
   padding: 20px;
   color: var(--label);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .export-controls-mount,
@@ -299,12 +354,28 @@
 
 .export-controls {
   display: grid;
+  gap: 10px;
+}
+
+.segmented-field {
+  display: grid;
+  gap: 7px;
+}
+
+.segmented-field-label {
+  font-size: var(--control-font);
+  font-weight: 400;
+  color: var(--ref-section);
 }
 
 .export-format-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
+}
+
+.render-profile-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .export-format-option {
@@ -315,11 +386,11 @@
   border-radius: var(--radius);
   background: var(--control-surface);
   color: var(--muted-text);
-  font: 500 var(--control-font)/1 "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 500 var(--control-font)/1 var(--font-sans);
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
-  box-shadow: 0 0 0 1px transparent;
+  box-shadow: var(--control-ring);
   transition-property: background-color, color, box-shadow, transform;
   transition-duration: 150ms, 150ms, 150ms, 120ms;
   transition-timing-function: ease-out;
@@ -351,43 +422,30 @@
 }
 
 @media (max-width: 980px) {
-  .dial-panel-mount {
-    flex: none;
-    overflow: visible;
-  }
-
-  .halftone-dialkit,
-  .halftone-dialkit .dialkit-panel,
-  .halftone-dialkit .dialkit-panel-inline,
-  .halftone-dialkit .dialkit-folder-root {
-    height: auto;
-  }
-
-  .halftone-dialkit .dialkit-panel-inline {
-    overflow: visible;
-  }
-
   .export-format-option {
     min-height: 44px;
   }
 }
 
-@media (max-width: 980px) and (pointer: coarse) {
-  .halftone-dialkit .dialkit-color-control,
-  .halftone-dialkit .dialkit-button {
-    min-height: 44px;
+@media (max-width: 980px), (pointer: coarse) {
+  .halftone-dialkit .dialkit-color-hex,
+  .halftone-dialkit .dialkit-color-hex-input,
+  .studio-color-hex-button {
+    display: none;
   }
+}
 
+@media (max-width: 980px) and (pointer: coarse) {
   .halftone-dialkit .dialkit-color-inputs {
     position: relative;
   }
 
   .halftone-dialkit .dialkit-color-swatch {
     display: block;
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     border: 0;
-    border-radius: 5px;
+    border-radius: 4px;
     box-shadow: inset 0 0 0 1px var(--dial-border-hover);
   }
 
@@ -398,10 +456,12 @@
   .halftone-dialkit .dialkit-color-picker-native {
     position: absolute;
     top: 50%;
-    right: -6px;
+    right: -10px;
     display: block !important;
     width: 44px;
-    height: 44px;
+    /* Must not exceed the row height, or adjacent rows' invisible tap targets
+       overlap in the gap between them and steal each other's taps. */
+    height: var(--dial-row-height);
     padding: 0;
     margin: 0;
     opacity: 0;

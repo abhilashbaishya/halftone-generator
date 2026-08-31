@@ -18,6 +18,26 @@ import {
 
 const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
 
+// iOS Safari stalls the page for ~1s after setPointerCapture on a touch
+// pointer. DialKit (and anyone else) still calls it; skip it for touch.
+(function ignoreTouchPointerCapture() {
+  const touchIds = new Set();
+  const track = (event) => {
+    if (event.pointerType !== "touch") return;
+    if (event.type === "pointerdown") touchIds.add(event.pointerId);
+    else touchIds.delete(event.pointerId);
+  };
+  document.addEventListener("pointerdown", track, true);
+  document.addEventListener("pointerup", track, true);
+  document.addEventListener("pointercancel", track, true);
+
+  const setCapture = Element.prototype.setPointerCapture;
+  Element.prototype.setPointerCapture = function setPointerCapture(id) {
+    if (touchIds.has(id)) return;
+    return setCapture.call(this, id);
+  };
+})();
+
 const previewPasses = {
   grain: new GrainPass(),
   bloom: new BloomPass(),
@@ -279,7 +299,10 @@ const builtInPresets = {
 const compareState = {
   split: 0.5,
   zoom: 1,
-  draggingSplit: false
+  draggingSplit: false,
+  splitPointerId: null,
+  splitTouch: null,
+  splitLayout: null
 };
 
 const MIN_ZOOM = 0.5;
@@ -329,6 +352,7 @@ let scaledSourceKey = "";
 let sourceToken = 0;
 let imageLoadToken = 0;
 let uploadError = "";
+let hasUserImage = false;
 
 // Phones and tablets: cap the backing store well below the desktop budget and
 // clamp DPR, or an `ultra` preset at DPR 3 asks for ~10M pixels per render.
@@ -711,25 +735,32 @@ function setZoom(nextZoom) {
   applyViewTransform();
 }
 
+function getSplitLayout() {
+  return compareState.splitLayout ?? {
+    wrap: canvasWrap.getBoundingClientRect(),
+    plane: canvasPlane.getBoundingClientRect()
+  };
+}
+
 function updateSplitPreview() {
   const split = clamp(compareState.split, 0, 1);
   compareState.split = split;
   const splitPercent = Math.round(split * 100);
 
-  splitHandle.setAttribute("aria-valuenow", String(splitPercent));
-  splitHandle.setAttribute("aria-valuetext", `${splitPercent}% halftone and ${100 - splitPercent}% source`);
+  if (splitHandle.getAttribute("aria-valuenow") !== String(splitPercent)) {
+    splitHandle.setAttribute("aria-valuenow", String(splitPercent));
+    splitHandle.setAttribute("aria-valuetext", `${splitPercent}% halftone and ${100 - splitPercent}% source`);
+  }
 
-  const rightInset = (1 - split) * 100;
-  halftoneOverlay.style.clipPath = `inset(0 ${rightInset}% 0 0)`;
+  halftoneOverlay.style.clipPath = `inset(0 ${(1 - split) * 100}% 0 0)`;
 
-  const wrapRect = canvasWrap.getBoundingClientRect();
-  const planeRect = canvasPlane.getBoundingClientRect();
-  const planeWidth = planeRect.width;
-  const planeHeight = planeRect.height;
+  const { wrap, plane } = getSplitLayout();
+  const planeWidth = plane.width;
+  const planeHeight = plane.height;
 
   if (planeWidth > 0 && planeHeight > 0) {
-    const left = planeRect.left - wrapRect.left + planeWidth * split;
-    const top = planeRect.top - wrapRect.top;
+    const left = plane.left - wrap.left + planeWidth * split;
+    const top = plane.top - wrap.top;
     splitHandle.style.left = `${left}px`;
     splitHandle.style.top = `${top}px`;
     splitHandle.style.height = `${planeHeight}px`;
@@ -741,10 +772,10 @@ function updateSplitPreview() {
 }
 
 function setSplitFromClientX(clientX) {
-  const planeRect = canvasPlane.getBoundingClientRect();
-  if (planeRect.width <= 0) return;
+  const { plane } = getSplitLayout();
+  if (plane.width <= 0) return;
 
-  compareState.split = (clientX - planeRect.left) / planeRect.width;
+  compareState.split = (clientX - plane.left) / plane.width;
   updateSplitPreview();
 }
 
@@ -1136,7 +1167,8 @@ async function loadImageFromFile(file) {
     setRenderStatus("Loading image…", true, true);
     loadImageSource(safeBlob, {
       token,
-      onLoad: () => {
+        onLoad: () => {
+        setHasUserImage(true);
         setUploadError();
         saveImageToDb(safeBlob);
         resetView();
@@ -1664,23 +1696,60 @@ async function exportImage() {
   }
 }
 
+function onSplitDocumentMove(event) {
+  if (event.pointerId !== compareState.splitPointerId) return;
+  handleSplitPointerMove(event);
+}
+
 function handleSplitPointerDown(event) {
   if (event.button !== 0) return;
   compareState.draggingSplit = true;
-  splitHandle.setPointerCapture(event.pointerId);
-  setSplitFromClientX(event.clientX);
+  compareState.splitPointerId = event.pointerId;
+  compareState.splitLayout = {
+    wrap: canvasWrap.getBoundingClientRect(),
+    plane: canvasPlane.getBoundingClientRect()
+  };
+  compareState.splitTouch = event.pointerType === "touch"
+    ? { x: event.clientX, y: event.clientY, locked: false }
+    : { locked: true };
+
+  document.addEventListener("pointermove", onSplitDocumentMove, true);
+
+  if (compareState.splitTouch.locked) {
+    setSplitFromClientX(event.clientX);
+  }
 }
 
 function handleSplitPointerMove(event) {
   if (!compareState.draggingSplit) return;
+  if (event.pointerId !== compareState.splitPointerId) return;
+
+  const touch = compareState.splitTouch;
+  if (touch && !touch.locked) {
+    const dx = event.clientX - touch.x;
+    const dy = event.clientY - touch.y;
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    if (Math.abs(dy) > Math.abs(dx)) {
+      endSplitDrag(event);
+      return;
+    }
+    touch.locked = true;
+  }
+
   setSplitFromClientX(event.clientX);
 }
 
-function handleSplitPointerUp(event) {
-  compareState.draggingSplit = false;
-  if (splitHandle.hasPointerCapture(event.pointerId)) {
-    splitHandle.releasePointerCapture(event.pointerId);
+function endSplitDrag(event) {
+  if (!compareState.draggingSplit) return;
+  if (event && compareState.splitPointerId != null && event.pointerId !== compareState.splitPointerId) {
+    return;
   }
+
+  compareState.draggingSplit = false;
+  compareState.splitPointerId = null;
+  compareState.splitTouch = null;
+  compareState.splitLayout = null;
+  document.removeEventListener("pointermove", onSplitDocumentMove, true);
 }
 
 // ── React inspector bridge ───────────────────────────────────────────────
@@ -1707,12 +1776,24 @@ function getStudioState() {
       format: exportFormat,
       exporting: Boolean(activeExport)
     },
-    uploadError
+    uploadError,
+    hasUserImage
   };
 }
 
 function emitStudioState() {
   window.dispatchEvent(new CustomEvent(STUDIO_STATE_EVENT, { detail: getStudioState() }));
+}
+
+function syncExportEmphasis() {
+  controls.exportBtn.classList.toggle("button-primary", hasUserImage);
+}
+
+function setHasUserImage(next) {
+  const changed = hasUserImage !== next;
+  hasUserImage = next;
+  syncExportEmphasis();
+  if (changed) emitStudioState();
 }
 
 function setPanelSetting(key, value) {
@@ -1736,6 +1817,9 @@ window.halftoneStudio = Object.freeze({
   },
   uploadImage() {
     controls.imageInput.click();
+  },
+  openImageFile(file) {
+    if (file) loadImageFromFile(file);
   },
   savePreset(name) {
     const result = savePresetByName(name);
@@ -1849,9 +1933,8 @@ splitHandle.addEventListener("keydown", (event) => {
 });
 
 splitHandle.addEventListener("pointerdown", handleSplitPointerDown);
-splitHandle.addEventListener("pointermove", handleSplitPointerMove);
-splitHandle.addEventListener("pointerup", handleSplitPointerUp);
-splitHandle.addEventListener("pointercancel", handleSplitPointerUp);
+document.addEventListener("pointerup", endSplitDrag, true);
+document.addEventListener("pointercancel", endSplitDrag, true);
 
 // iOS fires resize every time the URL bar slides in or out, i.e. on every
 // scroll of the mobile layout. Only re-render if the backing store actually
@@ -1885,6 +1968,10 @@ function applyTheme(theme) {
   iconSun.style.display = isLight ? "none" : "";
   iconMoon.style.display = isLight ? "" : "none";
   themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.setAttribute("content", isLight ? "#f6f5f1" : "#1e1d1e");
+  }
   emitStudioState();
 }
 
@@ -1905,6 +1992,7 @@ resetView();
 updateSplitPreview();
 updateOutputs();
 applyPreset(DEFAULT_PRESET);
+syncExportEmphasis();
 emitStudioState();
 
 // Boot image. Every path here must terminate: previously a stalled
@@ -1913,14 +2001,16 @@ emitStudioState();
 function loadInitialImage() {
   const token = ++imageLoadToken;
   const giveUp = () => {
+    setHasUserImage(false);
     drawPlaceholder();
     setRenderStatus("Upload an image", false, true);
   };
 
-  const tryLoad = (source, onError) => {
+  const tryLoad = (source, { isUser, onError }) => {
     loadImageSource(source, {
       token,
       onLoad: () => {
+        setHasUserImage(isUser);
         setRenderStatus("Ready", false);
         resetView();
         requestRender();
@@ -1952,10 +2042,13 @@ function loadInitialImage() {
       : null;
     if (token !== imageLoadToken) return;
     if (safeStoredImage) {
-      tryLoad(safeStoredImage, () => tryLoad(PLACEHOLDER_URL, giveUp));
+      tryLoad(safeStoredImage, {
+        isUser: true,
+        onError: () => tryLoad(PLACEHOLDER_URL, { isUser: false, onError: giveUp })
+      });
       return;
     }
-    tryLoad(PLACEHOLDER_URL, giveUp);
+    tryLoad(PLACEHOLDER_URL, { isUser: false, onError: giveUp });
   });
 }
 
