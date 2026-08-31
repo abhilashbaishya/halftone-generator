@@ -953,7 +953,7 @@ input.cpick-hue::-moz-range-thumb {
 
 /* ── Outputs ── */
 output {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text);
   font-size: 0.8425rem;
   font-weight: 500;
