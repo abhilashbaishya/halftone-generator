@@ -745,21 +745,45 @@ function isMobileShell() {
   return window.matchMedia(MOBILE_SHELL).matches;
 }
 
+const REDUCE_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() => window.matchMedia(REDUCE_MOTION_QUERY).matches);
+
+  useEffect(() => {
+    const query = window.matchMedia(REDUCE_MOTION_QUERY);
+    const update = () => setReduced(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}
+
+function ReducedMotionRoot({ children }) {
+  const reduced = usePrefersReducedMotion();
+  return (
+    <MotionConfig reducedMotion={reduced ? "always" : "never"}>
+      {children}
+    </MotionConfig>
+  );
+}
+
 async function bootDesktopStudio() {
   if (desktopBooted) return;
   desktopBooted = true;
   await import("../script.js");
   createRoot(document.getElementById("dialPanelRoot")).render(
-    <MotionConfig reducedMotion="user">
+    <ReducedMotionRoot>
       <DialPanel />
-    </MotionConfig>
+    </ReducedMotionRoot>
   );
   const exportControlsRoot = document.getElementById("exportControlsRoot");
   if (exportControlsRoot) {
     createRoot(exportControlsRoot).render(
-      <MotionConfig reducedMotion="user">
+      <ReducedMotionRoot>
         <ExportControls />
-      </MotionConfig>
+      </ReducedMotionRoot>
     );
   }
 }
