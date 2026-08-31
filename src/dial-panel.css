@@ -7,24 +7,52 @@
 .halftone-dialkit {
   height: 100%;
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --dial-glass-bg: var(--csel-panel-bg);
-  --dial-dropdown-bg: var(--csel-panel-bg);
-  --dial-surface: var(--control-surface);
-  --dial-surface-hover: var(--control-surface-hover);
-  --dial-surface-active: var(--control-surface-active);
-  --dial-surface-subtle: var(--divider);
-  --dial-text-root: var(--text);
-  --dial-text-section: var(--muted-text);
-  --dial-text-label: var(--muted-text);
-  --dial-text-focus: var(--text);
-  --dial-text-primary: var(--text);
-  --dial-text-secondary: var(--muted-text);
-  --dial-text-tertiary: var(--label);
-  --dial-border: var(--btn-border);
-  --dial-border-hover: var(--btn-hover-border);
-  --dial-row-height: var(--control-h);
-  --dial-radius: var(--radius);
-  --dial-shadow-dropdown: var(--csel-panel-shadow);
+
+  --ref-row: rgb(35, 35, 33);
+  --ref-row-hover: rgb(43, 43, 40);
+  --ref-fill: rgb(50, 50, 46);
+  --ref-fill-active: rgb(62, 62, 57);
+  --ref-label: rgb(198, 196, 189);
+  --ref-value: rgb(241, 239, 232);
+  --ref-section: rgb(126, 124, 117);
+  --ref-dropdown: rgb(38, 38, 35);
+  --ref-hairline: rgba(255, 255, 255, 0.07);
+  --ref-dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.halftone-dialkit[data-theme="light"] {
+  --ref-row: rgb(238, 237, 231);
+  --ref-row-hover: rgb(230, 229, 222);
+  --ref-fill: rgb(220, 218, 210);
+  --ref-fill-active: rgb(206, 204, 195);
+  --ref-label: rgb(94, 92, 86);
+  --ref-value: rgb(28, 27, 25);
+  --ref-section: rgb(140, 137, 129);
+  --ref-dropdown: rgb(252, 251, 248);
+  --ref-hairline: rgba(0, 0, 0, 0.08);
+  --ref-dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Matches DialKit's own [data-theme] specificity so these win in both themes. */
+.dialkit-root.halftone-dialkit {
+  --dial-glass-bg: transparent;
+  --dial-dropdown-bg: var(--ref-dropdown);
+  --dial-surface: var(--ref-row);
+  --dial-surface-hover: var(--ref-row-hover);
+  --dial-surface-active: var(--ref-fill);
+  --dial-surface-subtle: var(--ref-row);
+  --dial-text-root: var(--ref-value);
+  --dial-text-section: var(--ref-section);
+  --dial-text-label: var(--ref-label);
+  --dial-text-focus: var(--ref-value);
+  --dial-text-primary: var(--ref-value);
+  --dial-text-secondary: var(--ref-label);
+  --dial-text-tertiary: var(--ref-section);
+  --dial-border: var(--ref-hairline);
+  --dial-border-hover: var(--ref-fill-active);
+  --dial-row-height: 31px;
+  --dial-radius: 8px;
+  --dial-shadow-dropdown: var(--ref-dropdown-shadow);
 }
 
 .halftone-dialkit .dialkit-panel,
@@ -79,6 +107,39 @@
 
 .halftone-dialkit .dialkit-folder-inner {
   gap: 7px;
+}
+
+.halftone-dialkit .dialkit-folder-title,
+.halftone-dialkit .dialkit-slider-label,
+.halftone-dialkit .dialkit-slider-value,
+.halftone-dialkit .dialkit-select-label,
+.halftone-dialkit .dialkit-select-value,
+.halftone-dialkit .dialkit-color-label,
+.halftone-dialkit .dialkit-color-hex,
+.halftone-dialkit .dialkit-button {
+  font-size: 11px;
+}
+
+.halftone-dialkit .dialkit-folder-title-root {
+  font-size: 12px;
+}
+
+.halftone-dialkit .dialkit-slider-label,
+.halftone-dialkit .dialkit-select-label,
+.halftone-dialkit .dialkit-color-label {
+  font-weight: 400;
+}
+
+.halftone-dialkit .dialkit-slider-value {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--ref-value);
+}
+
+/* The reference renders a bare fill: no handle, no hashmarks. */
+.halftone-dialkit .dialkit-slider-handle,
+.halftone-dialkit .dialkit-slider-hashmarks {
+  display: none;
 }
 
 .halftone-dialkit .dialkit-slider,
@@ -306,18 +367,14 @@
     overflow: visible;
   }
 
-  .dialkit-touch-safe-slider,
-  .dialkit-touch-safe-slider .dialkit-slider {
-    touch-action: pan-y;
-  }
-
   .export-format-option {
     min-height: 44px;
   }
 }
 
 @media (max-width: 980px) and (pointer: coarse) {
-  .halftone-dialkit .dialkit-color-control {
+  .halftone-dialkit .dialkit-color-control,
+  .halftone-dialkit .dialkit-button {
     min-height: 44px;
   }
 

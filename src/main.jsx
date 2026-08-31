@@ -20,8 +20,6 @@ const RENDER_PROFILE_OPTIONS = [
   { value: "print", label: "Print" }
 ];
 
-const TOUCH_AXIS_THRESHOLD = 10;
-const TOUCH_HORIZONTAL_BIAS = 1.15;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 function clampValue(value, min, max) {
@@ -63,14 +61,6 @@ function hsvToHex({ h, s, v }) {
     .join("")}`;
 }
 
-function snapSliderValue(clientX, rect, min, max, step) {
-  const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  const rawValue = min + percent * (max - min);
-  const snappedValue = min + Math.round((rawValue - min) / step) * step;
-  const decimals = `${step}`.split(".")[1]?.length ?? 0;
-  return Number(Math.max(min, Math.min(max, snappedValue)).toFixed(decimals));
-}
-
 function useCompactLayout() {
   const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 980px)").matches);
 
@@ -98,89 +88,12 @@ function useStudioState() {
   return state;
 }
 
-function SettingSlider({ settingKey, value, min = 0, max = 1, step = 0.01, ...props }) {
-  const touchGesture = useRef(null);
-
+function SettingSlider({ settingKey, ...props }) {
   const handleChange = useCallback((nextValue) => {
     window.halftoneStudio.setSetting(settingKey, nextValue);
   }, [settingKey]);
 
-  const handlePointerDownCapture = useCallback((event) => {
-    if (event.pointerType !== "touch" || !event.isPrimary) return;
-
-    event.stopPropagation();
-    touchGesture.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      mode: "pending",
-      rect: event.currentTarget.getBoundingClientRect()
-    };
-  }, []);
-
-  const handlePointerMoveCapture = useCallback((event) => {
-    const gesture = touchGesture.current;
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
-
-    event.stopPropagation();
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = event.clientY - gesture.startY;
-    const horizontalDistance = Math.abs(deltaX);
-    const verticalDistance = Math.abs(deltaY);
-
-    if (gesture.mode === "pending") {
-      if (Math.max(horizontalDistance, verticalDistance) < TOUCH_AXIS_THRESHOLD) return;
-
-      if (verticalDistance > horizontalDistance * TOUCH_HORIZONTAL_BIAS) {
-        gesture.mode = "scroll";
-        return;
-      }
-
-      if (horizontalDistance > verticalDistance * TOUCH_HORIZONTAL_BIAS) {
-        gesture.mode = "adjust";
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } else {
-        return;
-      }
-    }
-
-    if (gesture.mode !== "adjust") return;
-    event.preventDefault();
-    handleChange(snapSliderValue(event.clientX, gesture.rect, min, max, step));
-  }, [handleChange, max, min, step]);
-
-  const finishTouchGesture = useCallback((event) => {
-    const gesture = touchGesture.current;
-    if (!gesture || event.pointerId !== gesture.pointerId) return;
-
-    event.stopPropagation();
-    if (gesture.mode === "adjust") {
-      event.preventDefault();
-      handleChange(snapSliderValue(event.clientX, gesture.rect, min, max, step));
-    }
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    touchGesture.current = null;
-  }, [handleChange, max, min, step]);
-
-  const cancelTouchGesture = useCallback((event) => {
-    if (touchGesture.current?.pointerId === event.pointerId) {
-      touchGesture.current = null;
-    }
-  }, []);
-
-  return (
-    <div
-      className="dialkit-touch-safe-slider"
-      onPointerDownCapture={handlePointerDownCapture}
-      onPointerMoveCapture={handlePointerMoveCapture}
-      onPointerUpCapture={finishTouchGesture}
-      onPointerCancelCapture={cancelTouchGesture}
-    >
-      <Slider value={value} onChange={handleChange} min={min} max={max} step={step} {...props} />
-    </div>
-  );
+  return <Slider onChange={handleChange} {...props} />;
 }
 
 function SettingSelect({ settingKey, value, ...props }) {
