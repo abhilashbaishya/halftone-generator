@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test"
+    "test": "node --test",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "dialkit": "1.4.3",
@@ -16,6 +17,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "vite": "8.2.2"
   }
 }

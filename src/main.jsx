@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
+import { MotionConfig } from "motion/react";
 import {
   Folder,
   SelectControl,
@@ -602,6 +603,99 @@ function DialPanel() {
   );
 }
 
+function useMotionReady() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, []);
+
+  return ready;
+}
+
+function SegmentedRadios({
+  options,
+  value,
+  onChange,
+  columns,
+  className = "",
+  labelledBy,
+  label,
+  disabled = false
+}) {
+  const groupRef = useRef(null);
+  const motionReady = useMotionReady();
+  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
+
+  const selectIndex = useCallback((nextIndex) => {
+    const option = options[nextIndex];
+    if (!option || disabled) return;
+    onChange(option.value);
+    requestAnimationFrame(() => {
+      groupRef.current?.querySelector(`[data-value="${option.value}"]`)?.focus();
+    });
+  }, [disabled, onChange, options]);
+
+  const onKeyDown = useCallback((event) => {
+    let nextIndex = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (selectedIndex + 1) % options.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (selectedIndex - 1 + options.length) % options.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = options.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectIndex(nextIndex);
+  }, [options.length, selectIndex, selectedIndex]);
+
+  return (
+    <div
+      ref={groupRef}
+      className={["export-format-grid", className, motionReady ? "is-ready" : ""].filter(Boolean).join(" ")}
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      aria-label={label}
+      onKeyDown={onKeyDown}
+      style={{
+        "--segments": columns,
+        "--segment-index": selectedIndex
+      }}
+    >
+      <span className="export-format-thumb" aria-hidden="true" />
+      {options.map((option, index) => {
+        const selected = index === selectedIndex;
+        return (
+          <button
+            key={option.value}
+            className="export-format-option"
+            type="button"
+            role="radio"
+            tabIndex={selected ? 0 : -1}
+            aria-checked={selected}
+            data-selected={selected}
+            data-value={option.value}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ExportControls() {
   const state = useStudioState();
 
@@ -623,44 +717,23 @@ function ExportControls() {
       <div className="export-controls">
         <div className="segmented-field">
           <span className="segmented-field-label" id="render-profile-label">Render profile</span>
-          <div className="export-format-grid render-profile-grid" role="radiogroup" aria-labelledby="render-profile-label">
-            {RENDER_PROFILE_OPTIONS.map((option) => {
-              const selected = option.value === quality;
-              return (
-                <button
-                  key={option.value}
-                  className="export-format-option"
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  data-selected={selected}
-                  onClick={() => setQuality(option.value)}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedRadios
+            className="render-profile-grid"
+            labelledBy="render-profile-label"
+            options={RENDER_PROFILE_OPTIONS}
+            value={quality}
+            columns={4}
+            onChange={setQuality}
+          />
         </div>
-        <div className="export-format-grid" role="radiogroup" aria-label="Export format">
-          {EXPORT_FORMAT_OPTIONS.map((option) => {
-            const selected = option.value === format.value;
-            return (
-              <button
-                key={option.value}
-                className="export-format-option"
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                data-selected={selected}
-                disabled={state.export.exporting}
-                onClick={() => setFormat(option.value)}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedRadios
+          label="Export format"
+          options={EXPORT_FORMAT_OPTIONS}
+          value={format.value}
+          columns={3}
+          disabled={state.export.exporting}
+          onChange={setFormat}
+        />
       </div>
     </div>
   );
@@ -676,10 +749,18 @@ async function bootDesktopStudio() {
   if (desktopBooted) return;
   desktopBooted = true;
   await import("../script.js");
-  createRoot(document.getElementById("dialPanelRoot")).render(<DialPanel />);
+  createRoot(document.getElementById("dialPanelRoot")).render(
+    <MotionConfig reducedMotion="user">
+      <DialPanel />
+    </MotionConfig>
+  );
   const exportControlsRoot = document.getElementById("exportControlsRoot");
   if (exportControlsRoot) {
-    createRoot(exportControlsRoot).render(<ExportControls />);
+    createRoot(exportControlsRoot).render(
+      <MotionConfig reducedMotion="user">
+        <ExportControls />
+      </MotionConfig>
+    );
   }
 }
 

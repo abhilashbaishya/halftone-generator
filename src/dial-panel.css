@@ -96,15 +96,8 @@
 }
 
 .halftone-dialkit .dialkit-folder-icon {
-  transition: transform 0.15s ease;
-}
-
-.halftone-dialkit .dialkit-folder[data-open="false"] > .dialkit-folder-header .dialkit-folder-icon {
-  transform: rotate(0deg) !important;
-}
-
-.halftone-dialkit .dialkit-folder[data-open="true"] > .dialkit-folder-header .dialkit-folder-icon {
-  transform: rotate(180deg) !important;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .halftone-dialkit .dialkit-folder-inner {
@@ -341,6 +334,10 @@
   line-height: 1.4;
 }
 
+.halftone-dialkit .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-content {
+  overflow: hidden;
+}
+
 .dial-panel-loading {
   padding: 20px;
   color: var(--label);
@@ -369,16 +366,42 @@
 }
 
 .export-format-grid {
+  --segment-gap: 7px;
+  --segments: 3;
+  --segment-index: 0;
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(var(--segments), minmax(0, 1fr));
+  gap: var(--segment-gap);
 }
 
 .render-profile-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  --segments: 4;
+}
+
+.export-format-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  width: calc((100% - var(--segment-gap) * (var(--segments) - 1)) / var(--segments));
+  border-radius: var(--radius);
+  background: var(--segment-selected-bg);
+  box-shadow: 0 0 0 1px var(--segment-selected-ring);
+  pointer-events: none;
+  transform: translateX(calc(var(--segment-index) * (100% + var(--segment-gap))));
+}
+
+.export-format-grid.is-ready .export-format-thumb {
+  transition-property: transform;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .export-format-option {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: var(--control-h);
   padding: 0 10px;
@@ -391,8 +414,8 @@
   -webkit-appearance: none;
   cursor: pointer;
   box-shadow: var(--control-ring);
-  transition-property: background-color, color, box-shadow, transform;
-  transition-duration: 150ms, 150ms, 150ms, 120ms;
+  transition-property: background-color, color;
+  transition-duration: 150ms;
   transition-timing-function: ease-out;
 }
 
@@ -402,9 +425,14 @@
 }
 
 .export-format-option[data-selected="true"] {
-  background: var(--segment-selected-bg);
+  background: transparent;
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--segment-selected-ring);
+  box-shadow: none;
+}
+
+.export-format-option[data-selected="true"]:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
 }
 
 .export-format-option:focus-visible {
@@ -412,13 +440,15 @@
   outline-offset: 2px;
 }
 
-.export-format-option:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
 .export-format-option:disabled {
   opacity: 0.48;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .export-format-grid.is-ready .export-format-thumb {
+    transition: none;
+  }
 }
 
 @media (max-width: 980px) {
