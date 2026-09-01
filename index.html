@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
-    <meta name="theme-color" content="#1e1d1e" />
+    <meta name="theme-color" content="#000000" />
     <title>Halftone Studio</title>
     <link rel="preload" href="./fonts/ABCDiatype-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="./fonts/ABCDiatype-Medium.woff2" as="font" type="font/woff2" crossorigin />
@@ -12,9 +12,14 @@
   </head>
   <body>
     <div class="phone-gate">
-      <p class="phone-gate-brand" translate="no">Halftone Studio</p>
-      <h1>Open this on a computer</h1>
-      <p>This editor isn’t built for phones. Use a desktop or laptop browser.</p>
+      <div class="phone-gate-inner">
+        <p class="phone-gate-brand" translate="no">Halftone Studio</p>
+        <h1 class="phone-gate-title">Open this on a computer</h1>
+        <p class="phone-gate-copy">
+          <span>This editor isn’t built for phones.</span>
+          <span>Use a desktop or laptop browser.</span>
+        </p>
+      </div>
     </div>
     <h1 class="sr-only app-title">Halftone Studio</h1>
     <main class="workspace">
