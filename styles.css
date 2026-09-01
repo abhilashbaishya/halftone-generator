@@ -305,14 +305,20 @@ body {
   }
 
   .phone-gate-copy {
+    display: grid;
+    gap: 0.375rem;
     margin: 0;
-    max-width: 32ch;
+    max-width: 100%;
     font-size: 1rem;
     font-weight: 400;
-    line-height: 1.55;
+    line-height: 1.5;
     letter-spacing: -0.008em;
     color: oklch(1 0 0 / 0.56);
-    text-wrap: pretty;
+  }
+
+  .phone-gate-copy span {
+    display: block;
+    text-wrap: balance;
   }
 }
 
