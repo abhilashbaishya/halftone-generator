@@ -2,9 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
     <meta name="theme-color" content="#000000" />
+    <script>
+      (() => {
+        const phone = matchMedia('(max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse)').matches;
+        let saved;
+        try { saved = localStorage.getItem('halftone.theme'); } catch {}
+        const theme = !phone && ['light', 'dark'].includes(saved) ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.classList.toggle('light', theme === 'light');
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f6f5f1' : '#1e1d1e';
+      })();
+    </script>
     <title>Halftone Studio</title>
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Halftone Studio" />
@@ -27,16 +38,6 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="phone-gate">
-      <div class="phone-gate-inner">
-        <p class="phone-gate-brand" translate="no">Halftone Studio</p>
-        <h1 class="phone-gate-title">Open this on a computer</h1>
-        <p class="phone-gate-copy">
-          <span>This editor isn’t built for phones.</span>
-          <span>Use a desktop or laptop browser.</span>
-        </p>
-      </div>
-    </div>
     <h1 class="sr-only app-title">Halftone Studio</h1>
     <main class="workspace">
       <aside class="control-rail">

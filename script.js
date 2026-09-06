@@ -1,7 +1,10 @@
+import { mountMobilePreview } from "./src/mobile-preview.js";
+import { mountStudioTheme } from "./src/theme.js";
+import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
-import { renderHalftoneAsync, renderHalftoneSync } from "./renderer-core.js";
+import { renderHalftoneAsync } from "./renderer-core.js";
 import { calculateExportDimensions, getExportPixelBudget } from "./export-policy.js";
 import { estimateEncodedSize } from "./export-estimator.js";
 import {
@@ -17,26 +20,6 @@ import {
 } from "./image-policy.js";
 
 const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
-
-// iOS Safari stalls the page for ~1s after setPointerCapture on a touch
-// pointer. DialKit (and anyone else) still calls it; skip it for touch.
-(function ignoreTouchPointerCapture() {
-  const touchIds = new Set();
-  const track = (event) => {
-    if (event.pointerType !== "touch") return;
-    if (event.type === "pointerdown") touchIds.add(event.pointerId);
-    else touchIds.delete(event.pointerId);
-  };
-  document.addEventListener("pointerdown", track, true);
-  document.addEventListener("pointerup", track, true);
-  document.addEventListener("pointercancel", track, true);
-
-  const setCapture = Element.prototype.setPointerCapture;
-  Element.prototype.setPointerCapture = function setPointerCapture(id) {
-    if (touchIds.has(id)) return;
-    return setCapture.call(this, id);
-  };
-})();
 
 const previewPasses = {
   grain: new GrainPass(),
@@ -115,10 +98,8 @@ const canvasPlane = document.getElementById("canvasPlane");
 const halftoneOverlay = document.getElementById("halftoneOverlay");
 const splitHandle = document.getElementById("splitHandle");
 
-const hiddenCanvas = document.createElement("canvas");
-const hiddenCtx = hiddenCanvas.getContext("2d", { willReadFrequently: true });
 
-if (!previewCtx || !sourceCtx || !hiddenCtx) {
+if (!previewCtx || !sourceCtx) {
   throw new Error("Canvas context is unavailable.");
 }
 
@@ -320,9 +301,23 @@ let customPresets = {};
 let renderWorker = null;
 let workerEnabled = false;
 let renderRequestId = 0;
-let workerBusy = false;
+let previewBusy = false;
 let renderQueued = false;
 let previewIsCurrent = false;
+let previewGeneration = 0;
+let previewInteractions = 0;
+let pendingPreviewJob = null;
+let drawnSourceKey = "";
+const previewWorkCanvas = document.createElement("canvas");
+const previewWorkCtx = previewWorkCanvas.getContext("2d", { willReadFrequently: true });
+
+function setPreviewInteraction(active) {
+  const wasInteracting = previewInteractions > 0;
+  previewInteractions = Math.max(0, previewInteractions + (active ? 1 : -1));
+  if (wasInteracting === (previewInteractions > 0) || !isCompactDevice()) return;
+  previewGeneration += 1;
+  requestRender();
+}
 let exportRequestId = 0;
 let activeExport = null;
 let exportFeedbackTimer = null;
@@ -370,6 +365,7 @@ function isIOS() {
 function setSourceImage(image) {
   sourceImage = image;
   sourceToken += 1;
+  previewGeneration += 1;
   scaledSourceKey = "";
   previewIsCurrent = false;
   invalidateExportEstimate();
@@ -778,8 +774,8 @@ function setSplitFromClientX(clientX) {
 
 function fitCanvasToStage() {
   const stageRect = canvasWrap.getBoundingClientRect();
-  const stageWidth = Math.max(320, Math.floor(stageRect.width));
-  const stageHeight = Math.max(260, Math.floor(stageRect.height));
+  const stageWidth = Math.max(1, Math.floor(stageRect.width));
+  const stageHeight = Math.max(1, Math.floor(stageRect.height));
   const maxDisplayWidth = 1320;
   const maxDisplayHeight = 860;
   const availableWidth = Math.min(stageWidth, maxDisplayWidth);
@@ -812,12 +808,11 @@ function fitCanvasToStage() {
   const resized = previewCanvas.width !== backingWidth || previewCanvas.height !== backingHeight;
 
   if (resized) {
+    previewGeneration += 1;
     previewCanvas.width = backingWidth;
     previewCanvas.height = backingHeight;
     sourceCanvas.width = backingWidth;
     sourceCanvas.height = backingHeight;
-    hiddenCanvas.width = backingWidth;
-    hiddenCanvas.height = backingHeight;
   }
 
   const widthCss = `${cssWidth}px`;
@@ -847,6 +842,9 @@ function drawSourcePreview() {
     return;
   }
 
+  const key = `${sourceToken}:${sourceCanvas.width}x${sourceCanvas.height}`;
+  if (drawnSourceKey === key) return;
+  drawnSourceKey = key;
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
   sourceCtx.drawImage(getScaledSource(sourceCanvas.width, sourceCanvas.height), 0, 0);
 }
@@ -868,13 +866,35 @@ function getRenderSettings() {
   };
 }
 
-function renderHalftoneOnMain(targetCtx, width, height, settings) {
-  hiddenCanvas.width = width;
-  hiddenCanvas.height = height;
-  hiddenCtx.clearRect(0, 0, width, height);
-  hiddenCtx.drawImage(sourceImage, 0, 0, width, height);
-  const imageData = hiddenCtx.getImageData(0, 0, width, height);
-  renderHalftoneSync(targetCtx, imageData.data, width, height, settings);
+async function renderPreviewOnMain(job) {
+  try {
+    previewWorkCanvas.width = job.width;
+    previewWorkCanvas.height = job.height;
+    const source = getScaledSource(job.width, job.height);
+    const pixels = source.getContext("2d").getImageData(0, 0, job.width, job.height);
+    const result = await renderHalftoneAsync(previewWorkCtx, pixels.data, job.width, job.height, job.settings, {
+      shouldCancel: () => job.generation !== previewGeneration || (!job.draft && renderQueued),
+      renderChunkRows: 4
+    });
+    if (!result.cancelled) presentPreview(previewWorkCanvas, job);
+  } catch (error) {
+    console.error(error);
+    setRenderStatus("Preview failed · try adjusting a control", false, true);
+  } finally {
+    finishPreviewRender();
+  }
+}
+
+function presentPreview(image, job) {
+  if (!shouldPresentPreview(job, previewGeneration, renderQueued, previewInteractions > 0)) return;
+  // Effects also run at draft resolution. The visible canvas retains its size,
+  // so switching between draft and final never clears or shifts the artwork.
+  const result = runPostProcessChain(image, previewPasses, job.postProcess);
+  previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  previewCtx.drawImage(result, 0, 0, previewCanvas.width, previewCanvas.height);
+  previewIsCurrent = !job.draft;
+  if (previewIsCurrent) scheduleExportEstimate();
+  setRenderStatus("Ready", false);
 }
 
 // The source was re-scaled from full resolution on every render, including
@@ -904,7 +924,7 @@ function createScaledBitmap(width, height) {
 
 function disableWorker() {
   workerEnabled = false;
-  workerBusy = false;
+  previewBusy = false;
   if (renderWorker) {
     renderWorker.terminate();
     renderWorker = null;
@@ -913,149 +933,89 @@ function disableWorker() {
 
 // One render in flight at a time. A drag fires input per pixel; without this
 // every frame posts more work than the worker can retire and the UI locks up.
-function finishWorkerRender() {
-  workerBusy = false;
+function finishPreviewRender() {
+  previewBusy = false;
   if (!renderQueued) return;
   renderQueued = false;
   requestRender();
 }
 
 function initializeWorker() {
-  if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
-    disableWorker();
-    return;
-  }
-
+  if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) return;
   try {
     renderWorker = new Worker(new URL("./renderer-worker.js", import.meta.url), { type: "module" });
     workerEnabled = true;
-
     renderWorker.addEventListener("message", (event) => {
       const { type, requestId, bitmap } = event.data || {};
-
-      if (type === "error") {
-        if (requestId === renderRequestId) {
-          disableWorker();
-          const settings = getRenderSettings();
-          renderHalftoneOnMain(previewCtx, previewCanvas.width, previewCanvas.height, settings);
-          applyPostProcess(previewCtx, previewCanvas);
-          setRenderStatus("Ready", false);
-        }
-        finishWorkerRender();
-        return;
-      }
-
+      if (type === "error") { retryPreviewOnMain(); return; }
       if (type !== "rendered") return;
-
-      // A slider drag can queue newer settings while the worker is busy. Do
-      // not flash the obsolete bitmap before rendering the latest request.
-      if (requestId !== renderRequestId || renderQueued) {
-        if (bitmap && typeof bitmap.close === "function") bitmap.close();
-        finishWorkerRender();
-        return;
+      try {
+        if (requestId === renderRequestId && pendingPreviewJob) presentPreview(bitmap, pendingPreviewJob);
+      } finally {
+        bitmap?.close?.();
+        finishPreviewRender();
       }
-
-      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-      previewCtx.drawImage(bitmap, 0, 0, previewCanvas.width, previewCanvas.height);
-      if (bitmap && typeof bitmap.close === "function") bitmap.close();
-      applyPostProcess(previewCtx, previewCanvas);
-      setRenderStatus("Ready", false);
-      finishWorkerRender();
     });
-
-    renderWorker.addEventListener("error", () => {
-      disableWorker();
-      requestRender();
-    });
+    renderWorker.addEventListener("error", retryPreviewOnMain);
   } catch {
     disableWorker();
   }
 }
 
-function renderWithWorker(width, height, settings) {
-  if (!renderWorker || !workerEnabled || !sourceImage) return;
+function retryPreviewOnMain() {
+  disableWorker();
+  renderQueued = false;
+  requestRender();
+}
 
-  // Coalesce: hold the latest request until the in-flight one lands.
-  if (workerBusy) {
-    renderQueued = true;
-    return;
-  }
-
+function renderWithWorker(job) {
   const requestId = ++renderRequestId;
-  workerBusy = true;
-  setRenderStatus("Rendering…", true);
-
-  createScaledBitmap(width, height)
-    .then((sourceBitmap) => {
-      if (requestId !== renderRequestId) {
-        if (typeof sourceBitmap.close === "function") sourceBitmap.close();
-        finishWorkerRender();
-        return;
-      }
-
-      if (!renderWorker || !workerEnabled) {
-        if (typeof sourceBitmap.close === "function") sourceBitmap.close();
-        renderHalftoneOnMain(previewCtx, width, height, settings);
-        applyPostProcess(previewCtx, previewCanvas);
-        setRenderStatus("Ready", false);
-        finishWorkerRender();
-        return;
-      }
-
-      renderWorker.postMessage(
-        {
-          type: "render",
-          requestId,
-          width,
-          height,
-          settings,
-          sourceBitmap
-        },
-        [sourceBitmap]
-      );
-    })
-    .catch(() => {
-      disableWorker();
-      if (requestId === renderRequestId) {
-        renderHalftoneOnMain(previewCtx, width, height, settings);
-        applyPostProcess(previewCtx, previewCanvas);
-        setRenderStatus("Ready", false);
-      }
-      finishWorkerRender();
-    });
+  pendingPreviewJob = job;
+  createScaledBitmap(job.width, job.height).then((sourceBitmap) => {
+    if (job.generation !== previewGeneration) {
+      sourceBitmap.close?.();
+      finishPreviewRender();
+      return;
+    }
+    if (!renderWorker || !workerEnabled) {
+      sourceBitmap.close?.();
+      renderPreviewOnMain(job);
+      return;
+    }
+    renderWorker.postMessage({ type: "render", requestId, width: job.width, height: job.height,
+      settings: job.settings, sourceBitmap }, [sourceBitmap]);
+  }).catch(retryPreviewOnMain);
 }
 
 function generateHalftone() {
   fitCanvasToStage();
   updateSplitPreview();
-
   if (!sourceImage) {
     drawPlaceholder();
     setRenderStatus("Upload an image", false);
     return;
   }
-
+  if (previewBusy) { renderQueued = true; return; }
+  // The snapshot includes effects; a completed job never mixes old dots with
+  // newer effect values. At most one job runs, plus one latest pending update.
+  renderQueued = false;
   drawSourcePreview();
-
-  const width = previewCanvas.width;
-  const height = previewCanvas.height;
-  const settings = getRenderSettings();
-
-  if (workerEnabled && renderWorker) {
-    renderWithWorker(width, height, settings);
-    return;
-  }
-
+  const job = {
+    ...getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
+      previewInteractions > 0 && isCompactDevice()),
+    generation: previewGeneration,
+    postProcess: getPostProcessSettings()
+  };
+  previewBusy = true;
   setRenderStatus("Rendering…", true);
-  renderHalftoneOnMain(previewCtx, width, height, settings);
-  applyPostProcess(previewCtx, previewCanvas);
-  setRenderStatus("Ready", false);
+  if (workerEnabled && renderWorker) renderWithWorker(job);
+  else renderPreviewOnMain(job);
 }
 
 function requestRender() {
   previewIsCurrent = false;
   invalidateExportEstimate();
-  if (workerBusy) renderQueued = true;
+  if (previewBusy) renderQueued = true;
   if (renderFrame !== null) return;
 
   renderFrame = window.requestAnimationFrame(() => {
@@ -1116,18 +1076,6 @@ function runPostProcessChain(src, passes = previewPasses, settings = getPostProc
   src = passes.crt.apply(src, settings.crt);
 
   return src;
-}
-
-function applyPostProcess(ctx, canvas) {
-  const result = runPostProcessChain(canvas);
-  if (result !== canvas) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(result, 0, 0);
-  }
-  if (canvas === previewCanvas) {
-    previewIsCurrent = true;
-    scheduleExportEstimate();
-  }
 }
 
 function updateOutputs() {
@@ -1320,7 +1268,7 @@ async function estimateCurrentExportSize(requestId) {
 }
 
 function scheduleExportEstimate(delay = 420) {
-  if (!sourceImage || !previewIsCurrent) return;
+  if (!sourceImage || !previewIsCurrent || previewInteractions > 0) return;
   clearTimeout(exportEstimateTimer);
   const requestId = ++exportEstimateRequestId;
 
@@ -1796,6 +1744,7 @@ function setHasUserImage(next) {
 function setPanelSetting(key, value) {
   if (!PANEL_SETTING_FIELDS.has(key) || !(key in controls)) return;
   if ((key === "inkColor" || key === "paperColor") && !isStudioColor(value)) return;
+  if (controls[key].value === String(value)) return;
   controls[key].value = String(value);
   updateOutputs();
   syncPresetActions();
@@ -1807,6 +1756,7 @@ window.halftoneStudio = Object.freeze({
   eventName: STUDIO_STATE_EVENT,
   getState: getStudioState,
   setSetting: setPanelSetting,
+  setPreviewInteraction,
   setExportFormat,
   selectPreset(name) {
     applyPreset(name);
@@ -1954,38 +1904,14 @@ controls.grainStrength.addEventListener("input", () => { updateOutputs(); reques
 controls.bloomStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
 controls.crtStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
 
-// ── Theme toggle ──────────────────────────────────────────────────────────
-const themeToggle = document.getElementById("themeToggle");
-const iconSun = document.getElementById("iconSun");
-const iconMoon = document.getElementById("iconMoon");
-const THEME_KEY = "halftone.theme";
-
-function applyTheme(theme) {
-  const isLight = theme === "light";
-  document.documentElement.classList.toggle("light", isLight);
-  iconSun.style.display = isLight ? "none" : "";
-  iconMoon.style.display = isLight ? "" : "none";
-  themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
-  const themeColor = document.querySelector('meta[name="theme-color"]');
-  if (themeColor) {
-    themeColor.setAttribute("content", isLight ? "#f6f5f1" : "#1e1d1e");
-  }
-  emitStudioState();
-}
-
-themeToggle.addEventListener("click", () => {
-  const next = document.documentElement.classList.contains("light") ? "dark" : "light";
-  localStorage.setItem(THEME_KEY, next);
-  applyTheme(next);
-});
-
-applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+mountStudioTheme(emitStudioState);
 
 customPresets = loadCustomPresets();
 rebuildPresetSelect(DEFAULT_PRESET);
 syncPresetActions();
 syncExportButtonLabel();
 initializeWorker();
+mountMobilePreview(resetView);
 resetView();
 updateSplitPreview();
 updateOutputs();

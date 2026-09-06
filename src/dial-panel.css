@@ -48,6 +48,11 @@
 .halftone-dialkit .dialkit-panel-inline,
 .halftone-dialkit .dialkit-panel-inner {
   background: transparent;
+  /* The rail supplies the solid surface. DialKit's glass blur and forced
+     layer are unnecessary here and can smear the scrolling edge in WebKit. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
 }
 
 .halftone-dialkit .dialkit-panel-inline {
@@ -573,4 +578,48 @@
   .studio-folder .dialkit-folder-icon {
     transition: none;
   }
+}
+
+@media (max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse) {
+  .control-rail .dial-panel-mount {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .halftone-dialkit .dialkit-folder-root > .dialkit-panel-header {
+    display: none;
+  }
+  /* Each tab already separates its group from the navigation. */
+  .halftone-dialkit .studio-folder { border-top: 0; }
+}
+
+.halftone-dialkit .dialkit-slider[data-touch-dragging="true"] .dialkit-slider-handle {
+  opacity: 0.9 !important;
+  transform: translateY(-50%) scale(1) !important;
+}
+
+@media (max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse) {
+  .control-rail .dial-panel-mount {
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    touch-action: pan-y pinch-zoom;
+  }
+  .control-rail .dial-panel-mount,
+  .control-rail .halftone-dialkit,
+  .halftone-dialkit .dialkit-panel,
+  .halftone-dialkit .dialkit-panel-inner,
+  .halftone-dialkit .studio-control-host {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .halftone-dialkit .dialkit-slider {
+    width: 100% !important;
+    transform: none !important;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* Safari otherwise magnifies the entire viewport when editing small text. */
+  .halftone-dialkit input:not([type="range"]) { font-size: 16px; }
+  .halftone-dialkit .dialkit-color-popover { max-width: calc(100vw - 24px); }
 }

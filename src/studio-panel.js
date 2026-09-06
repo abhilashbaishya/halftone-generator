@@ -1,5 +1,7 @@
 import { mountSlider, mountSelectControl, mountColorControl } from "dialkit/vanilla";
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
+import { mountTouchSlider } from "./touch-slider.js";
+import { mountMobileLayout } from "./mobile-layout.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
   value, label: value[0].toUpperCase() + value.slice(1)
@@ -93,44 +95,6 @@ function mountSegments(host, options, label, columns, onChange, className = "") 
       node.setAttribute("aria-checked", String(selected));
     });
   };
-}
-
-// Let vertical touch gestures scroll normally. Only horizontal drags belong to
-// the slider; no global overrides of preventDefault or setPointerCapture.
-function supportTouchScroll(host, props) {
-  const track = host.querySelector(".dialkit-slider");
-  let gesture;
-  track.addEventListener("pointerdown", (event) => {
-    if (event.pointerType !== "touch" || event.target.closest("input")) return;
-    event.stopImmediatePropagation();
-    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, rect: track.getBoundingClientRect(), horizontal: false };
-  }, true);
-  const apply = (x) => {
-    const fraction = Math.max(0, Math.min(1, (x - gesture.rect.left) / gesture.rect.width));
-    const raw = props.min + fraction * (props.max - props.min);
-    const value = Math.max(props.min, Math.min(props.max, props.min + Math.round((raw - props.min) / props.step) * props.step));
-    props.onChange(Number(value.toFixed(6)));
-  };
-  track.addEventListener("pointermove", (event) => {
-    if (gesture?.id !== event.pointerId) return;
-    const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
-    if (!gesture.horizontal) {
-      if (Math.hypot(dx, dy) < 6) return;
-      if (Math.abs(dy) > Math.abs(dx)) { gesture = null; return; }
-      gesture.horizontal = true;
-      track.setPointerCapture(event.pointerId);
-    }
-    event.preventDefault();
-    apply(event.clientX);
-  });
-  track.addEventListener("pointerup", (event) => {
-    if (gesture?.id !== event.pointerId) return;
-    apply(event.clientX);
-    gesture = null;
-    if (track.hasPointerCapture(event.pointerId)) track.releasePointerCapture(event.pointerId);
-  });
-  track.addEventListener("pointercancel", () => { gesture = null; });
-  track.addEventListener("lostpointercapture", () => { gesture = null; });
 }
 
 export function mountStudioPanel(studio) {
@@ -264,7 +228,8 @@ export function mountStudioPanel(studio) {
     track.addEventListener("focusout", () => {
       queueMicrotask(() => { track.tabIndex = -1; });
     });
-    supportTouchScroll(target, props);
+    const removeTouch = mountTouchSlider(track, { ...props, onInteraction: (active) => studio.setPreviewInteraction?.(active) });
+    controls.push({ destroy: removeTouch });
     controls.push(control);
     let previous = props.value;
     bindings.push(() => {
@@ -316,6 +281,33 @@ export function mountStudioPanel(studio) {
   document.getElementById("exportControlsRoot").replaceChildren(exportRoot);
   bindings.push(() => { updateQuality(state.settings.quality); updateFormat(state.export.format, state.export.exporting); });
 
+  const unmountMobile = mountMobileLayout({
+    presets: [source.closest(".studio-folder")],
+    adjust: [layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
+    colors: [colors.closest(".studio-folder")]
+  });
+
+  // Observe only our color drag surfaces; DialKit/native ranges retain their
+  // own pointer capture. This tells the renderer when to refine the preview.
+  const colorPointers = new Set();
+  const colorStart = (event) => {
+    if (event.pointerType !== "touch" || !event.target.closest(".halftone-dialkit .dialkit-color-plane, .halftone-dialkit .dialkit-color-track")) return;
+    if (colorPointers.has(event.pointerId)) return;
+    colorPointers.add(event.pointerId);
+    studio.setPreviewInteraction?.(true);
+  };
+  const colorEnd = (event) => {
+    if (colorPointers.delete(event.pointerId)) studio.setPreviewInteraction?.(false);
+  };
+  const colorCancel = () => {
+    for (const id of colorPointers) colorEnd({ pointerId: id });
+  };
+  document.addEventListener("pointerdown", colorStart, true);
+  document.addEventListener("pointerup", colorEnd, true);
+  document.addEventListener("pointercancel", colorEnd, true);
+  document.addEventListener("lostpointercapture", colorEnd, true);
+  window.addEventListener("blur", colorCancel);
+
   const update = (event) => {
     state = event?.detail ?? studio.getState();
     root.dataset.theme = exportRoot.dataset.theme = state.theme;
@@ -326,6 +318,13 @@ export function mountStudioPanel(studio) {
   return () => {
     window.removeEventListener(studio.eventName, update);
     compact.removeEventListener("change", onCompact);
+    unmountMobile();
+    colorCancel();
+    document.removeEventListener("pointerdown", colorStart, true);
+    document.removeEventListener("pointerup", colorEnd, true);
+    document.removeEventListener("pointercancel", colorEnd, true);
+    document.removeEventListener("lostpointercapture", colorEnd, true);
+    window.removeEventListener("blur", colorCancel);
     controls.forEach((control) => control.destroy());
     root.remove();
     exportRoot.remove();
