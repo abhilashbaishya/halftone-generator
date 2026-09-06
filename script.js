@@ -413,15 +413,6 @@ function numberValue(control, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function hexToRgb(hex) {
-  const value = hex.replace("#", "");
-  const parsed = parseInt(value, 16);
-  return {
-    r: (parsed >> 16) & 255,
-    g: (parsed >> 8) & 255,
-    b: parsed & 255
-  };
-}
 
 function getQualityConfig() {
   return QUALITY_MODES[controls.quality.value] || QUALITY_MODES[DEFAULT_QUALITY];
@@ -450,6 +441,12 @@ function getUploadErrorMessage(message, file) {
   return message;
 }
 
+function isStudioColor(value) {
+  return typeof value === "string"
+    && /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|oklch|color)\([^;{}]*\)|transparent)$/i.test(value.trim())
+    && CSS.supports("color", value);
+}
+
 function sanitizePreset(rawPreset) {
   if (!rawPreset || typeof rawPreset !== "object") return null;
 
@@ -464,8 +461,8 @@ function sanitizePreset(rawPreset) {
     microDot: Number(rawPreset.microDot),
     jitter: Number(rawPreset.jitter),
     seed: Number(rawPreset.seed),
-    inkColor: typeof rawPreset.inkColor === "string" ? rawPreset.inkColor : "#111111",
-    paperColor: typeof rawPreset.paperColor === "string" ? rawPreset.paperColor : "#f5f5f5"
+    inkColor: isStudioColor(rawPreset.inkColor) ? rawPreset.inkColor : "#111111",
+    paperColor: isStudioColor(rawPreset.paperColor) ? rawPreset.paperColor : "#f5f5f5"
   };
 
   // Optional so presets saved before post-processing existed still load.
@@ -866,8 +863,8 @@ function getRenderSettings() {
     jitter: hiddenJitter / 100,
     seed: hiddenSeed,
     quality: getQualityConfig(),
-    ink: hexToRgb(controls.inkColor.value),
-    paper: hexToRgb(controls.paperColor.value)
+    ink: controls.inkColor.value,
+    paper: controls.paperColor.value
   };
 }
 
@@ -1752,9 +1749,9 @@ function endSplitDrag(event) {
   document.removeEventListener("pointermove", onSplitDocumentMove, true);
 }
 
-// ── React inspector bridge ───────────────────────────────────────────────
+// ── Inspector bridge ───────────────────────────────────────────────
 // DialKit owns the visible controls. The renderer continues to read the
-// native inputs, keeping the proven image pipeline independent from React.
+// native inputs, keeping the proven image pipeline independent from the control panel.
 const STUDIO_STATE_EVENT = "halftone:state";
 const PANEL_SETTING_FIELDS = new Set(PRESET_COMPARE_FIELDS);
 
@@ -1798,6 +1795,7 @@ function setHasUserImage(next) {
 
 function setPanelSetting(key, value) {
   if (!PANEL_SETTING_FIELDS.has(key) || !(key in controls)) return;
+  if ((key === "inkColor" || key === "paperColor") && !isStudioColor(value)) return;
   controls[key].value = String(value);
   updateOutputs();
   syncPresetActions();

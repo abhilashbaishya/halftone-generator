@@ -127,3 +127,17 @@ test("chunked renderer can be cancelled before it paints", async () => {
   assert.equal(result.cancelled, true);
   assert.deepEqual(context.operations, []);
 });
+
+test("CSS colors and opacity reach both rendering paths without hex truncation", async () => {
+  const fixture = createFixture();
+  fixture.settings.ink = "oklch(0.65 0.2 30 / 0.5)";
+  fixture.settings.paper = "color(display-p3 0.9 0.95 1 / 0.25)";
+  const sync = new RecordingContext();
+  const async = new RecordingContext();
+  renderHalftoneSync(sync, fixture.pixels, fixture.width, fixture.height, fixture.settings);
+  await renderHalftoneAsync(async, fixture.pixels, fixture.width, fixture.height, fixture.settings, { yieldControl: () => Promise.resolve() });
+  assert.deepEqual(sync.operations.filter(([op]) => op === "fillStyle"), [
+    ["fillStyle", fixture.settings.paper], ["fillStyle", fixture.settings.ink]
+  ]);
+  assert.deepEqual(async.operations, sync.operations);
+});

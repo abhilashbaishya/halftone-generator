@@ -104,9 +104,9 @@ function createRenderState(targetCtx, integral, width, height, settings) {
   const { cellSize, angle, quality, ink, paper } = settings;
 
   targetCtx.clearRect(0, 0, width, height);
-  targetCtx.fillStyle = `rgb(${paper.r} ${paper.g} ${paper.b})`;
+  targetCtx.fillStyle = typeof paper === "string" ? paper : `rgb(${paper.r} ${paper.g} ${paper.b})`;
   targetCtx.fillRect(0, 0, width, height);
-  targetCtx.fillStyle = `rgb(${ink.r} ${ink.g} ${ink.b})`;
+  targetCtx.fillStyle = typeof ink === "string" ? ink : `rgb(${ink.r} ${ink.g} ${ink.b})`;
 
   const diagonal = Math.sqrt(width * width + height * height);
   return {
