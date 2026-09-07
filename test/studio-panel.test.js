@@ -116,6 +116,87 @@ test("preset dropdown supports keyboard selection and restores trigger focus", a
   assert.equal(document.querySelector('[role="listbox"]'), null);
 });
 
+test('section transitions reverse from their visible height and restore natural sizing', () => {
+  const trigger = findButton('Tone');
+  const content = document.getElementById(trigger.getAttribute('aria-controls'));
+  const body = content.firstElementChild;
+  Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 180 });
+  let visibleHeight = 180;
+  content.getBoundingClientRect = () => new browser.DOMRect(0, 0, 280, visibleHeight);
+  const starts = [];
+  Object.defineProperty(content, 'offsetHeight', { configurable: true, get() {
+    starts.push(content.style.height);
+    return visibleHeight;
+  } });
+  trigger.click();
+  assert.equal(content.style.height, '0px');
+  assert.equal(content.inert, true);
+  visibleHeight = 75; // tap again before the closing animation completes
+  trigger.click();
+  assert.deepEqual(starts, ['180px', '75px']);
+  assert.equal(content.style.height, '180px');
+  assert.equal(content.inert, false);
+  const end = new browser.Event('transitionend', { bubbles: true });
+  Object.defineProperty(end, 'propertyName', { value: 'height' });
+  content.dispatchEvent(end);
+  assert.equal(content.style.height, 'auto');
+});
+
+test('reduced motion opens and closes sections without measured animation', () => {
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  browser.matchMedia = (query) => query === '(prefers-reduced-motion: reduce)' ? { matches: true } : nativeMatchMedia(query);
+  const trigger = findButton('Tone');
+  const content = document.getElementById(trigger.getAttribute('aria-controls'));
+  content.getBoundingClientRect = () => { throw new Error('should not measure reduced-motion transitions'); };
+  trigger.click();
+  assert.equal(content.style.height, '0px');
+  trigger.click();
+  assert.equal(content.style.height, 'auto');
+});
+
+test('mobile scrolling reports one busy interval through momentum and resumes after settling', async () => {
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const calls = [];
+  studio.setPanelScrolling = (active) => calls.push(active);
+  const panel = document.getElementById('dialPanelRoot');
+  panel.dispatchEvent(new browser.Event('scroll'));
+  panel.dispatchEvent(new browser.Event('scroll'));
+  assert.deepEqual(calls, [true]);
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.deepEqual(calls, [true, false]);
+  panel.dispatchEvent(new browser.Event('scroll'));
+  document.querySelector('.mobile-editor-tabs').children[1].click();
+  assert.deepEqual(calls, [true, false, true, false]);
+});
+
+test('iPad follows the system theme and fits the preview even with a saved desktop override', async () => {
+  const { TOUCH_LAYOUT } = await import('../src/mobile-layout.js');
+  const { mountStudioTheme } = await import('../src/theme.js');
+  const { mountMobilePreview } = await import('../src/mobile-preview.js');
+  browser.happyDOM.setWindowSize({ width: 1194, height: 834 });
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  const touch = new browser.EventTarget();
+  touch.matches = true;
+  const system = new browser.EventTarget();
+  system.matches = true;
+  browser.matchMedia = (query) => query === TOUCH_LAYOUT ? touch
+    : query === '(prefers-color-scheme: dark)' ? system : nativeMatchMedia(query);
+  globalThis.localStorage = browser.localStorage;
+  localStorage.setItem('halftone.theme', 'light');
+  document.body.insertAdjacentHTML('beforeend', '<canvas id="sourceCanvas"></canvas><button id="themeToggle"><span id="iconSun"></span><span id="iconMoon"></span></button>');
+  const disposeTheme = mountStudioTheme();
+  let fitted = 0;
+  const disposePreview = mountMobilePreview(() => fitted++);
+  assert.equal(document.getElementById('themeToggle').hidden, true);
+  assert.equal(document.documentElement.classList.contains('light'), false);
+  assert.equal(fitted, 1);
+  system.matches = false;
+  system.dispatchEvent(new browser.Event('change'));
+  assert.equal(document.documentElement.classList.contains('light'), true);
+  disposeTheme();
+  disposePreview();
+});
+
 test("preset names stay single-line, validate, save, and return focus", () => {
   studio.setSetting("cellSize", 9);
   findButton("Save preset").click();
@@ -224,7 +305,47 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(state.settings.cellSize, 12);
 });
 
-test('horizontal touch stays attached through thumb drift and cancellation refines once', () => {
+test('phone tabs restore independent scroll positions and ignore active-tab taps', () => {
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  const panel = document.getElementById('dialPanelRoot');
+  const actions = document.querySelector('.rail-actions');
+  tabs[1].click();
+  panel.scrollTop = 180;
+  tabs[1].click();
+  assert.equal(panel.scrollTop, 180);
+  tabs[2].click();
+  assert.equal(panel.scrollTop, 0);
+  panel.scrollTop = 65;
+  tabs[3].click();
+  actions.scrollTop = 95;
+  tabs[0].click();
+  assert.equal(panel.scrollTop, 0);
+  tabs[1].click();
+  assert.equal(panel.scrollTop, 180);
+  tabs[2].click();
+  assert.equal(panel.scrollTop, 65);
+  tabs[3].click();
+  assert.equal(actions.scrollTop, 95);
+});
+
+test('diagonal scroll and an undecided gesture returning to its start do not change a slider', () => {
+  const slider = document.querySelector('[role="slider"][aria-label="Cell size"]');
+  const pointer = (type, x, y) => slider.dispatchEvent(new browser.PointerEvent(type, {
+    pointerType: 'touch', pointerId: 1, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true
+  }));
+  pointer('pointerdown', 50, 25);
+  pointer('pointermove', 58, 34);
+  assert.equal(slider.hasPointerCapture(1), false);
+  pointer('pointerup', 58, 34);
+  pointer('pointerdown', 50, 25);
+  pointer('pointermove', 60, 34); // undecided: almost equal horizontal/vertical movement
+  pointer('pointermove', 50, 25);
+  pointer('pointerup', 50, 25);
+  assert.equal(settingsChanged.length, 0);
+});
+
+test('horizontal touch stays attached through thumb drift and cancellation refines once', async () => {
   const calls = [];
   studio.setPreviewInteraction = (active) => calls.push(active);
   const slider = document.querySelector('[role="slider"][aria-label="Cell size"]');
@@ -236,9 +357,11 @@ test('horizontal touch stays attached through thumb drift and cancellation refin
   pointer('pointermove', 132, 30);
   assert.deepEqual(calls, [true]);
   pointer('pointermove', 350, 85); // beyond the row, with vertical drift
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(state.settings.cellSize, 20);
   const count = settingsChanged.length;
   pointer('pointermove', 390, 90);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(settingsChanged.length, count); // no duplicate bound updates
   pointer('pointercancel', 390, 90);
   pointer('lostpointercapture', 390, 90);
@@ -246,6 +369,35 @@ test('horizontal touch stays attached through thumb drift and cancellation refin
   assert.equal(slider.hasPointerCapture(1), false);
   pointer('pointermove', 20, 20);
   assert.equal(state.settings.cellSize, 20);
+});
+
+test('touch updates once per frame and flushes the final value before refinement', async () => {
+  const slider = document.querySelector('[role="slider"][aria-label="Cell size"]');
+  const pointer = (type, x) => slider.dispatchEvent(new browser.PointerEvent(type, {
+    pointerType: 'touch', pointerId: 1, button: 0, clientX: x, clientY: 25, bubbles: true, cancelable: true
+  }));
+  const refinements = [];
+  studio.setPreviewInteraction = (active) => { if (!active) refinements.push(state.settings.cellSize); };
+  pointer('pointerdown', 50);
+  for (let x = 60; x <= 200; x += 5) pointer('pointermove', x);
+  assert.equal(settingsChanged.length, 0);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(settingsChanged.length, 1);
+  assert.equal(state.settings.cellSize, 14);
+  pointer('pointermove', 240);
+  pointer('pointerup', 300);
+  assert.equal(state.settings.cellSize, 20);
+  assert.deepEqual(refinements, [20]);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(settingsChanged.length, 2);
+
+  pointer('pointerdown', 300);
+  pointer('pointermove', 160);
+  pointer('pointercancel', 160);
+  assert.equal(state.settings.cellSize, 12);
+  assert.deepEqual(refinements, [20, 12]);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(settingsChanged.length, 3);
 });
 
 test('color gestures enable draft rendering and finish on cancellation', () => {

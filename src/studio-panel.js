@@ -21,8 +21,8 @@ function button(label, onClick, className = "") {
   return node;
 }
 
-// Native buttons provide Enter/Space activation. CSS keeps our fast, clipping
-// section motion independent of DialKit's default fading spring animation.
+// Measure once per toggle so the controls retain their natural layout while
+// the section opens. A quick reversal starts at the currently visible height.
 export function mountStudioFolder(host, title, defaultOpen = true, root = false) {
   const folder = element("div", `dialkit-folder${root ? " dialkit-folder-root" : " studio-folder"}`);
   const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header" : ""}`);
@@ -35,11 +35,28 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
   folder.append(header, content);
   host.append(folder);
   const setOpen = (open) => {
+    if (folder.dataset.open === String(open)) return;
+    const animate = !root && folder.dataset.open !== undefined && folder.getClientRects().length > 0
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (animate) {
+      const height = content.getBoundingClientRect().height;
+      content.style.transition = 'none';
+      content.style.height = `${height}px`;
+      // Establish the starting height once, including on an interrupted transition.
+      void content.offsetHeight;
+    }
     folder.dataset.open = String(open);
     if (!root) trigger.setAttribute("aria-expanded", String(open));
     content.inert = !open;
     content.setAttribute("aria-hidden", String(!open));
+    content.style.transition = '';
+    content.style.height = animate ? `${open ? body.scrollHeight : 0}px` : open ? 'auto' : '0px';
   };
+  content.addEventListener('transitionend', (event) => {
+    if (event.target !== content || event.propertyName !== 'height') return;
+    // Open sections must grow naturally when presets or validation text change.
+    if (folder.dataset.open === 'true') content.style.height = 'auto';
+  });
   if (!root) {
     content.id = `studio-section-${title.toLowerCase()}`;
     trigger.setAttribute("aria-controls", content.id);
@@ -84,6 +101,7 @@ function mountSegments(host, options, label, columns, onChange, className = "") 
   host.append(group);
   requestAnimationFrame(() => requestAnimationFrame(() => group.classList.add("is-ready")));
   return (nextValue, nextDisabled = false) => {
+    if (nextValue === value && nextDisabled === disabled) return;
     value = nextValue;
     disabled = nextDisabled;
     group.style.setProperty("--segment-index", Math.max(0, options.findIndex((option) => option.value === value)));
@@ -143,6 +161,7 @@ export function mountStudioPanel(studio) {
   const selectProps = () => ({ label: state.presetModified ? "Preset · Edited" : "Preset", value: state.selectedPreset,
     options: state.presets, onChange: (value) => { closeNamer(false); studio.selectPreset(value); } });
   const select = mountSelectControl(selectHost, selectProps());
+  let previousSelect = JSON.stringify(selectProps());
   controls.push(select);
   const actions = element("div", "dialkit-preset-actions");
   const namer = element("form", "dialkit-preset-namer");
@@ -202,7 +221,12 @@ export function mountStudioPanel(studio) {
     upload.classList.toggle("dialkit-button-primary", !state.hasUserImage);
     uploadError.hidden = !state.uploadError;
     if (errorText.textContent !== state.uploadError) errorText.textContent = state.uploadError;
-    select.update(selectProps());
+    const nextSelect = selectProps();
+    const selectSignature = JSON.stringify(nextSelect);
+    if (selectSignature !== previousSelect) {
+      previousSelect = selectSignature;
+      select.update(nextSelect);
+    }
     namer.hidden = !naming;
     actions.hidden = naming;
     save.disabled = !state.presetModified;
@@ -286,7 +310,7 @@ export function mountStudioPanel(studio) {
     image: [source.closest(".studio-folder")],
     adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
     colors: [colors.closest(".studio-folder")]
-  });
+  }, { onScrollActivity: (active) => studio.setPanelScrolling?.(active) });
 
   // Observe only our color drag surfaces; DialKit/native ranges retain their
   // own pointer capture. This tells the renderer when to refine the preview.

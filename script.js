@@ -1,6 +1,7 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
+import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
 import { GrainPass } from "./grain-pass.js";
@@ -308,8 +309,10 @@ let renderQueued = false;
 let previewIsCurrent = false;
 let previewGeneration = 0;
 let previewInteractions = 0;
+let panelScrolling = false;
 let pendingPreviewJob = null;
 let drawnSourceKey = "";
+let previewLayoutKey = "";
 const previewWorkCanvas = document.createElement("canvas");
 const previewWorkCtx = previewWorkCanvas.getContext("2d", { willReadFrequently: true });
 
@@ -319,6 +322,13 @@ function setPreviewInteraction(active) {
   if (wasInteracting === (previewInteractions > 0) || !isCompactDevice()) return;
   previewGeneration += 1;
   requestRender();
+}
+
+function setPanelScrolling(active) {
+  if (panelScrolling === active) return;
+  panelScrolling = active;
+  if (active) invalidateExportEstimate();
+  else scheduleExportEstimate();
 }
 let exportRequestId = 0;
 let activeExport = null;
@@ -990,14 +1000,21 @@ function renderWithWorker(job) {
 }
 
 function generateHalftone() {
-  fitCanvasToStage();
-  updateSplitPreview();
+  if (previewBusy) { renderQueued = true; return; }
+  // Slider values do not change the fitted geometry. Avoid writing canvas
+  // styles and then forcing layout reads on every interactive frame.
+  const layoutKey = [sourceToken, sourceImage?.width, sourceImage?.height,
+    controls.quality.value, window.innerWidth, window.innerHeight, window.devicePixelRatio].join(':');
+  if (layoutKey !== previewLayoutKey) {
+    fitCanvasToStage();
+    updateSplitPreview();
+    previewLayoutKey = layoutKey;
+  }
   if (!sourceImage) {
     drawPlaceholder();
     setRenderStatus("Upload an image", false);
     return;
   }
-  if (previewBusy) { renderQueued = true; return; }
   // The snapshot includes effects; a completed job never mixes old dots with
   // newer effect values. At most one job runs, plus one latest pending update.
   renderQueued = false;
@@ -1236,7 +1253,7 @@ function getEstimateUncertainty(format) {
 
 async function estimateCurrentExportSize(requestId) {
   const plan = getExportPlan();
-  if (!plan || !previewCanvas.width || !previewCanvas.height || activeExport || requestId !== exportEstimateRequestId) return;
+  if (!plan || !previewCanvas.width || !previewCanvas.height || activeExport || panelScrolling || requestId !== exportEstimateRequestId) return;
 
   const format = getExportFormat(exportFormat);
   const signature = getExportSignature(plan, format);
@@ -1270,7 +1287,7 @@ async function estimateCurrentExportSize(requestId) {
 }
 
 function scheduleExportEstimate(delay = 420) {
-  if (!sourceImage || !previewIsCurrent || previewInteractions > 0 || activeExport) return;
+  if (!sourceImage || !previewIsCurrent || previewInteractions > 0 || activeExport || panelScrolling) return;
   clearTimeout(exportEstimateTimer);
   const requestId = ++exportEstimateRequestId;
 
@@ -1654,7 +1671,7 @@ function onSplitDocumentMove(event) {
 }
 
 function handleSplitPointerDown(event) {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || compareState.draggingSplit) return;
   compareState.draggingSplit = true;
   compareState.splitPointerId = event.pointerId;
   compareState.splitLayout = {
@@ -1662,9 +1679,11 @@ function handleSplitPointerDown(event) {
     plane: canvasPlane.getBoundingClientRect()
   };
   compareState.splitTouch = event.pointerType === "touch"
-    ? { x: event.clientX, y: event.clientY, locked: false }
+    ? { x: event.clientX, y: event.clientY, locked: false,
+        offset: event.clientX - (compareState.splitLayout.plane.left + compareState.splitLayout.plane.width * compareState.split) }
     : { locked: true };
 
+  splitHandle.setPointerCapture(event.pointerId);
   document.addEventListener("pointermove", onSplitDocumentMove, true);
 
   if (compareState.splitTouch.locked) {
@@ -1678,17 +1697,17 @@ function handleSplitPointerMove(event) {
 
   const touch = compareState.splitTouch;
   if (touch && !touch.locked) {
-    const dx = event.clientX - touch.x;
-    const dy = event.clientY - touch.y;
-    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-    if (Math.abs(dy) > Math.abs(dx)) {
+    const intent = touchIntent(touch, event);
+    if (intent === 'vertical') {
       endSplitDrag(event);
       return;
     }
+    if (intent !== 'horizontal') return;
     touch.locked = true;
   }
 
-  setSplitFromClientX(event.clientX);
+  event.preventDefault();
+  setSplitFromClientX(event.clientX - (touch?.offset ?? 0));
 }
 
 function endSplitDrag(event) {
@@ -1697,11 +1716,13 @@ function endSplitDrag(event) {
     return;
   }
 
+  const pointerId = compareState.splitPointerId;
   compareState.draggingSplit = false;
   compareState.splitPointerId = null;
   compareState.splitTouch = null;
   compareState.splitLayout = null;
   document.removeEventListener("pointermove", onSplitDocumentMove, true);
+  if (splitHandle.hasPointerCapture(pointerId)) splitHandle.releasePointerCapture(pointerId);
 }
 
 // ── Inspector bridge ───────────────────────────────────────────────
@@ -1764,6 +1785,7 @@ window.halftoneStudio = Object.freeze({
   getState: getStudioState,
   setSetting: setPanelSetting,
   setPreviewInteraction,
+  setPanelScrolling,
   setExportFormat,
   selectPreset(name) {
     applyPreset(name);
@@ -1888,6 +1910,8 @@ splitHandle.addEventListener("keydown", (event) => {
 });
 
 splitHandle.addEventListener("pointerdown", handleSplitPointerDown);
+splitHandle.addEventListener("lostpointercapture", endSplitDrag);
+window.addEventListener("blur", () => endSplitDrag());
 document.addEventListener("pointerup", endSplitDrag, true);
 document.addEventListener("pointercancel", endSplitDrag, true);
 
@@ -1895,6 +1919,7 @@ document.addEventListener("pointercancel", endSplitDrag, true);
 // scroll of the mobile layout. Only re-render if the backing store actually
 // changed size — fitCanvasToStage already reports that.
 window.addEventListener("resize", () => {
+  previewLayoutKey = "";
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     const resized = fitCanvasToStage();

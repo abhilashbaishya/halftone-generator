@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#000000" />
     <script>
       (() => {
-        const phone = matchMedia('(max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse)').matches;
+        const touch = matchMedia('(max-width: 767px), (any-pointer: coarse)').matches;
         let saved;
         try { saved = localStorage.getItem('halftone.theme'); } catch {}
-        const theme = !phone && ['light', 'dark'].includes(saved) ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const theme = !touch && ['light', 'dark'].includes(saved) ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.classList.toggle('light', theme === 'light');
         document.documentElement.style.colorScheme = theme;
         document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f6f5f1' : '#1e1d1e';

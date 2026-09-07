@@ -1,10 +1,20 @@
+import { touchIntent, TOUCH_SLOP } from './touch-intent.js';
+
 // One touch path per slider. Pointer capture keeps a horizontal drag attached
 // to the control; pan-y lets Safari cancel it when the user scrolls vertically.
 export function mountTouchSlider(track, { min, max, step, onChange, onInteraction = () => {} }) {
   let gesture;
+  let frame = null;
+  let pendingX;
+  const flush = () => {
+    if (frame !== null) window.cancelAnimationFrame(frame);
+    frame = null;
+    if (gesture && pendingX !== undefined) apply(pendingX);
+    pendingX = undefined;
+  };
   const listeners = [];
   const listen = (type, fn) => {
-    track.addEventListener(type, fn, true);
+    track.addEventListener(type, fn, { capture: true, passive: true });
     listeners.push([type, fn]);
   };
   const apply = (x) => {
@@ -17,6 +27,8 @@ export function mountTouchSlider(track, { min, max, step, onChange, onInteractio
   };
   const finish = () => {
     if (!gesture) return;
+    // Commit the latest sample before asking for the final-quality render.
+    flush();
     const { id, horizontal } = gesture;
     gesture = null;
     delete track.dataset.touchDragging;
@@ -24,32 +36,33 @@ export function mountTouchSlider(track, { min, max, step, onChange, onInteractio
     if (horizontal) onInteraction(false);
   };
   listen('pointerdown', (event) => {
-    if (event.pointerType !== 'touch' || event.target.closest('input')) return;
+    if (event.pointerType !== 'touch' || event.button !== 0 || event.target.closest('input')) return;
     event.stopImmediatePropagation();
     if (gesture) return;
     gesture = { id: event.pointerId, x: event.clientX, y: event.clientY,
-      rect: track.getBoundingClientRect(), horizontal: false };
+      rect: track.getBoundingClientRect(), horizontal: false, moved: false };
     track.setPointerCapture(event.pointerId);
   });
   listen('pointermove', (event) => {
     if (gesture?.id !== event.pointerId) return;
     event.stopImmediatePropagation();
-    const dx = Math.abs(event.clientX - gesture.x), dy = Math.abs(event.clientY - gesture.y);
+    if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) >= TOUCH_SLOP) gesture.moved = true;
     if (!gesture.horizontal) {
-      if (dy >= 8 && dy > dx * 1.5) { finish(); return; }
-      if (dx < 4 || dx < dy * 1.2) return;
+      const intent = touchIntent(gesture, event);
+      if (intent === 'vertical') { finish(); return; }
+      if (intent !== 'horizontal') return;
       gesture.horizontal = true;
       track.dataset.touchDragging = 'true';
       onInteraction(true);
     }
-    event.preventDefault();
-    apply(event.clientX);
+    pendingX = event.clientX;
+    if (frame === null) frame = window.requestAnimationFrame(flush);
   });
   listen('pointerup', (event) => {
     if (gesture?.id !== event.pointerId) return;
     event.stopImmediatePropagation();
     const distance = Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y);
-    if (gesture.horizontal || distance < 8) apply(event.clientX);
+    if (gesture.horizontal || (!gesture.moved && distance < TOUCH_SLOP)) pendingX = event.clientX;
     finish();
   });
   for (const type of ['pointercancel', 'lostpointercapture']) listen(type, (event) => {

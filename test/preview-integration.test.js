@@ -14,7 +14,15 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
   const nativeMatchMedia = browser.matchMedia.bind(browser);
   // All queried comma lists start with the width clause used by this phone.
   browser.matchMedia = (query) => nativeMatchMedia(query.split(',')[0]);
-  browser.HTMLElement.prototype.getBoundingClientRect = () => new browser.DOMRect(0, 0, 180, 120);
+  let layoutReads = 0;
+  browser.HTMLElement.prototype.getBoundingClientRect = () => {
+    layoutReads++;
+    return new browser.DOMRect(0, 0, 180, 120);
+  };
+  const captured = new WeakMap();
+  browser.HTMLElement.prototype.setPointerCapture = function(id) { captured.set(this, id); };
+  browser.HTMLElement.prototype.hasPointerCapture = function(id) { return captured.get(this) === id; };
+  browser.HTMLElement.prototype.releasePointerCapture = function() { captured.delete(this); };
   document.body.innerHTML = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).match(/<body>([\s\S]*)<\/body>/)[1];
   const paints = [];
   const contexts = new WeakMap();
@@ -61,6 +69,7 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
     if (useWorker) { await waitUntil(() => jobs.length); worker.complete(); }
     await waitUntil(() => paints.length);
     const full = paints.at(-1);
+    const readsBeforeDrag = layoutReads;
     studio.setPreviewInteraction(true);
     studio.setSetting('contrast', 1.4);
     if (useWorker) {
@@ -85,6 +94,41 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
     }
     assert.deepEqual(paints.at(-1), full);
     assert.equal(studio.getState().settings.contrast, 1.6);
+    assert.equal(layoutReads, readsBeforeDrag, 'slider rendering reuses fitted geometry');
+    const handle = document.getElementById('splitHandle');
+    const overlay = document.getElementById('halftoneOverlay');
+    const pointer = (target, type, x, y, id = 1) => target.dispatchEvent(new browser.PointerEvent(type, {
+      pointerType: 'touch', pointerId: id, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true
+    }));
+    assert.equal(handle.getAttribute('aria-valuenow'), '50');
+    pointer(handle, 'pointerdown', 110, 40); // grab 20px right of the divider
+    assert.ok(handle.hasPointerCapture(1));
+    pointer(document, 'pointermove', 112, 42);
+    assert.equal(handle.getAttribute('aria-valuenow'), '50');
+    pointer(document, 'pointermove', 128, 44); // move 18px, or 10% of the image
+    assert.equal(handle.getAttribute('aria-valuenow'), '60');
+    assert.equal(overlay.style.clipPath, 'inset(0 40% 0 0)');
+    pointer(handle, 'pointerdown', 10, 10, 2); // a second finger cannot steal the drag
+    pointer(document, 'pointermove', 20, 10, 2);
+    assert.equal(handle.getAttribute('aria-valuenow'), '60');
+    pointer(document, 'pointermove', 220, 100); // locked drag survives vertical drift
+    assert.equal(handle.getAttribute('aria-valuenow'), '100');
+    pointer(document, 'pointercancel', 220, 100);
+    assert.equal(handle.hasPointerCapture(1), false);
+    pointer(document, 'pointermove', 0, 0);
+    assert.equal(handle.getAttribute('aria-valuenow'), '100');
+    pointer(handle, 'pointerdown', 170, 40);
+    pointer(document, 'pointermove', 178, 49); // diagonal scrolling leaves comparison alone
+    assert.equal(handle.hasPointerCapture(1), false);
+    assert.equal(handle.getAttribute('aria-valuenow'), '100');
+    pointer(handle, 'pointerdown', 170, 40);
+    handle.releasePointerCapture(1);
+    pointer(handle, 'lostpointercapture', 170, 40);
+    pointer(document, 'pointermove', 0, 40);
+    assert.equal(handle.getAttribute('aria-valuenow'), '100');
+    pointer(handle, 'pointerdown', 170, 40);
+    browser.dispatchEvent(new browser.Event('blur'));
+    assert.equal(handle.hasPointerCapture(1), false);
     // Invalidate the deferred export-size estimate before disposing the DOM.
     studio.setPreviewInteraction(true);
     await browser.happyDOM.abort();
