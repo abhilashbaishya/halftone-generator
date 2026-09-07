@@ -1461,9 +1461,7 @@ canvas {
   .control-rail .rail-actions { overflow-x: hidden; overscroll-behavior: none; }
   .preview-toolbar .zoom-control,
   .preview-toolbar #zoomRange,
-  .preview-toolbar #resetViewBtn,
-  .split-handle { display: none; }
-  .halftone-overlay { clip-path: none !important; }
+  .preview-toolbar #resetViewBtn { display: none; }
   .preview-toolbar .theme-toggle { display: none; }
   .preview-toolbar {
     display: block;

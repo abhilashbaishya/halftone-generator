@@ -260,17 +260,17 @@ test('color gestures enable draft rendering and finish on cancellation', () => {
   assert.deepEqual(calls, [true, false]);
 });
 
-test('mobile preview stays fitted and exposes only the halftone to assistive technology', async () => {
+test('mobile split preview stays fitted and exposes the source to assistive technology', async () => {
   const { mountMobilePreview } = await import('../src/mobile-preview.js');
   document.body.insertAdjacentHTML('beforeend', '<canvas id="sourceCanvas"></canvas><canvas id="previewCanvas"></canvas>');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   let resetCount = 0;
   const dispose = mountMobilePreview(() => resetCount++);
-  assert.equal(document.getElementById('sourceCanvas').getAttribute('aria-hidden'), 'true');
+  assert.equal(document.getElementById('sourceCanvas').getAttribute('aria-hidden'), 'false');
   browser.happyDOM.setWindowSize({ width: 1200, height: 900 });
   assert.equal(document.getElementById('sourceCanvas').getAttribute('aria-hidden'), 'false');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
-  assert.equal(document.getElementById('sourceCanvas').getAttribute('aria-hidden'), 'true');
+  assert.equal(document.getElementById('sourceCanvas').getAttribute('aria-hidden'), 'false');
   assert.ok(resetCount >= 2);
   dispose();
 });

@@ -1,12 +1,12 @@
 import { PHONE_LAYOUT } from './mobile-layout.js';
 
-// Mobile always shows the fitted halftone. Desktop retains its split preview.
+// Keep the split preview fitted on mobile, where zoom controls are hidden.
 export function mountMobilePreview(resetView) {
   const media = window.matchMedia(PHONE_LAYOUT);
   const source = document.getElementById('sourceCanvas');
   const sync = () => {
     if (media.matches) resetView();
-    source.setAttribute('aria-hidden', String(media.matches));
+    source.setAttribute('aria-hidden', 'false');
   };
   media.addEventListener('change', sync);
   sync();
