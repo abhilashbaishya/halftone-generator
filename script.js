@@ -1,3 +1,5 @@
+import { encodeCanvas } from "./src/canvas-encoding.js";
+import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
@@ -1234,7 +1236,7 @@ function getEstimateUncertainty(format) {
 
 async function estimateCurrentExportSize(requestId) {
   const plan = getExportPlan();
-  if (!plan || !previewCanvas.width || !previewCanvas.height) return;
+  if (!plan || !previewCanvas.width || !previewCanvas.height || activeExport || requestId !== exportEstimateRequestId) return;
 
   const format = getExportFormat(exportFormat);
   const signature = getExportSignature(plan, format);
@@ -1247,8 +1249,8 @@ async function estimateCurrentExportSize(requestId) {
   const large = drawExportEstimateSample(exportEstimateCanvases[1], 640);
   const encoderQuality = getEncoderQuality(format);
   const [smallBlob, largeBlob] = await Promise.all([
-    canvasToBlob(small.canvas, format.mimeType, encoderQuality),
-    canvasToBlob(large.canvas, format.mimeType, encoderQuality)
+    encodeCanvas(small.canvas, format.mimeType, encoderQuality, { allowFallback: false }),
+    encodeCanvas(large.canvas, format.mimeType, encoderQuality, { allowFallback: false })
   ]);
 
   if (requestId !== exportEstimateRequestId) return;
@@ -1268,7 +1270,7 @@ async function estimateCurrentExportSize(requestId) {
 }
 
 function scheduleExportEstimate(delay = 420) {
-  if (!sourceImage || !previewIsCurrent || previewInteractions > 0) return;
+  if (!sourceImage || !previewIsCurrent || previewInteractions > 0 || activeExport) return;
   clearTimeout(exportEstimateTimer);
   const requestId = ++exportEstimateRequestId;
 
@@ -1354,6 +1356,13 @@ function setExportProgress(job, progress, label = "Cancel") {
   setRenderStatus(`Exporting… ${percent}%`, true, true);
 }
 
+function setExportEncoding(job) {
+  if (activeExport !== job || job.cancelled) return;
+  controls.exportBtn.textContent = "Cancel · Encoding…";
+  controls.exportBtn.setAttribute("aria-label", `Cancel ${job.format.label} encoding`);
+  setRenderStatus(`Encoding ${job.format.label}…`, true, true);
+}
+
 function setExportFeedback(text, resetDelay = 2200) {
   clearTimeout(exportFeedbackTimer);
   controls.exportBtn.textContent = text;
@@ -1371,33 +1380,21 @@ function formatFileSize(bytes) {
   return `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
 }
 
-function canvasToBlob(canvas, mimeType = "image/png", quality) {
-  return new Promise((resolve, reject) => {
-    if (typeof canvas.toBlob !== "function") {
-      reject(new Error("Image export is not supported in this browser."));
-      return;
+function canvasToBlob(canvas, mimeType = "image/png", quality, signal) {
+  return encodeCanvas(canvas, mimeType, quality, {
+    signal,
+    encodeWebp: async (pixels, encoderQuality) => {
+      const { encodeWebpInWorker } = await import("./src/webp-client.js");
+      return encodeWebpInWorker(pixels, encoderQuality, signal);
     }
-
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("The browser could not encode this image."));
-        return;
-      }
-      if (blob.type && blob.type !== mimeType) {
-        reject(new Error(`${mimeType} export is not supported in this browser.`));
-        return;
-      }
-      resolve(blob);
-    }, mimeType, quality);
   });
 }
 
 function downloadExport(blob, format) {
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `halftone-${timestamp}.${format.extension}`;
+  link.download = createExportFilename(format.extension);
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1409,7 +1406,7 @@ function canUseExportWorker() {
 }
 
 function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     let settled = false;
     const worker = new Worker(new URL("./export-worker.js", import.meta.url), { type: "module" });
     job.worker = worker;
@@ -1434,6 +1431,8 @@ function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
 
       if (type === "export-progress") {
         setExportProgress(job, progress);
+      } else if (type === "export-phase" && event.data.phase === "encoding") {
+        setExportEncoding(job);
       } else if (type === "export-cancelled") {
         settle(resolve, { cancelled: true });
       } else if (type === "export-complete") {
@@ -1449,9 +1448,8 @@ function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
       settle(reject, new Error(event.message || "Export worker failed."));
     });
 
-    try {
-      const sourceBitmap = await createImageBitmap(job.sourceImage);
-      if (job.cancelled) {
+    Promise.resolve().then(() => createImageBitmap(job.sourceImage)).then((sourceBitmap) => {
+      if (job.cancelled || settled) {
         if (typeof sourceBitmap.close === "function") sourceBitmap.close();
         settle(resolve, { cancelled: true });
         return;
@@ -1470,9 +1468,7 @@ function renderExportWithWorker(job, dimensions, settings, needsPostEffects) {
         },
         sourceBitmap
       }, [sourceBitmap]);
-    } catch (error) {
-      settle(reject, error);
-    }
+    }).catch((error) => settle(reject, error));
   });
 }
 
@@ -1515,6 +1511,7 @@ function cancelExport() {
   const job = activeExport;
   if (!job || job.cancelled) return;
   job.cancelled = true;
+  job.encodingController.abort();
   controls.exportBtn.textContent = "Cancelling…";
   controls.exportBtn.setAttribute("aria-label", `Cancelling ${job.format.label} export`);
   setRenderStatus("Cancelling export…", true, true);
@@ -1543,6 +1540,7 @@ async function exportImage() {
   const job = {
     id: ++exportRequestId,
     cancelled: false,
+    encodingController: new AbortController(),
     worker: null,
     format,
     plan,
@@ -1553,6 +1551,7 @@ async function exportImage() {
     previewWidth: previewCanvas.width
   };
   activeExport = job;
+  invalidateExportEstimate();
   controls.exportBtn.dataset.exporting = "true";
   controls.exportBtn.setAttribute("aria-busy", "true");
   setExportProgress(job, 0);
@@ -1600,11 +1599,19 @@ async function exportImage() {
       const exportSource = needsPostEffects
         ? runPostProcessChain(outputCanvas, exportPasses, job.postProcessSettings)
         : outputCanvas;
-      setExportProgress(job, 96);
+      // Snapshot WebGL effects before yielding to an asynchronous encoder;
+      // its drawing buffer may be discarded after the current frame.
+      if (exportSource !== outputCanvas) {
+        const context = outputCanvas.getContext("2d");
+        context.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        context.drawImage(exportSource, 0, 0);
+      }
+      setExportEncoding(job);
       blob = await canvasToBlob(
-        exportSource,
+        outputCanvas,
         job.format.mimeType,
-        getEncoderQuality(job.format)
+        getEncoderQuality(job.format),
+        job.encodingController.signal
       );
     }
 
@@ -1618,7 +1625,7 @@ async function exportImage() {
   } catch (error) {
     if (!job.cancelled) {
       console.error(error);
-      setRenderStatus("Export failed", false, true);
+      setRenderStatus(error.message || "Export failed", false, true);
       setExportFeedback("Export failed · Retry", 3000);
     }
   } finally {

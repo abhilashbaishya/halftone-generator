@@ -55,7 +55,7 @@ beforeEach(() => {
   state = {
     settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
     isCustomPreset: false, presets: [{ value: "Default", label: "Default" }, { value: "Poster", label: "Poster" }],
-    export: { format: "webp", exporting: false }, uploadError: "", hasUserImage: false
+    export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false
   };
   studio = {
     eventName: "halftone:test", getState: () => structuredClone(state),
@@ -164,12 +164,12 @@ test("color picker offers all three formats and returns focus on Escape", () => 
 test("export radio groups support keyboard changes and disabled export state", () => {
   const group = document.querySelector('[role="radiogroup"][aria-label="Export format"]');
   key(group.querySelector('[aria-checked="true"]'), 'End');
-  assert.equal(state.export.format, 'png');
+  assert.equal(state.export.format, 'webp');
   assert.equal(document.activeElement.getAttribute('aria-checked'), 'true');
   state.export.exporting = true; emit();
   assert.ok([...group.querySelectorAll('button')].every((node) => node.disabled));
   key(group, 'Home');
-  assert.equal(state.export.format, 'png');
+  assert.equal(state.export.format, 'webp');
 });
 
 test("vertical touch scrolling leaves slider values alone", () => {
@@ -195,12 +195,16 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   const actions = document.querySelector('.rail-actions');
   const slider = folder('layout').querySelector('[role="slider"]');
   assert.equal(nav.hidden, false);
+  assert.equal(nav.children[0].textContent, "Image");
   assert.equal(folder('source').hidden, false);
   assert.equal(folder('tone').hidden, true);
+  assert.equal(folder('presets').hidden, true);
+  assert.equal(folder('source').querySelector('.dialkit-select-trigger'), null);
+  assert.ok(folder('source').querySelector('.studio-upload-button'));
   assert.equal(actions.hidden, true);
   nav.children[1].click();
   assert.equal(folder('source').hidden, true);
-  for (const name of ['layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
   studio.setSetting('cellSize', 12);
   nav.children[2].click();
   assert.equal(folder('colors').hidden, false);
@@ -212,7 +216,7 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(nav.hidden, true);
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
-  for (const name of ['source', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   assert.equal(nav.children[3].getAttribute('aria-pressed'), 'true');
   nav.children[1].click();

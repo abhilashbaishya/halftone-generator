@@ -9,8 +9,8 @@ export function mountMobileLayout(groups) {
   const nav = document.createElement("nav");
   nav.className = "mobile-editor-tabs";
   nav.setAttribute("aria-label", "Editor controls");
-  let active = "presets";
-  const buttons = ["Presets", "Adjust", "Colors", "Export"].map((label) => {
+  let active = "image";
+  const buttons = ["Image", "Adjust", "Colors", "Export"].map((label) => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;

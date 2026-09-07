@@ -1,3 +1,4 @@
+import { encodeCanvas } from "./src/canvas-encoding.js";
 import { renderHalftoneAsync } from "./renderer-core.js";
 
 const sourceCanvas = new OffscreenCanvas(1, 1);
@@ -51,15 +52,14 @@ async function renderExport(message) {
       return;
     }
 
-    postProgress(0.92);
+    self.postMessage({ type: "export-phase", requestId, phase: "encoding" });
     const mimeType = encoding?.mimeType || "image/png";
-    const blob = await outputCanvas.convertToBlob({
-      type: mimeType,
-      quality: encoding?.quality
+    const blob = await encodeCanvas(outputCanvas, mimeType, encoding?.quality, {
+      encodeWebp: async (pixels, quality) => {
+        const { encodeWebpPixels } = await import("./src/webp-codec.js");
+        return encodeWebpPixels(pixels, quality);
+      }
     });
-    if (blob.type && blob.type !== mimeType) {
-      throw new Error(`${mimeType} export is not supported in this browser.`);
-    }
     if (isCancelled(requestId)) {
       self.postMessage({ type: "export-cancelled", requestId });
       return;

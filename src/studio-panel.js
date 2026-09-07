@@ -136,9 +136,10 @@ export function mountStudioPanel(studio) {
   uploadError.append(warning, errorBody);
   source.append(fileInput, upload, uploadError);
 
+  const presets = mountStudioFolder(folders, "Presets").body;
   let naming = false;
   const selectHost = element("div", "studio-control-host");
-  source.append(selectHost);
+  presets.append(selectHost);
   const selectProps = () => ({ label: state.presetModified ? "Preset · Edited" : "Preset", value: state.selectedPreset,
     options: state.presets, onChange: (value) => { closeNamer(false); studio.selectPreset(value); } });
   const select = mountSelectControl(selectHost, selectProps());
@@ -191,7 +192,7 @@ export function mountStudioPanel(studio) {
   const revert = button("Revert", () => { studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
   const remove = button("Delete", () => { studio.deletePreset(); selectHost.querySelector("button")?.focus(); }, "dialkit-button-danger");
   actions.append(save, revert, remove);
-  source.append(actions, namer);
+  presets.append(actions, namer);
   function closeNamer(focus = true) {
     naming = false;
     updateSource();
@@ -282,8 +283,8 @@ export function mountStudioPanel(studio) {
   bindings.push(() => { updateQuality(state.settings.quality); updateFormat(state.export.format, state.export.exporting); });
 
   const unmountMobile = mountMobileLayout({
-    presets: [source.closest(".studio-folder")],
-    adjust: [layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
+    image: [source.closest(".studio-folder")],
+    adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
     colors: [colors.closest(".studio-folder")]
   });
 

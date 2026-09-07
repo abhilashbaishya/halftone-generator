@@ -4,12 +4,15 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_EXPORT_FORMAT,
   EXPORT_FORMATS,
+  EXPORT_FORMAT_OPTIONS,
   getEncoderQuality,
   getExportFormat,
   isExportFormat
 } from "../export-formats.js";
 
-test("unknown export formats fall back to WebP", () => {
+test("unknown export formats fall back to PNG", () => {
+  assert.equal(DEFAULT_EXPORT_FORMAT, "png");
+  assert.deepEqual(EXPORT_FORMAT_OPTIONS.map((format) => format.value), ["png", "jpeg", "webp"]);
   assert.equal(getExportFormat("nope").value, DEFAULT_EXPORT_FORMAT);
   assert.equal(getExportFormat("toString").value, DEFAULT_EXPORT_FORMAT);
   assert.equal(getExportFormat("__proto__").value, DEFAULT_EXPORT_FORMAT);

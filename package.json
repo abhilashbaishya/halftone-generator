@@ -10,9 +10,11 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@jsquash/webp": "1.5.0",
     "dialkit": "2.0.0"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "1.0.8",
     "happy-dom": "20.14.0",
     "vite": "8.2.2"
   }

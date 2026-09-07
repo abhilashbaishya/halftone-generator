@@ -1,12 +1,12 @@
-export const DEFAULT_EXPORT_FORMAT = "webp";
+export const DEFAULT_EXPORT_FORMAT = "png";
 
 export const EXPORT_FORMATS = Object.freeze({
-  webp: Object.freeze({
-    value: "webp",
-    label: "WebP",
-    mimeType: "image/webp",
-    extension: "webp",
-    encoderQuality: 0.9
+  png: Object.freeze({
+    value: "png",
+    label: "PNG",
+    mimeType: "image/png",
+    extension: "png",
+    encoderQuality: undefined
   }),
   jpeg: Object.freeze({
     value: "jpeg",
@@ -15,12 +15,12 @@ export const EXPORT_FORMATS = Object.freeze({
     extension: "jpg",
     encoderQuality: 0.92
   }),
-  png: Object.freeze({
-    value: "png",
-    label: "PNG",
-    mimeType: "image/png",
-    extension: "png",
-    encoderQuality: undefined
+  webp: Object.freeze({
+    value: "webp",
+    label: "WebP",
+    mimeType: "image/webp",
+    extension: "webp",
+    encoderQuality: 0.9
   })
 });
 
