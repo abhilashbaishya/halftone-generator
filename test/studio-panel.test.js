@@ -305,6 +305,48 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(state.settings.cellSize, 12);
 });
 
+test('iPad sidebar tabs separate editing from export and preserve controls across rotation', async () => {
+  const { TOUCH_LAYOUT } = await import('../src/mobile-layout.js');
+  unmount();
+  browser.happyDOM.setWindowSize({ width: 1194, height: 834 });
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  const touch = new browser.EventTarget();
+  touch.matches = true;
+  browser.matchMedia = (query) => query === TOUCH_LAYOUT ? touch : nativeMatchMedia(query);
+  unmount = mountStudioPanel(studio);
+  const tabs = document.querySelector('.mobile-editor-tabs');
+  const panel = document.getElementById('dialPanelRoot');
+  const actions = document.querySelector('.rail-actions');
+  const folder = (name) => document.getElementById(`studio-section-${name}`).closest('.studio-folder');
+  const slider = folder('layout').querySelector('[role="slider"]');
+  assert.equal(tabs.hidden, false);
+  assert.equal(folder('source').hidden, false);
+  assert.equal(actions.hidden, true);
+  tabs.children[1].click();
+  assert.equal(folder('source').hidden, true);
+  assert.equal(folder('layout').hidden, false);
+  assert.equal(folder('presets').hidden, false);
+  panel.scrollTop = 140;
+  tabs.children[2].click();
+  assert.equal(folder('colors').hidden, false);
+  assert.equal(folder('layout').hidden, true);
+  tabs.children[3].click();
+  assert.equal(panel.hidden, true);
+  assert.equal(actions.hidden, false);
+  browser.happyDOM.setWindowSize({ width: 834, height: 1194 });
+  assert.equal(tabs.hidden, false);
+  assert.equal(actions.hidden, false);
+  tabs.children[1].click();
+  assert.equal(panel.scrollTop, 140);
+  assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
+  touch.matches = false;
+  touch.dispatchEvent(new browser.Event('change'));
+  assert.equal(tabs.hidden, true);
+  assert.equal(panel.hidden, false);
+  assert.equal(actions.hidden, false);
+  for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+});
+
 test('phone tabs restore independent scroll positions and ignore active-tab taps', () => {
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   const tabs = document.querySelector('.mobile-editor-tabs').children;

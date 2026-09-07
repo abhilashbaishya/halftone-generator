@@ -7,8 +7,7 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
   const rail = document.querySelector(".control-rail");
   const panel = document.getElementById("dialPanelRoot");
   const actions = rail.querySelector(".rail-actions");
-  const media = window.matchMedia(PHONE_LAYOUT);
-  const touch = window.matchMedia(TOUCH_LAYOUT);
+  const media = window.matchMedia(TOUCH_LAYOUT);
   let scrollTimer;
   let scrolling = false;
   const finishScroll = () => {
@@ -18,7 +17,7 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     onScrollActivity(false);
   };
   const onScroll = () => {
-    if (!touch.matches) return;
+    if (!media.matches) return;
     if (!scrolling) {
       scrolling = true;
       onScrollActivity(true);
@@ -52,7 +51,7 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
   });
   rail.insertBefore(nav, panel);
   function sync() {
-    if (!touch.matches) finishScroll();
+    if (!media.matches) finishScroll();
     nav.hidden = !media.matches;
     panel.hidden = media.matches && active === "export";
     actions.hidden = media.matches && active !== "export";

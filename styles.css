@@ -1366,7 +1366,7 @@ canvas {
 
 .mobile-editor-tabs { display: none; }
 
-/* A tablet keeps the sidebar, but Export stays outside the scrolling controls.
+/* A tablet keeps the sidebar with tabs above one scrolling content area.
    dvh accounts for browser bars that cover the bottom of the old 100vh rail. */
 @media (min-width: 768px) and (any-pointer: coarse) {
   body, .workspace { height: 100dvh; }
@@ -1376,13 +1376,48 @@ canvas {
     height: calc(100dvh - max(var(--rail-inset), env(safe-area-inset-top)) - max(var(--rail-inset), env(safe-area-inset-bottom)));
     max-height: none;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
     overflow: clip;
   }
-  .control-rail .rail-actions { padding-top: 12px; }
 }
 
 @media (max-width: 767px), (any-pointer: coarse) {
+  .mobile-editor-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .mobile-editor-tabs button {
+    min-height: 44px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ref-label);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-editor-tabs button[aria-pressed="true"] {
+    color: var(--ref-value);
+    background: var(--ref-row);
+  }
+  .control-rail .rail-actions {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
+    align-content: start;
+    padding-top: 12px;
+    border-top: 0;
+  }
+  .control-rail .dial-panel-mount,
+  .control-rail .rail-actions { scrollbar-width: none; }
+  .control-rail .dial-panel-mount::-webkit-scrollbar,
+  .control-rail .rail-actions::-webkit-scrollbar { display: none; }
   .preview-toolbar .zoom-control,
   .preview-toolbar #zoomRange,
   .preview-toolbar #resetViewBtn,
@@ -1443,36 +1478,6 @@ canvas {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
-  }
-  .mobile-editor-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 4px;
-    padding: 4px 0 8px;
-    border-bottom: 1px solid var(--divider);
-  }
-  .mobile-editor-tabs button {
-    min-height: 44px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--ref-label);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .mobile-editor-tabs button[aria-pressed="true"] {
-    color: var(--ref-value);
-    background: var(--ref-row);
-  }
-  .control-rail .rail-actions {
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    align-content: start;
-    padding-top: 12px;
-    border-top: 0;
   }
 }
 
