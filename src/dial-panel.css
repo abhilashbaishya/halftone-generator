@@ -50,8 +50,8 @@
   background: transparent;
   /* The rail supplies the solid surface. DialKit's glass blur and forced
      layer are unnecessary here and can smear the scrolling edge in WebKit. */
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transform: none;
 }
 
@@ -470,8 +470,9 @@
   --dial-surface-hover: rgb(255 255 255 / 6%);
   --dial-surface-active: rgb(255 255 255 / 7%);
   background: var(--preset-glass);
-  backdrop-filter: blur(16px) saturate(145%);
+  /* Keep the standard property last so production CSS retains it. */
   -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: blur(16px) saturate(145%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%),
     0 12px 32px rgb(0 0 0 / 20%), 0 3px 8px rgb(0 0 0 / 12%);
   border-radius: 12px;
@@ -517,8 +518,8 @@ html.light .studio-preset-menu-exit {
   .halftone-dialkit .studio-preset-menu,
   .halftone-dialkit .studio-preset-menu-exit {
     background: var(--ref-dropdown);
-    backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
