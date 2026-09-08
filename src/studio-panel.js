@@ -285,7 +285,7 @@ export function mountStudioPanel(studio) {
     });
   }
   const layout = mountStudioFolder(folders, "Layout").body;
-  slider(layout, "cellSize", "Cell size", 3, 20, 1);
+  slider(layout, "cellSize", "Cell size", 3, 12, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
   const tone = mountStudioFolder(folders, "Tone").body;
   slider(tone, "contrast", "Contrast", .5, 2.5, .05);

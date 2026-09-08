@@ -1,7 +1,8 @@
 import { mountSelectControl } from 'dialkit/vanilla';
+import { mountPresetMenuMotion } from './preset-menu-motion.js';
 
 const samples = {
-  red: { description: 'Bold, coarse dots', image: new URL('./preset-previews/red.png', import.meta.url).href },
+  red: { description: 'Crisp, balanced poster', image: new URL('./preset-previews/red.png', import.meta.url).href },
   orange: { description: 'Warm, textured print', image: new URL('./preset-previews/orange.png', import.meta.url).href },
   neon: { description: 'Neon negative with glow', image: new URL('./preset-previews/neon.png', import.meta.url).href },
   blue: { description: 'Fine, precise grid', image: new URL('./preset-previews/blue.png', import.meta.url).href },
@@ -14,9 +15,11 @@ export function mountPresetSelect(host, initial) {
   let props = initial;
   const control = mountSelectControl(host, props);
   const trigger = host.querySelector('.dialkit-select-trigger');
+  trigger.classList.add('studio-preset-trigger');
+  const motion = mountPresetMenuMotion(host, trigger);
   const decorate = () => {
     if (trigger.getAttribute('aria-expanded') !== 'true') return;
-    const popup = host.closest('.dialkit-root')?.querySelector('.dialkit-select-dropdown');
+    const popup = host.closest('.dialkit-root')?.querySelector('.dialkit-select-dropdown:not(.studio-preset-menu-exit)');
     if (!popup) return;
     popup.classList.add('studio-preset-menu');
     popup.querySelectorAll('.dialkit-select-option').forEach((button, index) => {
@@ -44,12 +47,14 @@ export function mountPresetSelect(host, initial) {
         button.prepend(image);
       }
     });
+    motion.open(popup);
   };
   trigger.addEventListener('click', decorate);
   trigger.addEventListener('keydown', decorate);
   return {
     update(next) { props = next; control.update(next); decorate(); },
     destroy() {
+      motion.destroy();
       trigger.removeEventListener('click', decorate);
       trigger.removeEventListener('keydown', decorate);
       control.destroy();

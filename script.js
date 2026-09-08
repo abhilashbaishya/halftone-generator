@@ -211,15 +211,15 @@ const controls = {
 };
 
 const builtInPresets = {
-  // Coarse, clean dots and strong tonal separation for graphic posters.
+  // Clean, regular dots and balanced tonal separation for graphic posters.
   red: {
     quality: "ultra",
-    cellSize: 14,
-    contrast: 2.1,
-    gamma: 0.72,
-    minDot: 8,
+    cellSize: 8,
+    contrast: 1.55,
+    gamma: 0.95,
+    minDot: 4,
     screenAngle: 22,
-    toneCurve: 0.6,
+    toneCurve: 0.95,
     microDot: 0,
     jitter: 0,
     seed: 11,
@@ -498,6 +498,8 @@ function sanitizePreset(rawPreset) {
     return null;
   }
 
+  // Keep older saved presets within the current control range on load.
+  sanitized.cellSize = Math.min(Number(controls.cellSize.max), Math.max(Number(controls.cellSize.min), sanitized.cellSize));
   return sanitized;
 }
 

@@ -464,10 +464,62 @@
   min-width: 0;
 }
 
-.halftone-dialkit .studio-preset-menu {
+.halftone-dialkit .studio-preset-menu,
+.halftone-dialkit .studio-preset-menu-exit {
+  --preset-glass: rgb(32 32 30 / 32%);
+  --dial-surface-hover: rgb(255 255 255 / 6%);
+  --dial-surface-active: rgb(255 255 255 / 7%);
+  background: var(--preset-glass);
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%),
+    0 12px 32px rgb(0 0 0 / 20%), 0 3px 8px rgb(0 0 0 / 12%);
+  border-radius: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
+}
+
+html.light .studio-preset-menu,
+html.light .studio-preset-menu-exit {
+  --preset-glass: rgb(255 255 252 / 42%);
+  --dial-surface-hover: rgb(0 0 0 / 4%);
+  --dial-surface-active: rgb(0 0 0 / 7%);
+}
+
+.studio-preset-menu-exit {
+  pointer-events: none !important;
+}
+
+.studio-preset-trigger .dialkit-select-chevron {
+  transform-origin: center;
+  transition: transform 300ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.studio-preset-trigger[aria-expanded="true"] .dialkit-select-chevron {
+  transform: rotate(180deg);
+}
+
+.studio-preset-trigger[aria-expanded="false"] .dialkit-select-chevron {
+  transition-duration: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-preset-trigger .dialkit-select-chevron { transition: none; }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .halftone-dialkit .studio-preset-menu,
+  .halftone-dialkit .studio-preset-menu-exit { background: var(--ref-dropdown); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .halftone-dialkit .studio-preset-menu,
+  .halftone-dialkit .studio-preset-menu-exit {
+    background: var(--ref-dropdown);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .halftone-dialkit .studio-preset-option {

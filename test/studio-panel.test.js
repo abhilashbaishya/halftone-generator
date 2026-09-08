@@ -2,6 +2,7 @@ import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { Window } from "happy-dom";
 import { mountStudioPanel } from "../src/studio-panel.js";
+import { mountPresetMenuMotion } from "../src/preset-menu-motion.js";
 
 let browser, state, studio, unmount, settingsChanged, savedName;
 const defaults = {
@@ -127,7 +128,7 @@ test('visual preset options preserve selection and distinguish built-in samples 
   let options = popup.querySelectorAll('.studio-preset-option');
   assert.equal(options.length, 3);
   assert.equal(options[0].querySelector('img').alt, '');
-  assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Bold, coarse dots');
+  assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Crisp, balanced poster');
   assert.equal(options[2].querySelector('img'), null);
   assert.equal(options[2].querySelector('.studio-preset-description').textContent, 'Your saved preset');
   options[1].click();
@@ -140,6 +141,95 @@ test('visual preset options preserve selection and distinguish built-in samples 
   key(document.activeElement, 'End');
   key(document.activeElement, 'Enter');
   assert.equal(state.selectedPreset, 'My print');
+  assert.equal(document.activeElement, trigger);
+});
+
+test('preset menu fades out without keeping interactive options and clears an interrupted exit', async (t) => {
+  const prototype = browser.HTMLElement.prototype;
+  const original = prototype.animate;
+  const animations = [];
+  prototype.animate = function(frames, options) {
+    let finish;
+    const animation = { node: this, frames, options, cancelled: false,
+      finished: new Promise((resolve) => { finish = resolve; }),
+      cancel() { this.cancelled = true; }, finish: () => finish() };
+    animations.push(animation);
+    return animation;
+  };
+  t.after(() => { if (original) prototype.animate = original; else delete prototype.animate; });
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(animations[0].options.duration, 300);
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  document.querySelector('.studio-preset-option').click();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  const exit = document.querySelector('.studio-preset-menu-exit');
+  assert.ok(exit);
+  assert.equal(exit.inert, true);
+  assert.equal(exit.getAttribute('aria-hidden'), 'true');
+  assert.equal(exit.hasAttribute('role'), false);
+  assert.equal(exit.querySelectorAll('[id]').length, 0);
+  assert.equal(animations[1].options.duration, 240);
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  trigger.click();
+  assert.equal(document.querySelector('.studio-preset-menu-exit'), null);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(animations[1].cancelled, true);
+  assert.ok(document.querySelector('.studio-preset-menu'));
+  animations[1].finish();
+  await Promise.resolve();
+  assert.ok(document.querySelector('.studio-preset-menu'), 'old exit cannot remove a reopened menu');
+  key(document.activeElement, 'Escape');
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(document.querySelector('.studio-preset-menu'), null);
+  assert.equal(document.activeElement, trigger);
+  animations.at(-1).finish();
+  await Promise.resolve();
+  assert.equal(document.querySelector('.studio-preset-menu-exit'), null);
+});
+
+test('preset exit waits beyond a microtask checkpoint for the menu to be removed', async (t) => {
+  const prototype = browser.HTMLElement.prototype;
+  const original = prototype.animate;
+  prototype.animate = () => ({ finished: new Promise(() => {}), cancel() {} });
+  const root = document.querySelector('.halftone-dialkit');
+  const host = document.createElement('div');
+  const trigger = document.createElement('button');
+  host.append(trigger);
+  root.append(host);
+  const popup = document.createElement('div');
+  popup.className = 'dialkit-select-dropdown studio-preset-menu';
+  root.append(popup);
+  const motion = mountPresetMenuMotion(host, trigger);
+  t.after(() => {
+    motion.destroy(); host.remove(); popup.remove();
+    if (original) prototype.animate = original; else delete prototype.animate;
+  });
+  motion.open(popup);
+  trigger.click();
+  // Model a native event checkpoint before the library's later close handler.
+  await Promise.resolve();
+  assert.equal(popup.isConnected, true);
+  popup.remove();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.ok(document.querySelector('.studio-preset-menu-exit'), 'exit must not be skipped by the earlier checkpoint');
+});
+
+test('reduced motion skips preset entrance and exit animation', async (t) => {
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  browser.matchMedia = (query) => query === '(prefers-reduced-motion: reduce)' ? { matches: true } : nativeMatchMedia(query);
+  const prototype = browser.HTMLElement.prototype;
+  const original = prototype.animate;
+  prototype.animate = () => { throw new Error('reduced motion must not animate'); };
+  t.after(() => { if (original) prototype.animate = original; else delete prototype.animate; });
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  key(document.activeElement, 'Escape');
+  await Promise.resolve();
+  assert.equal(document.querySelector('.studio-preset-menu-exit'), null);
+  assert.equal(document.querySelector('.studio-preset-menu'), null);
   assert.equal(document.activeElement, trigger);
 });
 
@@ -441,7 +531,7 @@ test('horizontal touch stays attached through thumb drift and cancellation refin
   assert.deepEqual(calls, [true]);
   pointer('pointermove', 350, 85); // beyond the row, with vertical drift
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
-  assert.equal(state.settings.cellSize, 20);
+  assert.equal(state.settings.cellSize, 12);
   const count = settingsChanged.length;
   pointer('pointermove', 390, 90);
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
@@ -451,7 +541,7 @@ test('horizontal touch stays attached through thumb drift and cancellation refin
   assert.deepEqual(calls, [true, false]);
   assert.equal(slider.hasPointerCapture(1), false);
   pointer('pointermove', 20, 20);
-  assert.equal(state.settings.cellSize, 20);
+  assert.equal(state.settings.cellSize, 12);
 });
 
 test('touch updates once per frame and flushes the final value before refinement', async () => {
@@ -466,19 +556,19 @@ test('touch updates once per frame and flushes the final value before refinement
   assert.equal(settingsChanged.length, 0);
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(settingsChanged.length, 1);
-  assert.equal(state.settings.cellSize, 14);
+  assert.equal(state.settings.cellSize, 9);
   pointer('pointermove', 240);
   pointer('pointerup', 300);
-  assert.equal(state.settings.cellSize, 20);
-  assert.deepEqual(refinements, [20]);
+  assert.equal(state.settings.cellSize, 12);
+  assert.deepEqual(refinements, [12]);
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(settingsChanged.length, 2);
 
   pointer('pointerdown', 300);
   pointer('pointermove', 160);
   pointer('pointercancel', 160);
-  assert.equal(state.settings.cellSize, 12);
-  assert.deepEqual(refinements, [20, 12]);
+  assert.equal(state.settings.cellSize, 8);
+  assert.deepEqual(refinements, [12, 8]);
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(settingsChanged.length, 3);
 });
