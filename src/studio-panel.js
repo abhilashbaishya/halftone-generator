@@ -298,6 +298,24 @@ export function mountStudioPanel(studio) {
     const props = { label, value: state.settings[key], onChange: (value) => studio.setSetting(key, value) };
     const control = mountColorControl(host, props);
     controls.push(control);
+    const swatch = host.querySelector('.dialkit-color-swatch');
+    swatch.addEventListener('click', () => {
+      if (swatch.getAttribute('aria-expanded') !== 'true') return;
+      const popup = root.querySelector(`.dialkit-color-popover[aria-label="${label} color picker"]`);
+      if (!popup) return;
+      popup.querySelector('.dialkit-color-format-row').hidden = true;
+      const plane = popup.querySelector('.dialkit-color-plane');
+      // DialKit normally focuses the active format tab. Start at the first
+      // visible control instead, without changing a pasted CSS color value.
+      plane.focus({ preventScroll: true });
+      popup.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || !event.shiftKey || event.target !== plane) return;
+        event.preventDefault();
+        event.stopPropagation();
+        swatch.click();
+        swatch.focus({ preventScroll: true });
+      }, true);
+    });
     let previous = props.value;
     bindings.push(() => {
       if (previous === state.settings[key]) return;

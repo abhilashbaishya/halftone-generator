@@ -231,13 +231,27 @@ test("color edits keep supported CSS formats and reject invalid values", () => {
   assert.equal(input.value, defaults.inkColor);
 });
 
-test("color picker offers all three formats and returns focus on Escape", () => {
+test("color picker starts at the color field without format tabs and returns focus on Escape", () => {
   const swatch = document.querySelector('[aria-label="Pick ink color"]');
   swatch.click();
   const popup = document.querySelector('.dialkit-color-popover');
   assert.ok(popup);
-  assert.deepEqual([...popup.querySelectorAll('.dialkit-color-format')].map((node) => node.textContent), ['Hex', 'OKLCH', 'Display P3']);
+  assert.equal(popup.querySelector('.dialkit-color-format-row').hidden, true);
+  assert.equal(document.activeElement, popup.querySelector('.dialkit-color-plane'));
+  assert.equal(popup.querySelector('.dialkit-color-css-input').value, defaults.inkColor);
+  assert.ok(popup.querySelector('[aria-label="Hue"]'));
+  assert.ok(popup.querySelector('[aria-label="Opacity"]'));
   key(document.activeElement, 'Escape');
+  assert.equal(document.querySelector('.dialkit-color-popover'), null);
+  assert.equal(document.activeElement, swatch);
+});
+
+test("Shift-Tab leaves the simplified picker and opening preserves pasted CSS colors", () => {
+  studio.setSetting('inkColor', 'oklch(0.65 0.2 30 / 0.5)');
+  const swatch = document.querySelector('[aria-label="Pick ink color"]');
+  swatch.click();
+  assert.equal(state.settings.inkColor, 'oklch(0.65 0.2 30 / 0.5)');
+  key(document.activeElement, 'Tab', { shiftKey: true });
   assert.equal(document.querySelector('.dialkit-color-popover'), null);
   assert.equal(document.activeElement, swatch);
 });

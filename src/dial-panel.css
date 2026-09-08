@@ -553,6 +553,11 @@
   box-shadow: var(--ref-dropdown-shadow);
 }
 
+/* Hex is the default; other CSS color values can still be pasted directly. */
+.halftone-dialkit .dialkit-color-format-row {
+  display: none;
+}
+
 .halftone-dialkit .dialkit-color-swatch {
   position: relative;
 }
