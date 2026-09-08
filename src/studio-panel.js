@@ -2,6 +2,7 @@ import { mountSlider, mountSelectControl, mountColorControl } from "dialkit/vani
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
 import { mountTouchSlider } from "./touch-slider.js";
 import { mountMobileLayout } from "./mobile-layout.js";
+import { createStudioIcon } from "./icons.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
   value, label: value[0].toUpperCase() + value.slice(1)
@@ -60,16 +61,31 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
   if (!root) {
     content.id = `studio-section-${title.toLowerCase()}`;
     trigger.setAttribute("aria-controls", content.id);
-    const glyph = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    glyph.setAttribute("viewBox", "0 0 16 16");
-    glyph.setAttribute("class", "dialkit-folder-icon");
-    glyph.setAttribute("aria-hidden", "true");
-    glyph.innerHTML = '<path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    const glyph = createStudioIcon('chevron-down', { class: 'dialkit-folder-icon', width: 20, height: 20 });
     trigger.append(glyph);
     trigger.addEventListener("click", () => setOpen(folder.dataset.open !== "true"));
   }
   setOpen(defaultOpen);
   return { body, setOpen };
+}
+
+function mountStaticSection(host, title, showHeading = true) {
+  const section = element("div", "dialkit-folder studio-folder studio-static-section");
+  section.dataset.open = "true";
+  if (showHeading) {
+    const header = element("div", "dialkit-folder-header");
+    const row = element("div", "dialkit-folder-header-top");
+    row.append(element("span", "dialkit-folder-title", title));
+    header.append(row);
+    section.append(header);
+  }
+  const content = element("div", "dialkit-folder-content");
+  content.id = `studio-section-${title.toLowerCase()}`;
+  const body = element("div", "dialkit-folder-inner");
+  content.append(body);
+  section.append(content);
+  host.append(section);
+  return body;
 }
 
 function mountSegments(host, options, label, columns, onChange, className = "") {
@@ -134,7 +150,7 @@ export function mountStudioPanel(studio) {
   root.append(panel);
   document.getElementById("dialPanelRoot").replaceChildren(root);
   const folders = mountStudioFolder(inner, "Halftone Studio", true, true).body;
-  const source = mountStudioFolder(folders, "Source").body;
+  const source = mountStaticSection(folders, "Source");
 
   const fileInput = element("input", "sr-only");
   fileInput.type = "file";
@@ -151,15 +167,14 @@ export function mountStudioPanel(studio) {
   uploadError.setAttribute("role", "alert");
   uploadError.setAttribute("aria-live", "assertive");
   uploadError.setAttribute("aria-atomic", "true");
-  const warning = element("span", "studio-upload-warning", "!");
-  warning.setAttribute("aria-hidden", "true");
+  const warning = createStudioIcon('circle-alert', { class: 'studio-upload-warning', width: 18, height: 18 });
   const errorBody = element("div", "");
   const errorText = element("p", "");
   errorBody.append(element("strong", "", "Image not uploaded"), errorText);
   uploadError.append(warning, errorBody);
   source.append(fileInput, upload, uploadError);
 
-  const presets = mountStudioFolder(folders, "Presets").body;
+  const presets = mountStaticSection(folders, "Presets", false);
   let naming = false;
   const selectHost = element("div", "studio-control-host");
   presets.append(selectHost);

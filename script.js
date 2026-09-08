@@ -1,6 +1,7 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
+import { mountStaticIcons } from "./src/icons.js";
 import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
@@ -23,6 +24,7 @@ import {
 } from "./image-policy.js";
 
 const PLACEHOLDER_URL = new URL("./placeholder.jpg", import.meta.url).href;
+mountStaticIcons();
 
 const previewPasses = {
   grain: new GrainPass(),

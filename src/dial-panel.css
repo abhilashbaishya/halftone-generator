@@ -473,6 +473,10 @@
   color: inherit;
 }
 
+.halftone-dialkit .studio-static-section > .dialkit-folder-header {
+  cursor: default;
+}
+
 .halftone-dialkit .studio-folder > .dialkit-folder-header .dialkit-folder-header-top:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: -2px;
@@ -509,6 +513,20 @@
 
 .studio-folder[data-open="true"] > .dialkit-folder-header .dialkit-folder-icon {
   transform: rotate(180deg);
+}
+
+@media (min-width: 768px) and (not (any-pointer: coarse)) {
+  /* Give desktop sections a gentler start, with the chevron settling in sync. */
+  .studio-folder > .dialkit-folder-content,
+  .studio-folder .dialkit-folder-icon {
+    transition-duration: 300ms;
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .studio-folder[data-open="false"] > .dialkit-folder-content,
+  .studio-folder[data-open="false"] > .dialkit-folder-header .dialkit-folder-icon {
+    transition-duration: 260ms;
+  }
 }
 
 .halftone-dialkit .dialkit-slider {
@@ -574,13 +592,10 @@
   color: var(--muted-text);
 }
 
-.studio-upload-warning {
-  display: grid;
-  place-items: center;
+.dialkit-upload-error > .studio-upload-warning {
   width: 18px;
   height: 18px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
+  flex-shrink: 0;
   color: var(--error-icon);
 }
 
