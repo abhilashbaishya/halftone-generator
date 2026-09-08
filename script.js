@@ -2,6 +2,7 @@ import { encodeCanvas } from "./src/canvas-encoding.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
 import { mountStaticIcons } from "./src/icons.js";
+import { getImageCellSize } from "./src/pattern-scale.js";
 import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
@@ -870,9 +871,9 @@ function drawSourcePreview() {
   sourceCtx.drawImage(getScaledSource(sourceCanvas.width, sourceCanvas.height), 0, 0);
 }
 
-function getRenderSettings() {
+function getRenderSettings(width = previewCanvas.width, height = previewCanvas.height) {
   return {
-    cellSize: Math.max(1, numberValue(controls.cellSize, 8)),
+    cellSize: getImageCellSize(Math.max(1, numberValue(controls.cellSize, 8)), width, height),
     contrast: numberValue(controls.contrast, 1.1),
     gamma: numberValue(controls.gamma, 1),
     minDot: numberValue(controls.minDot, 0) / 100,
@@ -1110,7 +1111,7 @@ function updateOutputs() {
   controls.grainOut.textContent = `${numberValue(controls.grainStrength, 0)}%`;
   controls.bloomOut.textContent = `${numberValue(controls.bloomStrength, 0)}%`;
   controls.crtOut.textContent = `${numberValue(controls.crtStrength, 0)}%`;
-  controls.cellSizeOut.textContent = `${numberValue(controls.cellSize, 8)} px`;
+  controls.cellSizeOut.textContent = String(numberValue(controls.cellSize, 8));
   controls.contrastOut.textContent = numberValue(controls.contrast, 1.1).toFixed(2);
   controls.gammaOut.textContent = numberValue(controls.gamma, 1).toFixed(2);
   controls.minDotOut.textContent = `${numberValue(controls.minDot, 0)}%`;
@@ -1211,7 +1212,6 @@ function getExportSignature(plan = getExportPlan(), format = getExportFormat(exp
     sourceToken,
     width: plan.dimensions.width,
     height: plan.dimensions.height,
-    previewWidth: previewCanvas.width,
     format: format.value,
     encoderQuality: format.encoderQuality ?? null,
     grainSeed,
@@ -1559,7 +1559,7 @@ async function exportImage() {
   const plan = getExportPlan(postProcessSettings);
   if (!plan) return;
   const format = getExportFormat(exportFormat);
-  const settings = getRenderSettings();
+  const settings = getRenderSettings(plan.dimensions.width, plan.dimensions.height);
   const exportSignature = getExportSignature(plan, format);
 
   clearTimeout(exportFeedbackTimer);
@@ -1573,8 +1573,7 @@ async function exportImage() {
     sourceImage,
     settings,
     postProcessSettings,
-    exportSignature,
-    previewWidth: previewCanvas.width
+    exportSignature
   };
   activeExport = job;
   invalidateExportEstimate();
@@ -1588,11 +1587,6 @@ async function exportImage() {
 
   try {
     const { dimensions, needsPostEffects } = job.plan;
-    job.settings.cellSize = Math.max(
-      1,
-      job.settings.cellSize * dimensions.width / Math.max(1, job.previewWidth)
-    );
-
     let result;
     if (canUseExportWorker()) {
       try {

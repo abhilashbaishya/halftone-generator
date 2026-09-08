@@ -464,6 +464,52 @@
   min-width: 0;
 }
 
+.halftone-dialkit .studio-preset-menu {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.halftone-dialkit .studio-preset-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+}
+
+.studio-preset-sample {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 5px;
+  outline: 1px solid rgb(255 255 255 / 10%);
+  outline-offset: -1px;
+}
+
+html.light .studio-preset-sample {
+  outline-color: rgb(0 0 0 / 10%);
+}
+
+.studio-preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.studio-preset-name {
+  overflow-wrap: anywhere;
+}
+
+.studio-preset-description {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--dial-text-secondary);
+}
+
 .halftone-dialkit .dialkit-folder-header-top {
   width: 100%;
   border: 0;

@@ -1,4 +1,5 @@
-import { mountSlider, mountSelectControl, mountColorControl } from "dialkit/vanilla";
+import { mountSlider, mountColorControl } from "dialkit/vanilla";
+import { mountPresetSelect } from "./preset-select.js";
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
 import { mountTouchSlider } from "./touch-slider.js";
 import { mountMobileLayout } from "./mobile-layout.js";
@@ -180,7 +181,7 @@ export function mountStudioPanel(studio) {
   presets.append(selectHost);
   const selectProps = () => ({ label: state.presetModified ? "Preset · Edited" : "Preset", value: state.selectedPreset,
     options: state.presets, onChange: (value) => { closeNamer(false); studio.selectPreset(value); } });
-  const select = mountSelectControl(selectHost, selectProps());
+  const select = mountPresetSelect(selectHost, selectProps());
   let previousSelect = JSON.stringify(selectProps());
   controls.push(select);
   const actions = element("div", "dialkit-preset-actions");
@@ -284,7 +285,7 @@ export function mountStudioPanel(studio) {
     });
   }
   const layout = mountStudioFolder(folders, "Layout").body;
-  slider(layout, "cellSize", "Cell size", 3, 20, 1, "px");
+  slider(layout, "cellSize", "Cell size", 3, 20, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
   const tone = mountStudioFolder(folders, "Tone").body;
   slider(tone, "contrast", "Contrast", .5, 2.5, .05);

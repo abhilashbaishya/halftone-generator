@@ -116,6 +116,33 @@ test("preset dropdown supports keyboard selection and restores trigger focus", a
   assert.equal(document.querySelector('[role="listbox"]'), null);
 });
 
+test('visual preset options preserve selection and distinguish built-in samples from saved presets', async () => {
+  state.presets = [{ value: 'red', label: 'Crimson Poster' }, { value: 'fine', label: 'Fine Screen' },
+    { value: 'My print', label: 'My print' }];
+  state.selectedPreset = 'red';
+  emit();
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  let popup = document.querySelector('.studio-preset-menu');
+  let options = popup.querySelectorAll('.studio-preset-option');
+  assert.equal(options.length, 3);
+  assert.equal(options[0].querySelector('img').alt, '');
+  assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Bold, coarse dots');
+  assert.equal(options[2].querySelector('img'), null);
+  assert.equal(options[2].querySelector('.studio-preset-description').textContent, 'Your saved preset');
+  options[1].click();
+  assert.equal(state.selectedPreset, 'fine');
+  assert.equal(document.querySelector('.studio-preset-menu'), null);
+  key(trigger, 'ArrowDown');
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  popup = document.querySelector('.studio-preset-menu');
+  assert.equal(popup.querySelectorAll('img').length, 2);
+  key(document.activeElement, 'End');
+  key(document.activeElement, 'Enter');
+  assert.equal(state.selectedPreset, 'My print');
+  assert.equal(document.activeElement, trigger);
+});
+
 test('section transitions reverse from their visible height and restore natural sizing', () => {
   const trigger = findButton('Tone');
   const content = document.getElementById(trigger.getAttribute('aria-controls'));

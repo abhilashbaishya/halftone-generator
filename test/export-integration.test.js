@@ -94,6 +94,18 @@ for (const nativeWebp of [true, false]) test(`default Ronaldo exports through th
       await mkdir(process.env.HALFTONE_EXPORT_ARTIFACT_DIR, { recursive: true });
       await writeFile(`${process.env.HALFTONE_EXPORT_ARTIFACT_DIR}/${nativeWebp ? 'native' : 'fallback'}.webp`, bytes);
     }
+    // Resizing the editor and changing DPR must not change exported dot density.
+    const previewWidth = document.getElementById('previewCanvas').width;
+    browser.HTMLElement.prototype.getBoundingClientRect = () => new browser.DOMRect(0, 0, 580, 700);
+    Object.defineProperty(browser, 'devicePixelRatio', { configurable: true, value: 2 });
+    browser.happyDOM.setWindowSize({ width: 1440, height: 1000 });
+    await waitUntil(() => document.getElementById('previewCanvas').width !== previewWidth
+      && document.getElementById('renderStatus').textContent === 'Ready');
+    document.getElementById('exportBtn').click();
+    await waitUntil(() => !studio.getState().export.exporting);
+    assert.equal(downloads.length, 2);
+    assert.deepEqual(Buffer.from(await downloads[1].blob.arrayBuffer()), bytes,
+      'same image and settings export identically after viewport and DPR changes');
     studio.setPreviewInteraction(true); // cancel deferred size estimation
   } finally {
     await browser.happyDOM.abort();
