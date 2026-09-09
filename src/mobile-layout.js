@@ -44,7 +44,8 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     workspace.inert = false;
     const restore = portraitFocus?.isConnected ? portraitFocus : null;
     portraitFocus = null;
-    restore?.focus({ preventScroll: true });
+    if (restore) restore.focus({ preventScroll: true });
+    else if (document.activeElement === landscapeHeading) landscapeHeading.blur();
   };
   phoneLandscape.addEventListener("change", syncPhoneLandscape);
   syncPhoneLandscape();

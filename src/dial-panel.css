@@ -396,7 +396,7 @@
   width: calc((100% - var(--segment-gap) * (var(--segments) - 1)) / var(--segments));
   border-radius: var(--radius);
   background: var(--segment-selected-bg);
-  box-shadow: inset 0 0 0 1px var(--segment-selected-ring);
+  box-shadow: 0 0 0 1px var(--segment-selected-ring);
   pointer-events: none;
   transform: translateX(calc(var(--segment-index) * (100% + var(--segment-gap))));
 }
@@ -452,6 +452,13 @@
 @media (max-width: 980px) {
   .export-format-option {
     min-height: 44px;
+  }
+}
+
+@media (max-width: 767px), (any-pointer: coarse) {
+  .export-format-thumb {
+    background: var(--ref-fill-active);
+    box-shadow: inset 0 0 0 1px var(--ref-hairline);
   }
 }
 

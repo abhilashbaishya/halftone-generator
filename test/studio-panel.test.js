@@ -539,6 +539,14 @@ test('phone landscape removes the editor from focus and restores the previous co
   landscape.dispatchEvent(new browser.Event('change'));
   assert.equal(workspace.inert, false);
   assert.equal(document.activeElement, slider);
+
+  slider.blur();
+  landscape.matches = true;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.equal(document.activeElement, heading);
+  landscape.matches = false;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.notEqual(document.activeElement, heading);
 });
 
 test('phone sheets use a slower entrance and a shorter exit', async (t) => {
