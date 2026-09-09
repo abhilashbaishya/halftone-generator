@@ -417,6 +417,15 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   nav.children[1].click();
   assert.equal(folder('source').hidden, true);
   for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['layout', 'tone', 'advanced']) {
+    const group = folder(name);
+    const heading = group.querySelector('.dialkit-folder-header-top');
+    assert.equal(group.dataset.phoneFlat, 'true');
+    assert.equal(group.dataset.open, 'true');
+    assert.equal(group.querySelector('.dialkit-folder-content').inert, false);
+    assert.equal(heading.getAttribute('role'), 'heading');
+    assert.equal(heading.hasAttribute('aria-expanded'), false);
+  }
   studio.setSetting('cellSize', 12);
   nav.children[2].click();
   assert.equal(folder('colors').hidden, false);
@@ -429,11 +438,68 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
   for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  assert.equal(folder('layout').dataset.phoneFlat, 'false');
+  assert.equal(folder('layout').querySelector('.dialkit-folder-header-top').getAttribute('role'), null);
+  assert.equal(folder('layout').querySelector('.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   assert.equal(nav.children[3].getAttribute('aria-pressed'), 'true');
   nav.children[1].click();
   assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
   assert.equal(state.settings.cellSize, 12);
+});
+
+test('phone preset and color pickers open as sheets while desktop keeps popovers', async () => {
+  const presetTrigger = document.querySelector('.dialkit-select-trigger');
+  presetTrigger.click();
+  assert.equal(document.querySelector('.studio-preset-menu').classList.contains('studio-phone-sheet'), false);
+  presetTrigger.click();
+
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  tabs[1].click();
+  presetTrigger.click();
+  assert.equal(document.querySelector('.studio-preset-menu').classList.contains('studio-phone-sheet'), true);
+  key(document.activeElement, 'Escape');
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+
+  tabs[2].click();
+  const swatch = document.querySelector('.dialkit-color-swatch');
+  swatch.click();
+  const color = document.querySelector('.dialkit-color-popover');
+  assert.ok(color);
+  assert.equal(color.classList.contains('studio-phone-sheet'), true);
+  assert.equal(document.activeElement, color.querySelector('.dialkit-color-plane'));
+});
+
+test('phone sheets use a slower entrance and a shorter exit', async (t) => {
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const prototype = browser.HTMLElement.prototype;
+  const original = prototype.animate;
+  const animations = [];
+  prototype.animate = function(frames, options) {
+    const animation = { node: this, frames, options, finished: new Promise(() => {}), cancel() {} };
+    animations.push(animation);
+    return animation;
+  };
+  t.after(() => { if (original) prototype.animate = original; else delete prototype.animate; });
+  document.querySelector('.mobile-editor-tabs').children[1].click();
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  assert.equal(animations.at(-1).options.duration, 260);
+  document.querySelector('.studio-preset-option').click();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(animations.at(-1).options.duration, 180);
+  assert.equal(document.querySelector('.studio-preset-menu-exit').classList.contains('studio-phone-sheet'), true);
+
+  document.querySelector('.mobile-editor-tabs').children[2].click();
+  const swatch = document.querySelector('.dialkit-color-swatch');
+  swatch.click();
+  assert.equal(animations.at(-1).options.duration, 260);
+  const plane = document.querySelector('.dialkit-color-plane');
+  key(plane, 'Escape');
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(animations.at(-1).options.duration, 180);
+  assert.ok(document.querySelector('.dialkit-color-popover.studio-phone-sheet-exit'));
 });
 
 test('iPad sidebar tabs separate editing from export and preserve controls across rotation', async () => {

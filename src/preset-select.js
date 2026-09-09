@@ -1,5 +1,6 @@
 import { mountSelectControl } from 'dialkit/vanilla';
 import { mountPresetMenuMotion } from './preset-menu-motion.js';
+import { PHONE_LAYOUT } from './mobile-layout.js';
 
 const samples = {
   red: { description: 'Crisp, balanced poster', image: new URL('./preset-previews/red.png', import.meta.url).href },
@@ -13,6 +14,7 @@ const samples = {
 // the option contents; style samples are static and never compete with rendering.
 export function mountPresetSelect(host, initial) {
   let props = initial;
+  const phone = window.matchMedia(PHONE_LAYOUT);
   const control = mountSelectControl(host, props);
   const trigger = host.querySelector('.dialkit-select-trigger');
   trigger.classList.add('studio-preset-trigger');
@@ -22,6 +24,7 @@ export function mountPresetSelect(host, initial) {
     const popup = host.closest('.dialkit-root')?.querySelector('.dialkit-select-dropdown:not(.studio-preset-menu-exit)');
     if (!popup) return;
     popup.classList.add('studio-preset-menu');
+    popup.classList.toggle('studio-phone-sheet', phone.matches);
     popup.querySelectorAll('.dialkit-select-option').forEach((button, index) => {
       if (button.classList.contains('studio-preset-option')) return;
       const option = props.options[index];

@@ -1,6 +1,29 @@
+const DEFAULT_MOTION = {
+  enterDuration: 300,
+  exitDuration: 240,
+  enterTransform: 'translateY(-6px)',
+  exitTransform: 'translateY(-6px)',
+  enterEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+  exitEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+};
+
+const PHONE_SHEET_MOTION = {
+  enterDuration: 260,
+  exitDuration: 180,
+  enterTransform: 'translateY(14px)',
+  exitTransform: 'translateY(10px)',
+  enterEasing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  exitEasing: 'cubic-bezier(0.4, 0, 1, 1)'
+};
+
 // DialKit owns focus and selection. A non-interactive visual copy lets its
 // immediate close remain accessible while the surface finishes fading away.
-export function mountPresetMenuMotion(host, trigger) {
+function mountPopupMotion(host, trigger, {
+  enabled = () => true,
+  optionSelector = '',
+  liveClass,
+  exitClass
+}) {
   let current, entering, exiting, exitAnimation, pending, destroyed = false;
   let closeFrame = 0;
   const canAnimate = (node) => typeof node?.animate === 'function'
@@ -14,11 +37,15 @@ export function mountPresetMenuMotion(host, trigger) {
     exiting?.remove();
     exitAnimation = exiting = undefined;
   };
+  const motionFor = (node) => node.classList.contains('studio-phone-sheet')
+    ? PHONE_SHEET_MOTION
+    : DEFAULT_MOTION;
   const captureClose = (event) => {
     const popup = current;
-    if (destroyed || !popup?.isConnected || !canAnimate(popup) || pending === popup) return;
+    if (destroyed || !popup?.isConnected || !enabled(popup) || !canAnimate(popup) || pending === popup) return;
     const inside = popup.contains(event.target), onTrigger = trigger.contains(event.target);
-    const closes = event.type === 'click' && (onTrigger || event.target.closest('.dialkit-select-option') && inside)
+    const choseOption = optionSelector && inside && event.target.closest(optionSelector);
+    const closes = event.type === 'click' && (onTrigger || choseOption)
       || event.type === 'pointerdown' && !inside && !onTrigger
       || event.type === 'focusin' && !inside && !onTrigger
       || event.type === 'keydown' && inside && ['Escape', 'Tab', 'Enter', ' '].includes(event.key);
@@ -36,8 +63,8 @@ export function mountPresetMenuMotion(host, trigger) {
       current = undefined;
       entering?.cancel();
       clearExit();
-      copy.classList.remove('studio-preset-menu');
-      copy.classList.add('studio-preset-menu-exit');
+      if (liveClass) copy.classList.remove(liveClass);
+      copy.classList.add(exitClass);
       copy.removeAttribute('id');
       copy.removeAttribute('role');
       copy.setAttribute('aria-hidden', 'true');
@@ -50,8 +77,9 @@ export function mountPresetMenuMotion(host, trigger) {
         copy.showPopover();
       }
       exiting = copy;
-      const animation = copy.animate([from, { opacity: 0, transform: 'translateY(-6px)' }], {
-        duration: 240, easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)', fill: 'forwards'
+      const motion = motionFor(copy);
+      const animation = copy.animate([from, { opacity: 0, transform: motion.exitTransform }], {
+        duration: motion.exitDuration, easing: motion.exitEasing, fill: 'forwards'
       });
       exitAnimation = animation;
       animation.finished.then(() => { if (exiting === copy) clearExit(); }, () => {});
@@ -60,17 +88,18 @@ export function mountPresetMenuMotion(host, trigger) {
   for (const type of ['click', 'pointerdown', 'focusin', 'keydown']) document.addEventListener(type, captureClose, true);
   return {
     open(popup) {
-      if (current === popup) return;
+      if (!enabled(popup) || current === popup) return;
       cancelAnimationFrame(closeFrame);
       closeFrame = 0;
       pending = undefined;
-      const from = exiting ? appearance(exiting) : { opacity: 0, transform: 'translateY(-6px)' };
+      const motion = motionFor(popup);
+      const from = exiting ? appearance(exiting) : { opacity: 0, transform: motion.enterTransform };
       clearExit();
       entering?.cancel();
       current = popup;
       if (!canAnimate(popup)) return;
       entering = popup.animate([from, { opacity: 1, transform: 'none' }], {
-        duration: 300, easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+        duration: motion.enterDuration, easing: motion.enterEasing
       });
       entering.finished.catch(() => {});
     },
@@ -82,4 +111,19 @@ export function mountPresetMenuMotion(host, trigger) {
       for (const type of ['click', 'pointerdown', 'focusin', 'keydown']) document.removeEventListener(type, captureClose, true);
     }
   };
+}
+
+export function mountPresetMenuMotion(host, trigger) {
+  return mountPopupMotion(host, trigger, {
+    optionSelector: '.dialkit-select-option',
+    liveClass: 'studio-preset-menu',
+    exitClass: 'studio-preset-menu-exit'
+  });
+}
+
+export function mountPhoneSheetMotion(host, trigger) {
+  return mountPopupMotion(host, trigger, {
+    enabled: (popup) => popup.classList.contains('studio-phone-sheet'),
+    exitClass: 'studio-phone-sheet-exit'
+  });
 }

@@ -16,4 +16,8 @@ test('production CSS retains standard preset blur and its reduced-transparency o
   const reduced = css.match(/@media\s*\(prefers-reduced-transparency:\s*reduce\)\{([^}]*studio-preset-menu[^}]*\})/)?.[1];
   assert.ok(reduced, 'Reduced-transparency rule exists');
   assert.match(reduced, /[;{]backdrop-filter:none[;}]/);
+  assert.match(css, /studio-folder\[data-phone-flat=true\]/);
+  assert.match(css, /studio-phone-sheet/);
+  assert.match(css, /max-height:calc\(44dvh/);
+  assert.match(css, /transform-origin:bottom!important|transform-origin:50% 100%!important/);
 });

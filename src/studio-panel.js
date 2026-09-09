@@ -2,8 +2,9 @@ import { mountSlider, mountColorControl } from "dialkit/vanilla";
 import { mountPresetSelect } from "./preset-select.js";
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
 import { mountTouchSlider } from "./touch-slider.js";
-import { mountMobileLayout } from "./mobile-layout.js";
+import { mountMobileLayout, PHONE_LAYOUT } from "./mobile-layout.js";
 import { createStudioIcon } from "./icons.js";
+import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
   value, label: value[0].toUpperCase() + value.slice(1)
@@ -36,9 +37,28 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
   header.append(trigger);
   folder.append(header, content);
   host.append(folder);
-  const setOpen = (open) => {
+  let flat = false;
+  let openBeforeFlat = defaultOpen;
+  const syncDisclosure = () => {
+    if (root) return;
+    if (flat) {
+      trigger.removeAttribute("aria-controls");
+      trigger.removeAttribute("aria-expanded");
+      trigger.setAttribute("role", "heading");
+      trigger.setAttribute("aria-level", "2");
+      trigger.tabIndex = -1;
+    } else {
+      trigger.setAttribute("aria-controls", content.id);
+      trigger.setAttribute("aria-expanded", folder.dataset.open);
+      trigger.removeAttribute("role");
+      trigger.removeAttribute("aria-level");
+      trigger.removeAttribute("tabindex");
+    }
+  };
+  const setOpen = (requestedOpen, allowAnimation = true) => {
+    const open = flat ? true : requestedOpen;
     if (folder.dataset.open === String(open)) return;
-    const animate = !root && folder.dataset.open !== undefined && folder.getClientRects().length > 0
+    const animate = allowAnimation && !root && folder.dataset.open !== undefined && folder.getClientRects().length > 0
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (animate) {
       const height = content.getBoundingClientRect().height;
@@ -48,11 +68,21 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
       void content.offsetHeight;
     }
     folder.dataset.open = String(open);
-    if (!root) trigger.setAttribute("aria-expanded", String(open));
+    if (!root && !flat) trigger.setAttribute("aria-expanded", String(open));
     content.inert = !open;
     content.setAttribute("aria-hidden", String(!open));
     content.style.transition = '';
     content.style.height = animate ? `${open ? body.scrollHeight : 0}px` : open ? 'auto' : '0px';
+  };
+  const setFlat = (nextFlat) => {
+    if (root || flat === nextFlat) return;
+    if (nextFlat) openBeforeFlat = folder.dataset.open === "true";
+    flat = nextFlat;
+    folder.dataset.phoneFlat = String(flat);
+    setOpen(flat ? true : openBeforeFlat, false);
+    content.style.transition = '';
+    content.style.height = folder.dataset.open === "true" ? 'auto' : '0px';
+    syncDisclosure();
   };
   content.addEventListener('transitionend', (event) => {
     if (event.target !== content || event.propertyName !== 'height') return;
@@ -64,10 +94,13 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
     trigger.setAttribute("aria-controls", content.id);
     const glyph = createStudioIcon('chevron-down', { class: 'dialkit-folder-icon', width: 20, height: 20 });
     trigger.append(glyph);
-    trigger.addEventListener("click", () => setOpen(folder.dataset.open !== "true"));
+    trigger.addEventListener("click", () => {
+      if (!flat) setOpen(folder.dataset.open !== "true");
+    });
   }
   setOpen(defaultOpen);
-  return { body, setOpen };
+  syncDisclosure();
+  return { body, setOpen, setFlat };
 }
 
 function mountStaticSection(host, title, showHeading = true) {
@@ -284,10 +317,12 @@ export function mountStudioPanel(studio) {
       control.update({ ...props, value: previous });
     });
   }
-  const layout = mountStudioFolder(folders, "Layout").body;
+  const layoutFolder = mountStudioFolder(folders, "Layout");
+  const layout = layoutFolder.body;
   slider(layout, "cellSize", "Cell size", 3, 12, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
-  const tone = mountStudioFolder(folders, "Tone").body;
+  const toneFolder = mountStudioFolder(folders, "Tone");
+  const tone = toneFolder.body;
   slider(tone, "contrast", "Contrast", .5, 2.5, .05);
   slider(tone, "gamma", "Gamma", .4, 2.4, .01);
   slider(tone, "toneCurve", "Tone curve", .45, 2.2, .01);
@@ -300,10 +335,14 @@ export function mountStudioPanel(studio) {
     const control = mountColorControl(host, props);
     controls.push(control);
     const swatch = host.querySelector('.dialkit-color-swatch');
+    const sheetMotion = mountPhoneSheetMotion(host, swatch);
+    controls.push(sheetMotion);
     swatch.addEventListener('click', () => {
       if (swatch.getAttribute('aria-expanded') !== 'true') return;
       const popup = root.querySelector(`.dialkit-color-popover[aria-label="${label} color picker"]`);
       if (!popup) return;
+      popup.classList.toggle('studio-phone-sheet', window.matchMedia(PHONE_LAYOUT).matches);
+      sheetMotion.open(popup);
       popup.querySelector('.dialkit-color-format-row').hidden = true;
       const plane = popup.querySelector('.dialkit-color-plane');
       // DialKit normally focuses the active format tab. Start at the first
@@ -326,9 +365,16 @@ export function mountStudioPanel(studio) {
   }
   colors.append(element("p", "studio-color-note", "Colors export in sRGB"));
   const compact = window.matchMedia("(max-width: 980px)");
+  const phone = window.matchMedia(PHONE_LAYOUT);
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
-  const onCompact = () => advanced.setOpen(!compact.matches);
-  compact.addEventListener("change", onCompact);
+  const adjustableFolders = [layoutFolder, toneFolder, advanced];
+  const syncAdjustLayout = () => {
+    adjustableFolders.forEach(({ setFlat }) => setFlat(phone.matches));
+    if (!phone.matches) advanced.setOpen(!compact.matches);
+  };
+  compact.addEventListener("change", syncAdjustLayout);
+  phone.addEventListener("change", syncAdjustLayout);
+  syncAdjustLayout();
   slider(advanced.body, "grainStrength", "Grain", 0, 100, 1, "%");
   slider(advanced.body, "bloomStrength", "Bloom", 0, 100, 1, "%");
   slider(advanced.body, "crtStrength", "CRT", 0, 100, 1, "%");
@@ -381,7 +427,8 @@ export function mountStudioPanel(studio) {
   update();
   return () => {
     window.removeEventListener(studio.eventName, update);
-    compact.removeEventListener("change", onCompact);
+    compact.removeEventListener("change", syncAdjustLayout);
+    phone.removeEventListener("change", syncAdjustLayout);
     unmountMobile();
     colorCancel();
     document.removeEventListener("pointerdown", colorStart, true);
