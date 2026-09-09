@@ -6,11 +6,15 @@ export const TOUCH_LAYOUT = "(max-width: 767px), (any-pointer: coarse)";
 
 export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) {
   const rail = document.querySelector(".control-rail");
+  const workspace = document.querySelector(".workspace");
+  const landscapeHeading = document.getElementById("phoneLandscapeTitle");
   const panel = document.getElementById("dialPanelRoot");
   const actions = rail.querySelector(".rail-actions");
   const media = window.matchMedia(TOUCH_LAYOUT);
+  const phoneLandscape = window.matchMedia(PHONE_LANDSCAPE);
   let scrollTimer;
   let scrolling = false;
+  let portraitFocus = null;
   const finishScroll = () => {
     clearTimeout(scrollTimer);
     if (!scrolling) return;
@@ -28,6 +32,22 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     scrollTimer = setTimeout(finishScroll, 180);
   };
   for (const node of [panel, actions, rail]) node.addEventListener('scroll', onScroll, { passive: true });
+  const syncPhoneLandscape = () => {
+    if (!workspace || !landscapeHeading) return;
+    if (phoneLandscape.matches) {
+      const active = document.activeElement;
+      if (workspace.contains(active)) portraitFocus = active;
+      workspace.inert = true;
+      landscapeHeading.focus({ preventScroll: true });
+      return;
+    }
+    workspace.inert = false;
+    const restore = portraitFocus?.isConnected ? portraitFocus : null;
+    portraitFocus = null;
+    restore?.focus({ preventScroll: true });
+  };
+  phoneLandscape.addEventListener("change", syncPhoneLandscape);
+  syncPhoneLandscape();
   const nav = document.createElement("nav");
   nav.className = "mobile-editor-tabs";
   nav.setAttribute("aria-label", "Editor controls");
@@ -67,6 +87,8 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     finishScroll();
     for (const node of [panel, actions, rail]) node.removeEventListener('scroll', onScroll);
     media.removeEventListener("change", sync);
+    phoneLandscape.removeEventListener("change", syncPhoneLandscape);
+    if (workspace) workspace.inert = false;
     panel.hidden = actions.hidden = false;
     Object.values(groups).flat().forEach((section) => { section.hidden = false; });
     nav.remove();

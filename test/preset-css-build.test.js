@@ -25,6 +25,7 @@ test('production CSS retains standard preset blur and its reduced-transparency o
   assert.match(css, /transform-origin:bottom!important|transform-origin:50% 100%!important/);
   assert.match(String(html?.source), /phone-landscape-notice/);
   assert.match(String(html?.source), /Rotate to portrait/);
+  assert.match(String(html?.source), /id="phoneLandscapeTitle" tabindex="-1"/);
   assert.match(css, /orientation:landscape/);
   assert.match(css, /phone-landscape-notice/);
 });

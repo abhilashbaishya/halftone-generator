@@ -50,7 +50,7 @@ beforeEach(() => {
     createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
     putImageData() {}, clearRect() {}, fillRect() {},
   });
-  document.body.innerHTML = '<aside class="control-rail"><div id="dialPanelRoot"></div><div class="rail-actions"><div id="exportControlsRoot"></div></div></aside>';
+  document.body.innerHTML = '<section class="phone-landscape-notice"><h2 id="phoneLandscapeTitle" tabindex="-1">Rotate to portrait</h2></section><main class="workspace"><aside class="control-rail"><div id="dialPanelRoot"></div><div class="rail-actions"><div id="exportControlsRoot"></div></div></aside></main>';
   settingsChanged = [];
   savedName = null;
   state = {
@@ -511,6 +511,34 @@ test('entering phone landscape closes any open top-layer sheet', async () => {
   landscape.matches = true;
   landscape.dispatchEvent(new browser.Event('change'));
   assert.equal(document.querySelector('.dialkit-color-popover:not(.studio-phone-sheet-exit)'), null);
+});
+
+test('phone landscape removes the editor from focus and restores the previous control', async () => {
+  const { PHONE_LANDSCAPE } = await import('../src/mobile-layout.js');
+  unmount();
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  const landscape = new browser.EventTarget();
+  landscape.matches = false;
+  browser.matchMedia = (query) => query === PHONE_LANDSCAPE ? landscape : nativeMatchMedia(query);
+  unmount = mountStudioPanel(studio);
+
+  document.querySelector('.mobile-editor-tabs').children[1].click();
+  const slider = document.querySelector('[role="slider"][aria-label="Cell size"]');
+  const workspace = document.querySelector('.workspace');
+  const heading = document.getElementById('phoneLandscapeTitle');
+  slider.focus();
+  assert.equal(document.activeElement, slider);
+
+  landscape.matches = true;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.equal(workspace.inert, true);
+  assert.equal(document.activeElement, heading);
+
+  landscape.matches = false;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.equal(workspace.inert, false);
+  assert.equal(document.activeElement, slider);
 });
 
 test('phone sheets use a slower entrance and a shorter exit', async (t) => {
