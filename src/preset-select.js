@@ -54,10 +54,15 @@ export function mountPresetSelect(host, initial) {
   };
   trigger.addEventListener('click', decorate);
   trigger.addEventListener('keydown', decorate);
+  const closeOnPhoneLayoutChange = () => {
+    if (trigger.getAttribute('aria-expanded') === 'true') trigger.click();
+  };
+  phone.addEventListener('change', closeOnPhoneLayoutChange);
   return {
     update(next) { props = next; control.update(next); decorate(); },
     destroy() {
       motion.destroy();
+      phone.removeEventListener('change', closeOnPhoneLayoutChange);
       trigger.removeEventListener('click', decorate);
       trigger.removeEventListener('keydown', decorate);
       control.destroy();

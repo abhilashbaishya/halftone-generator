@@ -1439,11 +1439,12 @@ canvas {
 
 /* Keep this breakpoint in sync with src/mobile-layout.js. */
 @media (max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse) {
+  :root { --phone-control-height: 44dvh; }
   body { height: 100dvh; overflow: hidden; }
   .workspace {
     height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(0, 44dvh);
+    grid-template-rows: minmax(0, 1fr) minmax(0, var(--phone-control-height));
   }
   .preview-stage {
     grid-row: 1;

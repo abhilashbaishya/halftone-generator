@@ -18,6 +18,7 @@ test('production CSS retains standard preset blur and its reduced-transparency o
   assert.match(reduced, /[;{]backdrop-filter:none[;}]/);
   assert.match(css, /studio-folder\[data-phone-flat=true\]/);
   assert.match(css, /studio-phone-sheet/);
-  assert.match(css, /max-height:calc\(44dvh/);
+  assert.match(css, /--phone-control-height:44dvh/);
+  assert.match(css, /max-height:calc\(var\(--phone-control-height\)/);
   assert.match(css, /transform-origin:bottom!important|transform-origin:50% 100%!important/);
 });

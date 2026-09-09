@@ -5,6 +5,7 @@ import { mountStaticIcons } from "./src/icons.js";
 import { getImageCellSize } from "./src/pattern-scale.js";
 import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
+import { isPhoneSheetDismissal } from "./src/preset-menu-motion.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
@@ -1676,7 +1677,8 @@ function onSplitDocumentMove(event) {
 }
 
 function handleSplitPointerDown(event) {
-  if (event.button !== 0 || compareState.draggingSplit) return;
+  if (event.button !== 0 || compareState.draggingSplit || isPhoneSheetDismissal(event)
+    || document.querySelector('.studio-phone-sheet:not(.studio-phone-sheet-exit)')) return;
   compareState.draggingSplit = true;
   compareState.splitPointerId = event.pointerId;
   compareState.splitLayout = {

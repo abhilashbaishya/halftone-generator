@@ -417,15 +417,18 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   nav.children[1].click();
   assert.equal(folder('source').hidden, true);
   for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
-  for (const name of ['layout', 'tone', 'advanced']) {
+  for (const name of ['layout', 'tone', 'colors', 'advanced']) {
     const group = folder(name);
-    const heading = group.querySelector('.dialkit-folder-header-top');
+    const trigger = group.querySelector('button.dialkit-folder-header-top');
+    const heading = group.querySelector('h2.studio-folder-static-heading');
     assert.equal(group.dataset.phoneFlat, 'true');
     assert.equal(group.dataset.open, 'true');
     assert.equal(group.querySelector('.dialkit-folder-content').inert, false);
-    assert.equal(heading.getAttribute('role'), 'heading');
-    assert.equal(heading.hasAttribute('aria-expanded'), false);
+    assert.equal(trigger.hidden, true);
+    assert.equal(heading.hidden, false);
+    assert.equal(heading.getAttribute('role'), null);
   }
+  assert.equal(document.querySelector('button[role="heading"]'), null);
   studio.setSetting('cellSize', 12);
   nav.children[2].click();
   assert.equal(folder('colors').hidden, false);
@@ -439,8 +442,9 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(actions.hidden, false);
   for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
   assert.equal(folder('layout').dataset.phoneFlat, 'false');
-  assert.equal(folder('layout').querySelector('.dialkit-folder-header-top').getAttribute('role'), null);
-  assert.equal(folder('layout').querySelector('.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
+  assert.equal(folder('layout').querySelector('button.dialkit-folder-header-top').hidden, false);
+  assert.equal(folder('layout').querySelector('h2.studio-folder-static-heading').hidden, true);
+  assert.equal(folder('layout').querySelector('button.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   assert.equal(nav.children[3].getAttribute('aria-pressed'), 'true');
   nav.children[1].click();
@@ -469,6 +473,15 @@ test('phone preset and color pickers open as sheets while desktop keeps popovers
   assert.ok(color);
   assert.equal(color.classList.contains('studio-phone-sheet'), true);
   assert.equal(document.activeElement, color.querySelector('.dialkit-color-plane'));
+  browser.happyDOM.setWindowSize({ width: 1024, height: 768 });
+  assert.equal(document.querySelector('.dialkit-color-popover'), null);
+
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  tabs[1].click();
+  presetTrigger.click();
+  assert.ok(document.querySelector('.studio-preset-menu.studio-phone-sheet'));
+  browser.happyDOM.setWindowSize({ width: 1024, height: 768 });
+  assert.equal(document.querySelector('.studio-preset-menu'), null);
 });
 
 test('phone sheets use a slower entrance and a shorter exit', async (t) => {

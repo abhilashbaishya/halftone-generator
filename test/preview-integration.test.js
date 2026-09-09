@@ -101,6 +101,13 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
       pointerType: 'touch', pointerId: id, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true
     }));
     assert.equal(handle.getAttribute('aria-valuenow'), '50');
+    const sheet = document.createElement('div');
+    sheet.className = 'studio-phone-sheet';
+    document.body.append(sheet);
+    pointer(handle, 'pointerdown', 110, 40);
+    assert.equal(handle.hasPointerCapture(1), false);
+    assert.equal(handle.getAttribute('aria-valuenow'), '50');
+    sheet.remove();
     pointer(handle, 'pointerdown', 110, 40); // grab 20px right of the divider
     assert.ok(handle.hasPointerCapture(1));
     pointer(document, 'pointermove', 112, 42);

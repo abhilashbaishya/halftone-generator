@@ -31,10 +31,16 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
   const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header" : ""}`);
   const trigger = element(root ? "div" : "button", "dialkit-folder-header-top");
   trigger.append(element("span", `dialkit-folder-title${root ? " dialkit-folder-title-root" : ""}`, title));
+  const flatHeading = root ? null : element("h2", "dialkit-folder-header-top studio-folder-static-heading");
+  if (flatHeading) {
+    flatHeading.append(element("span", "dialkit-folder-title", title));
+    flatHeading.hidden = true;
+  }
   const content = element("div", "dialkit-folder-content");
   const body = element("div", "dialkit-folder-inner");
   content.append(body);
   header.append(trigger);
+  if (flatHeading) header.append(flatHeading);
   folder.append(header, content);
   host.append(folder);
   let flat = false;
@@ -42,17 +48,13 @@ export function mountStudioFolder(host, title, defaultOpen = true, root = false)
   const syncDisclosure = () => {
     if (root) return;
     if (flat) {
-      trigger.removeAttribute("aria-controls");
-      trigger.removeAttribute("aria-expanded");
-      trigger.setAttribute("role", "heading");
-      trigger.setAttribute("aria-level", "2");
-      trigger.tabIndex = -1;
+      trigger.hidden = true;
+      flatHeading.hidden = false;
     } else {
+      trigger.hidden = false;
+      flatHeading.hidden = true;
       trigger.setAttribute("aria-controls", content.id);
       trigger.setAttribute("aria-expanded", folder.dataset.open);
-      trigger.removeAttribute("role");
-      trigger.removeAttribute("aria-level");
-      trigger.removeAttribute("tabindex");
     }
   };
   const setOpen = (requestedOpen, allowAnimation = true) => {
@@ -174,6 +176,8 @@ export function mountStudioPanel(studio) {
   let state = studio.getState();
   const bindings = [];
   const controls = [];
+  const compact = window.matchMedia("(max-width: 980px)");
+  const phone = window.matchMedia(PHONE_LAYOUT);
   const root = element("div", "dialkit-root halftone-dialkit");
   root.dataset.mode = "inline";
   root.dataset.theme = state.theme;
@@ -327,7 +331,8 @@ export function mountStudioPanel(studio) {
   slider(tone, "gamma", "Gamma", .4, 2.4, .01);
   slider(tone, "toneCurve", "Tone curve", .45, 2.2, .01);
   slider(tone, "minDot", "Minimum dot", 0, 60, 1, "%");
-  const colors = mountStudioFolder(folders, "Colors").body;
+  const colorsFolder = mountStudioFolder(folders, "Colors");
+  const colors = colorsFolder.body;
   for (const [key, label] of [["inkColor", "Ink"], ["paperColor", "Paper"]]) {
     const host = element("div", "studio-control-host");
     colors.append(host);
@@ -337,6 +342,11 @@ export function mountStudioPanel(studio) {
     const swatch = host.querySelector('.dialkit-color-swatch');
     const sheetMotion = mountPhoneSheetMotion(host, swatch);
     controls.push(sheetMotion);
+    const closeOnPhoneLayoutChange = () => {
+      if (swatch.getAttribute('aria-expanded') === 'true') swatch.click();
+    };
+    phone.addEventListener('change', closeOnPhoneLayoutChange);
+    controls.push({ destroy: () => phone.removeEventListener('change', closeOnPhoneLayoutChange) });
     swatch.addEventListener('click', () => {
       if (swatch.getAttribute('aria-expanded') !== 'true') return;
       const popup = root.querySelector(`.dialkit-color-popover[aria-label="${label} color picker"]`);
@@ -364,10 +374,8 @@ export function mountStudioPanel(studio) {
     });
   }
   colors.append(element("p", "studio-color-note", "Colors export in sRGB"));
-  const compact = window.matchMedia("(max-width: 980px)");
-  const phone = window.matchMedia(PHONE_LAYOUT);
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
-  const adjustableFolders = [layoutFolder, toneFolder, advanced];
+  const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, advanced];
   const syncAdjustLayout = () => {
     adjustableFolders.forEach(({ setFlat }) => setFlat(phone.matches));
     if (!phone.matches) advanced.setOpen(!compact.matches);

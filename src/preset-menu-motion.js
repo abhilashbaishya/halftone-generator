@@ -16,6 +16,12 @@ const PHONE_SHEET_MOTION = {
   exitEasing: 'cubic-bezier(0.4, 0, 1, 1)'
 };
 
+const phoneSheetDismissals = new WeakSet();
+
+export function isPhoneSheetDismissal(event) {
+  return phoneSheetDismissals.has(event);
+}
+
 // DialKit owns focus and selection. A non-interactive visual copy lets its
 // immediate close remain accessible while the surface finishes fading away.
 function mountPopupMotion(host, trigger, {
@@ -42,7 +48,7 @@ function mountPopupMotion(host, trigger, {
     : DEFAULT_MOTION;
   const captureClose = (event) => {
     const popup = current;
-    if (destroyed || !popup?.isConnected || !enabled(popup) || !canAnimate(popup) || pending === popup) return;
+    if (destroyed || !popup?.isConnected || !enabled(popup) || pending === popup) return;
     const inside = popup.contains(event.target), onTrigger = trigger.contains(event.target);
     const choseOption = optionSelector && inside && event.target.closest(optionSelector);
     const closes = event.type === 'click' && (onTrigger || choseOption)
@@ -50,6 +56,10 @@ function mountPopupMotion(host, trigger, {
       || event.type === 'focusin' && !inside && !onTrigger
       || event.type === 'keydown' && inside && ['Escape', 'Tab', 'Enter', ' '].includes(event.key);
     if (!closes) return;
+    if (event.type === 'pointerdown' && popup.classList.contains('studio-phone-sheet')) {
+      phoneSheetDismissals.add(event);
+    }
+    if (!canAnimate(popup)) return;
     const from = appearance(popup);
     const copy = popup.cloneNode(true);
     const scrollTop = popup.scrollTop;

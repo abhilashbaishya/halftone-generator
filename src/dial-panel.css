@@ -763,9 +763,8 @@ html.light .studio-preset-sample {
 
   /* The tab is already the disclosure level on phones. Keep useful group
      labels, but expose every Adjust control without nested accordions. */
-  .halftone-dialkit .studio-folder[data-phone-flat="true"] > .dialkit-folder-header .dialkit-folder-header-top {
+  .halftone-dialkit .studio-folder-static-heading {
     cursor: default;
-    pointer-events: none;
   }
 
   .halftone-dialkit .studio-folder[data-phone-flat="true"] .dialkit-folder-icon {
@@ -791,7 +790,7 @@ html.light .studio-preset-sample {
     inset: auto max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
     width: auto !important;
     max-width: none !important;
-    max-height: calc(44dvh - max(8px, env(safe-area-inset-bottom)) - 8px) !important;
+    max-height: calc(var(--phone-control-height) - max(8px, env(safe-area-inset-bottom))) !important;
     margin: 0 !important;
     border-radius: 16px;
     transform-origin: center bottom !important;
