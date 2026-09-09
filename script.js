@@ -149,24 +149,28 @@ const QUALITY_MODES = {
     sampleRadius: 0.4,
     edgeBoost: 0.12,
     ditherAmount: 0.06,
+    exportScale: 0.5,
     maxPixels: 5_000_000
   },
   high: {
     sampleRadius: 0.58,
     edgeBoost: 0.22,
     ditherAmount: 0.1,
+    exportScale: 1,
     maxPixels: 8_000_000
   },
   ultra: {
     sampleRadius: 0.7,
     edgeBoost: 0.3,
     ditherAmount: 0.14,
+    exportScale: 1.5,
     maxPixels: 10_500_000
   },
   print: {
     sampleRadius: 1.0,
     edgeBoost: 0.1,
     ditherAmount: 0,
+    exportScale: 2,
     maxPixels: 10_500_000
   }
 };
@@ -294,6 +298,8 @@ const builtInPresets = {
 const compareState = {
   split: 0.5,
   zoom: 1,
+  panX: 0,
+  panY: 0,
   draggingSplit: false,
   splitPointerId: null,
   splitTouch: null,
@@ -350,6 +356,8 @@ let exportEstimateRequestId = 0;
 const exportEstimateCanvases = [document.createElement("canvas"), document.createElement("canvas")];
 const exportEstimateCache = new Map();
 const exactExportSizeCache = new Map();
+let readyExport = null;
+let sharingExport = false;
 
 function loadExportPreferences() {
   try {
@@ -391,6 +399,7 @@ function setSourceImage(image) {
   previewGeneration += 1;
   scaledSourceKey = "";
   previewIsCurrent = false;
+  dropReadyExportIfStale();
   invalidateExportEstimate();
   updateExportMeta();
 }
@@ -738,18 +747,34 @@ function sliderValueToZoom(value) {
 }
 
 function applyViewTransform() {
-  canvasPlane.style.transform = `translate(-50%, -50%) scale(${compareState.zoom})`;
+  const wrap = canvasWrap.getBoundingClientRect();
+  const baseWidth = parseFloat(canvasPlane.style.width) || 0;
+  const baseHeight = parseFloat(canvasPlane.style.height) || 0;
+  const maxPanX = Math.max(0, (baseWidth * compareState.zoom - wrap.width) / 2);
+  const maxPanY = Math.max(0, (baseHeight * compareState.zoom - wrap.height) / 2);
+  compareState.panX = clamp(compareState.panX, -maxPanX, maxPanX);
+  compareState.panY = clamp(compareState.panY, -maxPanY, maxPanY);
+  canvasPlane.style.transform = `translate(-50%, -50%) translate3d(${compareState.panX}px, ${compareState.panY}px, 0) scale(${compareState.zoom})`;
   updateZoomOutput();
   updateSplitPreview();
 }
 
 function resetView() {
   compareState.zoom = 1;
+  compareState.panX = 0;
+  compareState.panY = 0;
   applyViewTransform();
 }
 
 function setZoom(nextZoom) {
   compareState.zoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+  applyViewTransform();
+}
+
+function setPreviewView({ zoom, panX, panY }) {
+  compareState.zoom = clamp(zoom, 1, MAX_ZOOM);
+  compareState.panX = Number.isFinite(panX) ? panX : compareState.panX;
+  compareState.panY = Number.isFinite(panY) ? panY : compareState.panY;
   applyViewTransform();
 }
 
@@ -1020,7 +1045,7 @@ function generateHalftone() {
     controls.quality.value, window.innerWidth, window.innerHeight, window.devicePixelRatio].join(':');
   if (layoutKey !== previewLayoutKey) {
     fitCanvasToStage();
-    updateSplitPreview();
+    applyViewTransform();
     previewLayoutKey = layoutKey;
   }
   if (!sourceImage) {
@@ -1046,6 +1071,7 @@ function generateHalftone() {
 
 function requestRender() {
   previewIsCurrent = false;
+  dropReadyExportIfStale();
   invalidateExportEstimate();
   if (previewBusy) renderQueued = true;
   if (renderFrame !== null) return;
@@ -1186,13 +1212,16 @@ function getExportPlan(postProcessSettings = getPostProcessSettings()) {
 
   const needsPostEffects = hasPostEffects(postProcessSettings);
   const sourceDimensions = getSourceDimensions();
-  const maxPixels = getExportPixelBudget({
+  const quality = getQualityConfig();
+  const deviceMaxPixels = getExportPixelBudget({
     compact: isCompactDevice() || isIOS(),
     hasPostEffects: needsPostEffects
   });
+  const maxPixels = Math.min(quality.maxPixels, deviceMaxPixels);
+  const scale = quality.exportScale;
   const dimensions = calculateExportDimensions(
-    sourceDimensions.width,
-    sourceDimensions.height,
+    Math.round(sourceDimensions.width * scale),
+    Math.round(sourceDimensions.height * scale),
     maxPixels
   );
 
@@ -1220,6 +1249,37 @@ function getExportSignature(plan = getExportPlan(), format = getExportFormat(exp
     grainSeed,
     settings: captureCurrentPreset()
   });
+}
+
+function getReadyExport() {
+  if (!readyExport) return null;
+  if (readyExport.signature === getExportSignature()) return readyExport;
+  readyExport = null;
+  return null;
+}
+
+function dropReadyExportIfStale() {
+  if (!readyExport || readyExport.signature === getExportSignature()) return;
+  readyExport = null;
+  clearTimeout(exportFeedbackTimer);
+  if (!activeExport && !sharingExport) syncExportButtonLabel();
+}
+
+function createShareableExport(blob, format, signature) {
+  if (!window.matchMedia("(any-pointer: coarse)").matches
+    || typeof File !== "function"
+    || typeof navigator.share !== "function"
+    || typeof navigator.canShare !== "function") return null;
+  const file = new File([blob], createExportFilename(format.extension), {
+    type: format.mimeType,
+    lastModified: Date.now()
+  });
+  try {
+    if (!navigator.canShare({ files: [file] })) return null;
+  } catch {
+    return null;
+  }
+  return { blob, file, format, signature };
 }
 
 function setCachedValue(cache, key, value, limit = 18) {
@@ -1357,17 +1417,23 @@ function updateExportMeta() {
 }
 
 function getExportButtonLabel(format = getExportFormat(exportFormat)) {
+  if (getReadyExport()) return "Save / Share";
   return `Export ${format.label}`;
 }
 
 function syncExportButtonLabel() {
-  if (activeExport) return;
+  if (activeExport || sharingExport) return;
   controls.exportBtn.textContent = getExportButtonLabel();
+  const shareReady = Boolean(getReadyExport());
+  controls.exportBtn.dataset.shareReady = String(shareReady);
+  if (shareReady) controls.exportBtn.setAttribute("aria-label", `Save or share ${getExportFormat(exportFormat).label}`);
+  else controls.exportBtn.removeAttribute("aria-label");
 }
 
 function setExportFormat(nextFormat) {
-  if (activeExport || !isExportFormat(nextFormat) || nextFormat === exportFormat) return;
+  if (activeExport || sharingExport || !isExportFormat(nextFormat) || nextFormat === exportFormat) return;
   exportFormat = nextFormat;
+  dropReadyExportIfStale();
   persistExportPreferences();
   clearTimeout(exportFeedbackTimer);
   invalidateExportEstimate();
@@ -1399,7 +1465,7 @@ function setExportFeedback(text, resetDelay = 2200) {
   controls.exportBtn.removeAttribute("aria-label");
   controls.exportBtn.dataset.exporting = "false";
   exportFeedbackTimer = setTimeout(() => {
-    if (activeExport) return;
+    if (activeExport || sharingExport) return;
     syncExportButtonLabel();
   }, resetDelay);
 }
@@ -1428,6 +1494,49 @@ function downloadExport(blob, format) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function shareExport(record) {
+  if (sharingExport) return;
+  sharingExport = true;
+  let shareResult;
+  let synchronousError;
+  try {
+    // Invoke while the export-button tap still owns transient activation.
+    shareResult = navigator.share({ files: [record.file] });
+    if (!shareResult || typeof shareResult.then !== "function") {
+      throw new Error("Native sharing is unavailable.");
+    }
+  } catch (error) {
+    synchronousError = error;
+  }
+  controls.exportBtn.textContent = "Sharing…";
+  controls.exportBtn.setAttribute("aria-busy", "true");
+  controls.exportBtn.dataset.shareReady = "false";
+  emitStudioState();
+
+  let outcome = "shared";
+  try {
+    if (synchronousError) throw synchronousError;
+    await shareResult;
+  } catch (error) {
+    outcome = error?.name === "AbortError" ? "dismissed" : "fallback";
+  }
+
+  sharingExport = false;
+  controls.exportBtn.removeAttribute("aria-busy");
+  if (outcome === "fallback") {
+    downloadExport(record.blob, record.format);
+    setRenderStatus("Export complete", false, true);
+    setExportFeedback(`Exported · ${formatFileSize(record.blob.size)}`);
+  } else if (outcome === "shared") {
+    setRenderStatus("Share complete", false, true);
+    setExportFeedback(`Shared · ${formatFileSize(record.blob.size)}`);
+  } else {
+    setRenderStatus("Ready", false);
+    syncExportButtonLabel();
+  }
+  emitStudioState();
 }
 
 function canUseExportWorker() {
@@ -1552,6 +1661,12 @@ function cancelExport() {
 }
 
 async function exportImage() {
+  const cached = getReadyExport();
+  if (cached) {
+    await shareExport(cached);
+    return;
+  }
+  if (sharingExport) return;
   if (activeExport) {
     cancelExport();
     return;
@@ -1642,9 +1757,18 @@ async function exportImage() {
     setExportProgress(job, 100);
     setCachedValue(exactExportSizeCache, job.exportSignature, blob.size);
     updateExportMeta();
-    downloadExport(blob, job.format);
-    setRenderStatus("Export complete", false, true);
-    setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
+    const shareable = job.exportSignature === getExportSignature()
+      ? createShareableExport(blob, job.format, job.exportSignature)
+      : null;
+    if (shareable) {
+      readyExport = shareable;
+      job.readyToShare = true;
+      setRenderStatus("Ready to save or share", false, true);
+    } else {
+      downloadExport(blob, job.format);
+      setRenderStatus("Export complete", false, true);
+      setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
+    }
   } catch (error) {
     if (!job.cancelled) {
       console.error(error);
@@ -1665,6 +1789,11 @@ async function exportImage() {
     if (job.cancelled) {
       setRenderStatus("Export cancelled", false, true);
       setExportFeedback("Export cancelled", 1600);
+    } else if (job.readyToShare) {
+      controls.exportBtn.removeAttribute("aria-busy");
+      controls.exportBtn.removeAttribute("aria-label");
+      controls.exportBtn.dataset.exporting = "false";
+      syncExportButtonLabel();
     }
     updateExportMeta();
     emitStudioState();
@@ -1754,7 +1883,8 @@ function getStudioState() {
     settings: captureCurrentPreset(),
     export: {
       format: exportFormat,
-      exporting: Boolean(activeExport)
+      exporting: Boolean(activeExport || sharingExport),
+      readyToShare: Boolean(getReadyExport())
     },
     uploadError,
     hasUserImage
@@ -1931,7 +2061,7 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(() => {
     const resized = fitCanvasToStage();
     updateExportMeta();
-    updateSplitPreview();
+    applyViewTransform();
     if (resized) requestRender();
     else scheduleExportEstimate(160);
   }, 120);
@@ -1950,7 +2080,17 @@ rebuildPresetSelect(DEFAULT_PRESET);
 syncPresetActions();
 syncExportButtonLabel();
 initializeWorker();
-mountMobilePreview(resetView);
+mountMobilePreview(resetView, {
+  target: canvasWrap,
+  getView: () => ({
+    zoom: compareState.zoom,
+    panX: compareState.panX,
+    panY: compareState.panY
+  }),
+  setView: setPreviewView,
+  isBlocked: () => compareState.draggingSplit
+    || Boolean(document.querySelector('.studio-phone-sheet:not(.studio-phone-sheet-exit)'))
+});
 resetView();
 updateSplitPreview();
 updateOutputs();

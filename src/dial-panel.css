@@ -209,8 +209,6 @@
   transform: scale(0.96);
 }
 
-/* Desktop: a real button. Phone: a file input covers the button so iOS gets
-   a direct tap (synthetic input.click() is what adds the ~1s cooldown). */
 .halftone-dialkit .studio-upload-button {
   width: 100%;
   touch-action: manipulation;

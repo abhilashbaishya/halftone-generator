@@ -1383,6 +1383,11 @@ canvas {
 }
 
 @media (max-width: 767px), (any-pointer: coarse) {
+  .canvas-wrap {
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
+
   .mobile-editor-tabs {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

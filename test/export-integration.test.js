@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { Window } from 'happy-dom';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { File as NodeFile } from 'node:buffer';
 import { initializeWebp, webpWasmUrl } from '../src/webp-codec.js';
 
 await initializeWebp({ wasmBinary: await readFile(new URL(webpWasmUrl)) });
@@ -16,14 +17,24 @@ const ronaldo = await loadImage(await readFile(new URL('../placeholder.jpg', imp
 
 // Real JPEG pixels, the app's export button/render path, real Canvas rasterizing
 // and real native/WASM encoders. This is not a Safari UI automation test.
-for (const nativeWebp of [true, false]) test(`default Ronaldo exports through the app with ${nativeWebp ? 'native WebP' : 'PNG-substituting native encoder'}`, async () => {
+const exportCases = [
+  { nativeWebp: true, nativeShare: false, label: 'native WebP' },
+  { nativeWebp: false, nativeShare: false, label: 'PNG-substituting native encoder' },
+  { nativeWebp: true, nativeShare: true, label: 'native mobile file sharing' }
+];
+
+for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Ronaldo exports through the app with ${label}`, async () => {
   const browser = new Window({ url: 'http://localhost:5173', width: 390, height: 844 });
-  for (const name of ['window', 'document', 'localStorage', 'navigator', 'CustomEvent', 'CSS']) {
-    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value: name === 'window' ? browser : browser[name] });
+  for (const name of ['window', 'document', 'localStorage', 'navigator', 'CustomEvent', 'CSS', 'File']) {
+    const value = name === 'window' ? browser : name === 'File' ? NodeFile : browser[name];
+    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
   }
   globalThis.getComputedStyle = browser.getComputedStyle.bind(browser);
   const matchMedia = browser.matchMedia.bind(browser);
-  browser.matchMedia = (query) => matchMedia(query.split(',')[0]);
+  const coarsePointer = new browser.EventTarget();
+  Object.defineProperty(coarsePointer, 'matches', { value: true });
+  browser.matchMedia = (query) => nativeShare && query === '(any-pointer: coarse)'
+    ? coarsePointer : matchMedia(query.split(',')[0]);
   browser.HTMLElement.prototype.getBoundingClientRect = () => new browser.DOMRect(0, 0, 300, 310);
   document.body.innerHTML = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).match(/<body>([\s\S]*)<\/body>/)[1];
   const canvases = new WeakMap();
@@ -62,7 +73,18 @@ for (const nativeWebp of [true, false]) test(`default Ronaldo exports through th
   browser.OffscreenCanvas = nativeWebp ? undefined : class {};
   browser.createImageBitmap = () => {};
 
-  const blobs = new Map(), downloads = [];
+  const blobs = new Map(), downloads = [], shares = [];
+  let shareBehavior = () => Promise.resolve();
+  if (nativeShare) {
+    Object.defineProperty(browser.navigator, 'canShare', {
+      configurable: true,
+      value: ({ files }) => files?.length === 1 && files[0] instanceof NodeFile
+    });
+    Object.defineProperty(browser.navigator, 'share', {
+      configurable: true,
+      value: (data) => { shares.push(data); return shareBehavior(); }
+    });
+  }
   const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
   URL.createObjectURL = (blob) => { const url = `blob:http://localhost/${blobs.size}`; blobs.set(url, blob); return url; };
   URL.revokeObjectURL = () => {};
@@ -72,20 +94,32 @@ for (const nativeWebp of [true, false]) test(`default Ronaldo exports through th
     assert.ok(condition(), document.getElementById('renderStatus').textContent);
   };
   try {
-    await import(`../script.js?export-test=${nativeWebp}`);
+    await import(`../script.js?export-test=${nativeWebp}-${nativeShare}`);
     const studio = browser.halftoneStudio;
-    await waitUntil(() => document.getElementById('exportMeta').textContent.includes('1389'));
+    await waitUntil(() => document.getElementById('exportMeta').textContent.includes('2084 × 2100'));
     studio.setExportFormat('webp');
     document.getElementById('exportBtn').click();
     await waitUntil(() => !studio.getState().export.exporting);
-    assert.equal(downloads.length, 1, document.getElementById('renderStatus').textContent);
-    const { blob, name } = downloads[0];
+    let blob, name;
+    if (nativeShare) {
+      assert.equal(downloads.length, 0);
+      assert.equal(studio.getState().export.readyToShare, true);
+      assert.equal(document.getElementById('exportBtn').textContent, 'Save / Share');
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => shares.length === 1 && !studio.getState().export.exporting);
+      assert.equal(downloads.length, 0);
+      [blob] = shares[0].files;
+      name = blob.name;
+    } else {
+      assert.equal(downloads.length, 1, document.getElementById('renderStatus').textContent);
+      ({ blob, name } = downloads[0]);
+    }
     assert.equal(blob.type, 'image/webp');
     assert.match(name, /^Halftone Studio - \d{4}-\d{2}-\d{2}\.webp$/);
     const bytes = Buffer.from(await blob.arrayBuffer());
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
     const decoded = await loadImage(bytes);
-    assert.deepEqual([decoded.width, decoded.height], [ronaldo.width, ronaldo.height]);
+    assert.deepEqual([decoded.width, decoded.height], [2084, 2100]);
     const sample = createCanvas(32, 32);
     const context = sample.getContext('2d'); context.drawImage(decoded, 0, 0, 32, 32);
     const pixels = context.getImageData(0, 0, 32, 32).data;
@@ -101,11 +135,31 @@ for (const nativeWebp of [true, false]) test(`default Ronaldo exports through th
     browser.happyDOM.setWindowSize({ width: 1440, height: 1000 });
     await waitUntil(() => document.getElementById('previewCanvas').width !== previewWidth
       && document.getElementById('renderStatus').textContent === 'Ready');
-    document.getElementById('exportBtn').click();
-    await waitUntil(() => !studio.getState().export.exporting);
-    assert.equal(downloads.length, 2);
-    assert.deepEqual(Buffer.from(await downloads[1].blob.arrayBuffer()), bytes,
-      'same image and settings export identically after viewport and DPR changes');
+    if (nativeShare) {
+      assert.equal(studio.getState().export.readyToShare, true,
+        'viewport changes retain the exact finished file');
+      const abort = new Error('Share sheet dismissed');
+      Object.defineProperty(abort, 'name', { value: 'AbortError' });
+      shareBehavior = () => Promise.reject(abort);
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => shares.length === 2 && !studio.getState().export.exporting);
+      assert.equal(document.getElementById('renderStatus').textContent, 'Ready');
+      assert.equal(document.getElementById('exportBtn').textContent, 'Save / Share');
+      shareBehavior = () => Promise.reject(new Error('Native share unavailable'));
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => shares.length === 3 && downloads.length === 1
+        && !studio.getState().export.exporting);
+      assert.equal(document.getElementById('renderStatus').textContent, 'Export complete');
+      studio.setSetting('contrast', 1.45);
+      assert.equal(studio.getState().export.readyToShare, false);
+      assert.equal(document.getElementById('exportBtn').textContent, 'Export WebP');
+    } else {
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => !studio.getState().export.exporting);
+      assert.equal(downloads.length, 2);
+      assert.deepEqual(Buffer.from(await downloads[1].blob.arrayBuffer()), bytes,
+        'same image and settings export identically after viewport and DPR changes');
+    }
     studio.setPreviewInteraction(true); // cancel deferred size estimation
   } finally {
     await browser.happyDOM.abort();

@@ -748,6 +748,64 @@ test('mobile split preview stays fitted and exposes the source to assistive tech
   dispose();
 });
 
+test('mobile preview pinches, pans after zoom, ignores the split handle and double-taps to fit', async () => {
+  const { mountMobilePreview } = await import('../src/mobile-preview.js');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="canvas-wrap">
+      <canvas id="sourceCanvas"></canvas>
+      <canvas id="previewCanvas"></canvas>
+      <button class="split-handle"></button>
+    </div>
+  `);
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const target = document.querySelector('.canvas-wrap');
+  target.getBoundingClientRect = () => new browser.DOMRect(0, 0, 300, 300);
+  let view = { zoom: 1, panX: 0, panY: 0 };
+  let resetCount = 0;
+  let viewUpdates = 0;
+  const resetView = () => {
+    resetCount++;
+    view = { zoom: 1, panX: 0, panY: 0 };
+  };
+  const dispose = mountMobilePreview(resetView, {
+    target,
+    getView: () => view,
+    setView: (next) => { view = next; viewUpdates++; }
+  });
+  const touch = (node, type, pointerId, clientX, clientY) => node.dispatchEvent(new browser.PointerEvent(type, {
+    pointerType: 'touch', pointerId, button: 0, clientX, clientY, bubbles: true, cancelable: true
+  }));
+
+  touch(target, 'pointerdown', 1, 100, 100);
+  touch(target, 'pointerdown', 2, 200, 100);
+  touch(target, 'pointermove', 2, 250, 100);
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  assert.equal(view.zoom, 1.5);
+  assert.equal(view.panX, 25);
+  touch(target, 'pointerup', 1, 100, 100);
+  touch(target, 'pointerup', 2, 250, 100);
+
+  touch(target, 'pointerdown', 3, 100, 100);
+  touch(target, 'pointermove', 3, 130, 125);
+  touch(target, 'pointerup', 3, 130, 125);
+  assert.deepEqual(view, { zoom: 1.5, panX: 55, panY: 50 });
+
+  const updatesBeforeHandle = viewUpdates;
+  const handle = target.querySelector('.split-handle');
+  touch(handle, 'pointerdown', 4, 150, 100);
+  touch(handle, 'pointermove', 4, 190, 100);
+  touch(handle, 'pointerup', 4, 190, 100);
+  assert.equal(viewUpdates, updatesBeforeHandle);
+
+  touch(target, 'pointerdown', 5, 80, 80);
+  touch(target, 'pointerup', 5, 80, 80);
+  touch(target, 'pointerdown', 6, 82, 82);
+  touch(target, 'pointerup', 6, 82, 82);
+  assert.equal(resetCount, 2);
+  assert.deepEqual(view, { zoom: 1, panX: 0, panY: 0 });
+  dispose();
+});
+
 test('theme follows the system by default, with desktop-only explicit overrides', async () => {
   const { mountStudioTheme } = await import('../src/theme.js');
   document.body.insertAdjacentHTML('beforeend', '<button id="themeToggle"><span id="iconSun"></span><span id="iconMoon"></span></button>');
