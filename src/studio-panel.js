@@ -2,7 +2,7 @@ import { mountSlider, mountColorControl } from "dialkit/vanilla";
 import { mountPresetSelect } from "./preset-select.js";
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
 import { mountTouchSlider } from "./touch-slider.js";
-import { mountMobileLayout, PHONE_LAYOUT } from "./mobile-layout.js";
+import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT } from "./mobile-layout.js";
 import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 
@@ -178,6 +178,7 @@ export function mountStudioPanel(studio) {
   const controls = [];
   const compact = window.matchMedia("(max-width: 980px)");
   const phone = window.matchMedia(PHONE_LAYOUT);
+  const phoneLandscape = window.matchMedia(PHONE_LANDSCAPE);
   const root = element("div", "dialkit-root halftone-dialkit");
   root.dataset.mode = "inline";
   root.dataset.theme = state.theme;
@@ -345,8 +346,10 @@ export function mountStudioPanel(studio) {
     const closeOnPhoneLayoutChange = () => {
       if (swatch.getAttribute('aria-expanded') === 'true') swatch.click();
     };
-    phone.addEventListener('change', closeOnPhoneLayoutChange);
-    controls.push({ destroy: () => phone.removeEventListener('change', closeOnPhoneLayoutChange) });
+    for (const media of [phone, phoneLandscape]) media.addEventListener('change', closeOnPhoneLayoutChange);
+    controls.push({ destroy: () => {
+      for (const media of [phone, phoneLandscape]) media.removeEventListener('change', closeOnPhoneLayoutChange);
+    } });
     swatch.addEventListener('click', () => {
       if (swatch.getAttribute('aria-expanded') !== 'true') return;
       const popup = root.querySelector(`.dialkit-color-popover[aria-label="${label} color picker"]`);

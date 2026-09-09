@@ -1,5 +1,6 @@
 // Keep this breakpoint in sync with styles.css and dial-panel.css.
 export const PHONE_LAYOUT = "(max-width: 767px), (max-width: 980px) and (max-height: 500px) and (pointer: coarse)";
+export const PHONE_LANDSCAPE = "(max-width: 980px) and (max-height: 500px) and (pointer: coarse) and (orientation: landscape)";
 // Includes iPads in landscape and with a trackpad attached.
 export const TOUCH_LAYOUT = "(max-width: 767px), (any-pointer: coarse)";
 

@@ -1,6 +1,6 @@
 import { mountSelectControl } from 'dialkit/vanilla';
 import { mountPresetMenuMotion } from './preset-menu-motion.js';
-import { PHONE_LAYOUT } from './mobile-layout.js';
+import { PHONE_LANDSCAPE, PHONE_LAYOUT } from './mobile-layout.js';
 
 const samples = {
   red: { description: 'Crisp, balanced poster', image: new URL('./preset-previews/red.png', import.meta.url).href },
@@ -15,6 +15,7 @@ const samples = {
 export function mountPresetSelect(host, initial) {
   let props = initial;
   const phone = window.matchMedia(PHONE_LAYOUT);
+  const phoneLandscape = window.matchMedia(PHONE_LANDSCAPE);
   const control = mountSelectControl(host, props);
   const trigger = host.querySelector('.dialkit-select-trigger');
   trigger.classList.add('studio-preset-trigger');
@@ -57,12 +58,12 @@ export function mountPresetSelect(host, initial) {
   const closeOnPhoneLayoutChange = () => {
     if (trigger.getAttribute('aria-expanded') === 'true') trigger.click();
   };
-  phone.addEventListener('change', closeOnPhoneLayoutChange);
+  for (const media of [phone, phoneLandscape]) media.addEventListener('change', closeOnPhoneLayoutChange);
   return {
     update(next) { props = next; control.update(next); decorate(); },
     destroy() {
       motion.destroy();
-      phone.removeEventListener('change', closeOnPhoneLayoutChange);
+      for (const media of [phone, phoneLandscape]) media.removeEventListener('change', closeOnPhoneLayoutChange);
       trigger.removeEventListener('click', decorate);
       trigger.removeEventListener('keydown', decorate);
       control.destroy();

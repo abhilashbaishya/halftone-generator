@@ -484,6 +484,35 @@ test('phone preset and color pickers open as sheets while desktop keeps popovers
   assert.equal(document.querySelector('.studio-preset-menu'), null);
 });
 
+test('entering phone landscape closes any open top-layer sheet', async () => {
+  const { PHONE_LANDSCAPE } = await import('../src/mobile-layout.js');
+  unmount();
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
+  const landscape = new browser.EventTarget();
+  landscape.matches = false;
+  browser.matchMedia = (query) => query === PHONE_LANDSCAPE ? landscape : nativeMatchMedia(query);
+  unmount = mountStudioPanel(studio);
+
+  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  tabs[1].click();
+  const presetTrigger = document.querySelector('.dialkit-select-trigger');
+  presetTrigger.click();
+  assert.ok(document.querySelector('.studio-preset-menu.studio-phone-sheet'));
+  landscape.matches = true;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.equal(document.querySelector('.studio-preset-menu'), null);
+
+  landscape.matches = false;
+  landscape.dispatchEvent(new browser.Event('change'));
+  tabs[2].click();
+  document.querySelector('.dialkit-color-swatch').click();
+  assert.ok(document.querySelector('.dialkit-color-popover.studio-phone-sheet'));
+  landscape.matches = true;
+  landscape.dispatchEvent(new browser.Event('change'));
+  assert.equal(document.querySelector('.dialkit-color-popover:not(.studio-phone-sheet-exit)'), null);
+});
+
 test('phone sheets use a slower entrance and a shorter exit', async (t) => {
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   const prototype = browser.HTMLElement.prototype;

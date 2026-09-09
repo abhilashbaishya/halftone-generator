@@ -9,6 +9,8 @@ test('production CSS retains standard preset blur and its reduced-transparency o
   const css = [result].flat().flatMap((bundle) => bundle.output)
     .filter((asset) => asset.type === 'asset' && asset.fileName.endsWith('.css'))
     .map((asset) => String(asset.source)).join('\n');
+  const html = [result].flat().flatMap((bundle) => bundle.output)
+    .find((asset) => asset.type === 'asset' && asset.fileName === 'index.html');
   const glass = css.match(/[^{}]*studio-preset-menu[^{}]*\{[^{}]*--preset-glass:[^{}]*blur\(16px\)[^{}]*\}/)?.[0];
   assert.ok(glass, 'Built preset glass rule exists');
   assert.match(glass, /[;{]backdrop-filter:blur\(16px\)/);
@@ -21,4 +23,8 @@ test('production CSS retains standard preset blur and its reduced-transparency o
   assert.match(css, /--phone-control-height:44dvh/);
   assert.match(css, /max-height:calc\(var\(--phone-control-height\)/);
   assert.match(css, /transform-origin:bottom!important|transform-origin:50% 100%!important/);
+  assert.match(String(html?.source), /phone-landscape-notice/);
+  assert.match(String(html?.source), /Rotate to portrait/);
+  assert.match(css, /orientation:landscape/);
+  assert.match(css, /phone-landscape-notice/);
 });
