@@ -131,9 +131,11 @@ test('visual preset options preserve selection and distinguish built-in samples 
   assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Crisp, balanced poster');
   assert.equal(options[2].querySelector('img'), null);
   assert.equal(options[2].querySelector('.studio-preset-description').textContent, 'Your saved preset');
-  options[1].click();
+  options[1].dispatchEvent(new browser.MouseEvent('click', { bubbles: true, detail: 1 }));
   assert.equal(state.selectedPreset, 'fine');
   assert.equal(document.querySelector('.studio-preset-menu'), null);
+  await Promise.resolve();
+  assert.notEqual(document.activeElement, trigger);
   key(trigger, 'ArrowDown');
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   popup = document.querySelector('.studio-preset-menu');

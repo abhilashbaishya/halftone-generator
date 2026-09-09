@@ -41,6 +41,15 @@ export function mountPresetSelect(host, initial) {
       text.append(name, description);
       button.classList.add('studio-preset-option');
       button.replaceChildren(text);
+      button.addEventListener('click', (event) => {
+        if (event.detail === 0) return;
+        // DialKit correctly restores the trigger for keyboard selection. A
+        // pointer selection does not need that focus, and leaving it there
+        // makes the macOS screenshot shortcut surface a misleading ring.
+        queueMicrotask(() => {
+          if (document.activeElement === trigger) trigger.blur();
+        });
+      });
       if (sample) {
         const image = document.createElement('img');
         image.className = 'studio-preset-sample';

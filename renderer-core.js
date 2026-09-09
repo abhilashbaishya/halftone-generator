@@ -28,14 +28,23 @@ function hash2d(x, y, salt, seed) {
   return value - Math.floor(value);
 }
 
-function adjustedLuma(r, g, b, contrast, gamma) {
-  let value = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  value = Math.pow(value, gamma);
-  value = (value - 0.5) * contrast + 0.5;
-  return clamp(value, 0, 1);
+function pixelLuma(r, g, b) {
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
-function fillIntegralRows(integral, data, width, contrast, gamma, startY, endY) {
+function toneLuma(value, contrast, gamma) {
+  const corrected = Math.pow(clamp(value, 0, 1), gamma);
+  if (contrast === 1) return corrected;
+
+  // A symmetric power curve keeps the end points and remains continuous at
+  // the midpoint. Unlike linear contrast followed by clamp(), it does not
+  // erase highlight and shadow differences before they reach the dot screen.
+  return corrected < 0.5
+    ? 0.5 * Math.pow(corrected * 2, contrast)
+    : 1 - 0.5 * Math.pow((1 - corrected) * 2, contrast);
+}
+
+function fillIntegralRows(integral, data, width, startY, endY) {
   const stride = width + 1;
 
   for (let y = startY; y < endY; y += 1) {
@@ -46,21 +55,19 @@ function fillIntegralRows(integral, data, width, contrast, gamma, startY, endY) 
 
     for (let x = 0; x < width; x += 1) {
       const pixelIndex = pixelRow + x * 4;
-      row += adjustedLuma(
+      row += pixelLuma(
         data[pixelIndex],
         data[pixelIndex + 1],
-        data[pixelIndex + 2],
-        contrast,
-        gamma
+        data[pixelIndex + 2]
       );
       integral[integralRow + x + 1] = integral[integralPreviousRow + x + 1] + row;
     }
   }
 }
 
-function buildLumaIntegral(data, width, height, contrast, gamma) {
+function buildLumaIntegral(data, width, height) {
   const integral = new Float32Array((width + 1) * (height + 1));
-  fillIntegralRows(integral, data, width, contrast, gamma, 0, height);
+  fillIntegralRows(integral, data, width, 0, height);
   return integral;
 }
 
@@ -130,7 +137,7 @@ function renderGridRow(state, gridYPosition) {
     targetCtx, integral, width, height, settings, centerX, centerY,
     cosine, sine, diagonal, radiusScale, samplingRadius
   } = state;
-  const { cellSize, minDot, toneCurve, microDotAmount, jitter, seed, quality } = settings;
+  const { cellSize, contrast, gamma, minDot, toneCurve, microDotAmount, jitter, seed, quality } = settings;
 
   for (let gridXPosition = -diagonal; gridXPosition <= diagonal; gridXPosition += cellSize) {
     const x = centerX + gridXPosition * cosine - gridYPosition * sine;
@@ -142,15 +149,22 @@ function renderGridRow(state, gridYPosition) {
     const baseLuma = sampleBoxAverage(integral, width, height, x, y, samplingRadius);
     const edgeStrength = sampleEdgeStrength(integral, width, height, x, y, samplingRadius);
 
-    let darkness = Math.pow(1 - baseLuma, toneCurve);
+    let darkness = Math.pow(1 - toneLuma(baseLuma, contrast, gamma), toneCurve);
     darkness = clamp(darkness + edgeStrength * quality.edgeBoost * (1 - darkness), 0, 1);
 
     const bayer = BAYER_8X8[((gridY & 7) * 8) + (gridX & 7)] - 0.5;
     darkness = clamp(darkness + bayer * quality.ditherAmount * (1 - darkness * 0.55), 0, 1);
     if (darkness < 0.003) continue;
 
-    const dotStrength = minDot + (1 - minDot) * darkness;
-    const radius = clamp(dotStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
+    // A circle's visible coverage grows with the square of its radius. Map the
+    // tone to area so midtones retain their intended weight, while minDot keeps
+    // its existing meaning as the smallest radius rather than an area value.
+    const minimumRadius = clamp(minDot, 0, 1);
+    const radiusStrength = Math.sqrt(
+      minimumRadius * minimumRadius
+      + (1 - minimumRadius * minimumRadius) * darkness
+    );
+    const radius = clamp(radiusStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
     const jitterX = (hash2d(gridX, gridY, 0.1, seed) - 0.5) * cellSize * 0.5 * jitter;
     const jitterY = (hash2d(gridX, gridY, 0.9, seed) - 0.5) * cellSize * 0.5 * jitter;
 
@@ -181,7 +195,7 @@ function renderGridRow(state, gridYPosition) {
 }
 
 export function renderHalftoneSync(targetCtx, pixelData, width, height, settings) {
-  const integral = buildLumaIntegral(pixelData, width, height, settings.contrast, settings.gamma);
+  const integral = buildLumaIntegral(pixelData, width, height);
   const state = createRenderState(targetCtx, integral, width, height, settings);
 
   for (let gridY = -state.diagonal; gridY <= state.diagonal; gridY += settings.cellSize) {
@@ -204,7 +218,7 @@ export async function renderHalftoneAsync(targetCtx, pixelData, width, height, s
   for (let startY = 0; startY < height; startY += integralChunkRows) {
     if (shouldCancel()) return { cancelled: true };
     const endY = Math.min(height, startY + integralChunkRows);
-    fillIntegralRows(integral, pixelData, width, settings.contrast, settings.gamma, startY, endY);
+    fillIntegralRows(integral, pixelData, width, startY, endY);
     onProgress((endY / height) * 0.5);
     await yieldControl();
   }

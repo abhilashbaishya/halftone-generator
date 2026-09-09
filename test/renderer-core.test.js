@@ -76,7 +76,69 @@ test("renderer output stays deterministic", () => {
   renderHalftoneSync(context, fixture.pixels, fixture.width, fixture.height, fixture.settings);
 
   const digest = createHash("sha256").update(JSON.stringify(context.operations)).digest("hex");
-  assert.equal(digest, "db2c8799f4670d532967d3050b6ff37980fe6ec746acd6547cd7f4f284a165bc");
+  assert.equal(digest, "04e2ad178b336955507845b7fea31377f490fa7f63c9121f20f9998a6ff21c8c");
+});
+
+test("dot area follows image darkness while preserving the minimum radius", () => {
+  const width = 9;
+  const height = 9;
+  const gray = 128;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < pixels.length; index += 4) {
+    pixels[index] = pixels[index + 1] = pixels[index + 2] = gray;
+    pixels[index + 3] = 255;
+  }
+  const context = new RecordingContext();
+  const cellSize = 3;
+  const minDot = 0.2;
+  renderHalftoneSync(context, pixels, width, height, {
+    cellSize,
+    contrast: 1,
+    gamma: 1,
+    minDot,
+    angle: 0,
+    toneCurve: 1,
+    microDotAmount: 0,
+    jitter: 0,
+    seed: 0,
+    quality: { sampleRadius: 0.5, edgeBoost: 0, ditherAmount: 0 },
+    ink: "#000",
+    paper: "#fff"
+  });
+
+  const radius = context.operations.find(([operation]) => operation === "arc")[4];
+  const radiusScale = cellSize * 0.5;
+  const normalizedArea = (radius / radiusScale) ** 2;
+  const darkness = 1 - gray / 255;
+  const expectedArea = minDot ** 2 + (1 - minDot ** 2) * darkness;
+  assert.ok(Math.abs(normalizedArea - expectedArea) < 1e-7);
+});
+
+test("high contrast preserves highlight information instead of clipping it", () => {
+  const width = 9;
+  const height = 9;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < pixels.length; index += 4) {
+    pixels[index] = pixels[index + 1] = pixels[index + 2] = 220;
+    pixels[index + 3] = 255;
+  }
+  const context = new RecordingContext();
+  renderHalftoneSync(context, pixels, width, height, {
+    cellSize: 3,
+    contrast: 2.2,
+    gamma: 0.95,
+    minDot: 0,
+    angle: 0,
+    toneCurve: 1,
+    microDotAmount: 0,
+    jitter: 0,
+    seed: 0,
+    quality: { sampleRadius: 0.5, edgeBoost: 0, ditherAmount: 0 },
+    ink: "#000",
+    paper: "#fff"
+  });
+
+  assert.ok(context.operations.some(([operation]) => operation === "arc"));
 });
 
 test("chunked renderer produces the same output as the synchronous renderer", async () => {
