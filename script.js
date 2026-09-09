@@ -212,7 +212,7 @@ const controls = {
 };
 
 const builtInPresets = {
-  // Clean, regular dots and balanced tonal separation for graphic posters.
+  // Clean, regular dots with deeper crimson ink for a punchy poster finish.
   red: {
     quality: "ultra",
     cellSize: 6,
@@ -224,24 +224,24 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 11,
-    inkColor: "#cc0000",
+    inkColor: "#b8202a",
     paperColor: "#f5f5f5"
   },
-  // Softer ink coverage, irregular dots and light grain on warm paper.
+  // A coarser diagonal screen with irregular dots and grain on warm paper.
   orange: {
     quality: "high",
-    cellSize: 6,
+    cellSize: 7,
     contrast: 1.15,
     gamma: 1,
     minDot: 4,
-    screenAngle: 15,
+    screenAngle: 45,
     toneCurve: 1.05,
-    microDot: 18,
-    jitter: 12,
+    microDot: 24,
+    jitter: 18,
     seed: 42,
     inkColor: "#ad551e",
     paperColor: "#f3dfbc",
-    grainStrength: 10
+    grainStrength: 14
   },
   // A luminous negative: bright dots on dark paper, with restrained glow.
   neon: {

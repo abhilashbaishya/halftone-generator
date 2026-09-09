@@ -128,7 +128,7 @@ test('visual preset options preserve selection and distinguish built-in samples 
   let options = popup.querySelectorAll('.studio-preset-option');
   assert.equal(options.length, 3);
   assert.equal(options[0].querySelector('img').alt, '');
-  assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Crisp, balanced poster');
+  assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Punchy crimson poster');
   assert.equal(options[2].querySelector('img'), null);
   assert.equal(options[2].querySelector('.studio-preset-description').textContent, 'Your saved preset');
   options[1].dispatchEvent(new browser.MouseEvent('click', { bubbles: true, detail: 1 }));

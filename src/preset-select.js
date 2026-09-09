@@ -3,10 +3,10 @@ import { mountPresetMenuMotion } from './preset-menu-motion.js';
 import { PHONE_LANDSCAPE, PHONE_LAYOUT } from './mobile-layout.js';
 
 const samples = {
-  red: { description: 'Crisp, balanced poster', image: new URL('./preset-previews/red.png', import.meta.url).href },
-  orange: { description: 'Warm, textured print', image: new URL('./preset-previews/orange.png', import.meta.url).href },
-  neon: { description: 'Neon negative with glow', image: new URL('./preset-previews/neon.png', import.meta.url).href },
-  blue: { description: 'Fine, precise grid', image: new URL('./preset-previews/blue.png', import.meta.url).href },
+  red: { description: 'Punchy crimson poster', image: new URL('./preset-previews/red.png', import.meta.url).href },
+  orange: { description: 'Warm, weathered ink', image: new URL('./preset-previews/orange.png', import.meta.url).href },
+  neon: { description: 'Fluorescent negative glow', image: new URL('./preset-previews/neon.png', import.meta.url).href },
+  blue: { description: 'Pale cyanotype grid', image: new URL('./preset-previews/blue.png', import.meta.url).href },
   fine: { description: 'Soft photographic detail', image: new URL('./preset-previews/fine.png', import.meta.url).href }
 };
 
