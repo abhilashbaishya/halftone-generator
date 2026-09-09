@@ -75,6 +75,7 @@ function mountPopupMotion(host, trigger, {
       clearExit();
       if (liveClass) copy.classList.remove(liveClass);
       copy.classList.add(exitClass);
+      if (copy.classList.contains('studio-phone-sheet')) copy.classList.add('studio-phone-sheet-exit');
       copy.removeAttribute('id');
       copy.removeAttribute('role');
       copy.setAttribute('aria-hidden', 'true');

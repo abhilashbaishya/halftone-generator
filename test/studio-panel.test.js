@@ -502,7 +502,9 @@ test('phone sheets use a slower entrance and a shorter exit', async (t) => {
   document.querySelector('.studio-preset-option').click();
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   assert.equal(animations.at(-1).options.duration, 180);
-  assert.equal(document.querySelector('.studio-preset-menu-exit').classList.contains('studio-phone-sheet'), true);
+  const presetExit = document.querySelector('.studio-preset-menu-exit');
+  assert.equal(presetExit.classList.contains('studio-phone-sheet'), true);
+  assert.equal(presetExit.classList.contains('studio-phone-sheet-exit'), true);
 
   document.querySelector('.mobile-editor-tabs').children[2].click();
   const swatch = document.querySelector('.dialkit-color-swatch');

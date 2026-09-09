@@ -765,6 +765,7 @@ html.light .studio-preset-sample {
      labels, but expose every Adjust control without nested accordions. */
   .halftone-dialkit .studio-folder-static-heading {
     cursor: default;
+    margin: 0;
   }
 
   .halftone-dialkit .studio-folder[data-phone-flat="true"] .dialkit-folder-icon {
