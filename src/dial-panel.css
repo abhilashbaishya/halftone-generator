@@ -250,22 +250,103 @@
 }
 
 .halftone-dialkit .dialkit-button-danger:not(:hover) {
-  color: var(--dial-text-tertiary);
+  color: var(--ref-value);
+  background: var(--dial-surface);
+}
+
+.halftone-dialkit .dialkit-button-danger:hover {
+  color: #ffb4ae;
 }
 
 .dialkit-preset-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 7px;
 }
 
-.dialkit-preset-actions > .dialkit-button-danger:nth-child(3) {
+.dialkit-preset-actions.has-revert {
+  grid-template-columns: 1fr 1fr;
+}
+
+.dialkit-preset-actions > .dialkit-button {
+  white-space: nowrap;
+}
+
+.dialkit-preset-actions.has-revert > .dialkit-button-danger {
   grid-column: 1 / -1;
+}
+
+.studio-preset-namer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.studio-preset-namer-actions > .dialkit-button {
+  white-space: nowrap;
 }
 
 .dialkit-preset-namer {
   display: grid;
   gap: 7px;
+}
+
+/* Same metrics as the Preset select trigger. */
+.halftone-dialkit .studio-preset-name-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: var(--dial-row-height);
+  padding: 0 12px;
+  border-radius: var(--dial-radius);
+  background: var(--dial-surface);
+  box-shadow: var(--control-ring);
+  cursor: text;
+}
+
+.halftone-dialkit .studio-preset-name-label,
+.halftone-dialkit .studio-preset-name-input,
+.halftone-dialkit .studio-preset-name-input::placeholder {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.halftone-dialkit .studio-preset-name-label {
+  flex: 0 0 auto;
+  color: var(--ref-label);
+}
+
+.halftone-dialkit .studio-preset-name-input-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  height: 18px;
+}
+
+.halftone-dialkit .studio-preset-name-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ref-value);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.halftone-dialkit .studio-preset-name-input::placeholder {
+  color: var(--ref-section);
+  opacity: 1;
 }
 
 .dialkit-inline-error {
@@ -547,8 +628,19 @@ html.light .studio-preset-menu-exit {
   width: 44px;
   height: 44px;
   border-radius: 5px;
+  object-fit: cover;
   outline: 1px solid rgb(255 255 255 / 10%);
   outline-offset: -1px;
+}
+
+.studio-preset-sample-empty {
+  display: block;
+  box-sizing: border-box;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 8%) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(225deg, rgb(255 255 255 / 8%) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(45deg, rgb(255 255 255 / 8%) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(315deg, rgb(255 255 255 / 8%) 25%, #2a2a28 25%) 0 0 / 12px 12px;
 }
 
 html.light .studio-preset-sample {
@@ -666,6 +758,17 @@ html.light .studio-preset-sample {
   display: none;
 }
 
+/* GPU gradients instead of DialKit's per-pixel OKLCH canvas. */
+.halftone-dialkit .dialkit-color-plane {
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, var(--studio-plane-hue, #f00));
+}
+
+.halftone-dialkit .dialkit-color-canvas {
+  display: none;
+}
+
 .halftone-dialkit .dialkit-color-swatch {
   position: relative;
 }
@@ -762,8 +865,24 @@ html.light .studio-preset-sample {
     user-select: none;
     -webkit-user-select: none;
   }
-  /* Safari otherwise magnifies the entire viewport when editing small text. */
+  /* Safari zooms focused inputs under 16px. Use 16px on the input only, then
+     scale that control so it still reads as 13px like the Name label. Do not
+     put transform on ::placeholder — Safari stacks it and the text goes small. */
   .halftone-dialkit input:not([type="range"]) { font-size: 16px; }
+  .halftone-dialkit .studio-preset-name-label {
+    font-size: 13px;
+  }
+  .halftone-dialkit .studio-preset-name-input {
+    font-size: 16px;
+    transform: scale(0.8125);
+    transform-origin: left center;
+    width: 123.0769%;
+    flex: 0 0 auto;
+  }
+  .halftone-dialkit .studio-preset-name-input::placeholder {
+    font-size: 16px;
+    transform: none;
+  }
   .halftone-dialkit .dialkit-color-popover { max-width: calc(100vw - 24px); }
 
   /* The tab is already the disclosure level on phones. Keep useful group

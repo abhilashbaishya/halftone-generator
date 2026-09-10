@@ -68,7 +68,7 @@ beforeEach(() => {
       savedName = name; state.presetModified = false; state.isCustomPreset = true; emit(); return { ok: true };
     },
     revertPreset: () => { state.settings = { ...defaults }; state.presetModified = false; emit(); },
-    deletePreset() {}, openImageFile() {}
+    deletePreset() {}, openImageFile() {}, restoreSample() {}
   };
   unmount = mountStudioPanel(studio);
 });
@@ -130,6 +130,7 @@ test('visual preset options preserve selection and distinguish built-in samples 
   assert.equal(options[0].querySelector('img').alt, '');
   assert.equal(options[0].querySelector('.studio-preset-description').textContent, 'Punchy crimson poster');
   assert.equal(options[2].querySelector('img'), null);
+  assert.ok(options[2].querySelector('.studio-preset-sample-empty'));
   assert.equal(options[2].querySelector('.studio-preset-description').textContent, 'Your saved preset');
   options[1].dispatchEvent(new browser.MouseEvent('click', { bubbles: true, detail: 1 }));
   assert.equal(state.selectedPreset, 'fine');
@@ -140,6 +141,7 @@ test('visual preset options preserve selection and distinguish built-in samples 
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
   popup = document.querySelector('.studio-preset-menu');
   assert.equal(popup.querySelectorAll('img').length, 2);
+  assert.equal(popup.querySelectorAll('.studio-preset-sample-empty').length, 1);
   key(document.activeElement, 'End');
   key(document.activeElement, 'Enter');
   assert.equal(state.selectedPreset, 'My print');
@@ -316,13 +318,43 @@ test('iPad follows the system theme and fits the preview even with a saved deskt
   disposePreview();
 });
 
+test("Update preset overwrites a custom preset without opening the namer", () => {
+  const names = [];
+  studio.savePreset = (name) => {
+    names.push(name);
+    state.presetModified = false;
+    emit();
+    return { ok: true };
+  };
+  state.isCustomPreset = true;
+  state.presetModified = true;
+  state.selectedPreset = "Hdjd";
+  emit();
+  findButton("Update preset").click();
+  assert.deepEqual(names, ["Hdjd"]);
+  assert.equal(document.querySelector('.dialkit-preset-namer')?.hidden, true);
+  assert.equal(findButton("Update preset"), undefined);
+  assert.ok(findButton("Save preset"));
+});
+
+test("Save preset from a built-in still opens the name form", () => {
+  state.isCustomPreset = false;
+  state.presetModified = true;
+  state.selectedPreset = "Default";
+  emit();
+  findButton("Save preset").click();
+  assert.equal(document.querySelector('.dialkit-preset-namer')?.hidden, false);
+  assert.equal(document.querySelector('.studio-preset-name-input')?.value, "");
+});
+
 test("preset names stay single-line, validate, save, and return focus", () => {
   studio.setSetting("cellSize", 9);
   findButton("Save preset").click();
-  const input = document.activeElement;
-  assert.equal(input.tagName, "INPUT");
+  const input = document.querySelector('.studio-preset-name-input');
+  assert.equal(input?.tagName, "INPUT");
   assert.equal(input.type, "text");
   assert.equal(input.maxLength, 40);
+  assert.equal(document.activeElement, input);
   const form = input.closest('form');
   form.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }));
   assert.equal(input.getAttribute('aria-invalid'), 'true');
@@ -332,6 +364,50 @@ test("preset names stay single-line, validate, save, and return focus", () => {
   assert.equal(savedName, "My print");
   assert.equal(form.hidden, true);
   assert.equal(document.activeElement, document.querySelector('.dialkit-select-trigger'));
+});
+
+test("touch Save preset opens the namer without focusing the keyboard", () => {
+  const matchMedia = browser.matchMedia.bind(browser);
+  browser.matchMedia = (query) => {
+    if (query.includes('any-pointer: coarse') || query.includes('max-width: 767px')) {
+      return { matches: true, addEventListener() {}, removeEventListener() {} };
+    }
+    return matchMedia(query);
+  };
+  studio.setSetting("cellSize", 9);
+  findButton("Save preset").click();
+  const input = document.querySelector('.studio-preset-name-input');
+  assert.equal(input?.closest('form')?.hidden, false);
+  assert.notEqual(document.activeElement, input);
+  browser.matchMedia = matchMedia;
+});
+
+test("custom preset actions stay full-width and Delete stays readable", () => {
+  state.isCustomPreset = true;
+  state.presetModified = false;
+  emit();
+  const actions = document.querySelector('.dialkit-preset-actions');
+  const save = findButton("Save preset");
+  const remove = findButton("Delete");
+  assert.equal(actions.classList.contains("has-revert"), false);
+  assert.equal(save.disabled, true);
+  assert.equal(remove.hidden, false);
+  state.presetModified = true;
+  emit();
+  assert.equal(actions.classList.contains("has-revert"), true);
+  assert.ok(findButton("Revert"));
+});
+
+test("custom presets with a thumbnail render a real sample image", () => {
+  state.presets = [
+    { value: "red", label: "Crimson Poster" },
+    { value: "Mine", label: "Mine", image: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", description: "Your saved preset" }
+  ];
+  emit();
+  document.querySelector('.dialkit-select-trigger').click();
+  const options = document.querySelectorAll('.studio-preset-option');
+  assert.equal(options[1].querySelector('img')?.src.startsWith("data:image/gif"), true);
+  assert.equal(options[1].querySelector('.studio-preset-sample-empty'), null);
 });
 
 test("color edits keep supported CSS formats and reject invalid values", () => {
@@ -363,6 +439,38 @@ test("color picker starts at the color field without format tabs and returns foc
   key(document.activeElement, 'Escape');
   assert.equal(document.querySelector('.dialkit-color-popover'), null);
   assert.equal(document.activeElement, swatch);
+});
+
+test("color picker uses a CSS hue plane instead of DialKit's live OKLCH canvas", () => {
+  document.querySelector('[aria-label="Pick ink color"]').click();
+  const popup = document.querySelector('.dialkit-color-popover');
+  const canvas = popup.querySelector('.dialkit-color-canvas');
+  const plane = popup.querySelector('.dialkit-color-plane');
+  const hue = popup.querySelector('[aria-label="Hue"]');
+  assert.equal(canvas.hidden, true);
+  assert.equal(canvas.width, 1);
+  assert.equal(canvas.height, 1);
+  assert.match(plane.style.getPropertyValue('--studio-plane-hue'), /^hsl\(/);
+  hue.value = '180';
+  hue.dispatchEvent(new browser.Event('input', { bubbles: true }));
+  assert.equal(plane.style.getPropertyValue('--studio-plane-hue'), 'hsl(180 100% 50%)');
+  key(document.activeElement, 'Escape');
+});
+
+test("Image action is one button that retitles from Upload to Replace", () => {
+  const upload = findButton("Upload image");
+  assert.ok(upload);
+  assert.equal(upload.classList.contains("dialkit-button-primary"), true);
+  assert.equal(findButton("Restore sample"), undefined);
+  state.hasUserImage = true;
+  emit();
+  assert.equal(upload.textContent, "Replace image");
+  assert.equal(upload.classList.contains("dialkit-button-primary"), false);
+  assert.equal(findButton("Upload image"), undefined);
+  state.hasUserImage = false;
+  emit();
+  assert.equal(upload.textContent, "Upload image");
+  assert.equal(upload.classList.contains("dialkit-button-primary"), true);
 });
 
 test("Shift-Tab leaves the simplified picker and opening preserves pasted CSS colors", () => {
@@ -844,4 +952,32 @@ test('theme follows the system by default, with desktop-only explicit overrides'
   dispose();
   system.dispatchEvent(new browser.Event('change'));
   assert.equal(changes, before);
+});
+
+test('theme changes use one coordinated snapshot transition', async () => {
+  const { mountStudioTheme } = await import('../src/theme.js');
+  document.body.insertAdjacentHTML('beforeend', '<button id="themeToggle"><span id="iconSun"></span><span id="iconMoon"></span></button>');
+  globalThis.localStorage = browser.localStorage;
+  const system = new browser.EventTarget();
+  system.matches = false;
+  const matchMedia = browser.matchMedia.bind(browser);
+  browser.matchMedia = (query) => query === '(prefers-color-scheme: dark)' ? system : matchMedia(query);
+  let transitions = 0;
+  Object.defineProperty(document, 'startViewTransition', {
+    configurable: true,
+    value: (update) => {
+      transitions++;
+      update();
+      return { ready: Promise.resolve(), finished: Promise.resolve(), skipTransition() {} };
+    }
+  });
+  const dispose = mountStudioTheme();
+  assert.equal(document.documentElement.classList.contains('light'), true);
+  document.getElementById('themeToggle').click();
+  assert.equal(transitions, 1);
+  assert.equal(document.documentElement.classList.contains('light'), false);
+  assert.equal(document.documentElement.classList.contains('theme-switching'), true);
+  await Promise.resolve();
+  assert.equal(document.documentElement.classList.contains('theme-switching'), false);
+  dispose();
 });

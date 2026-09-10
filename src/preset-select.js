@@ -30,6 +30,7 @@ export function mountPresetSelect(host, initial) {
       if (button.classList.contains('studio-preset-option')) return;
       const option = props.options[index];
       const sample = samples[option.value];
+      const imageSrc = sample?.image || option.image || '';
       const text = document.createElement('span');
       text.className = 'studio-preset-text';
       const name = document.createElement('span');
@@ -37,7 +38,7 @@ export function mountPresetSelect(host, initial) {
       name.textContent = option.label;
       const description = document.createElement('span');
       description.className = 'studio-preset-description';
-      description.textContent = sample?.description ?? 'Your saved preset';
+      description.textContent = sample?.description ?? option.description ?? 'Your saved preset';
       text.append(name, description);
       button.classList.add('studio-preset-option');
       button.replaceChildren(text);
@@ -50,14 +51,20 @@ export function mountPresetSelect(host, initial) {
           if (document.activeElement === trigger) trigger.blur();
         });
       });
-      if (sample) {
+      if (imageSrc) {
         const image = document.createElement('img');
         image.className = 'studio-preset-sample';
-        image.src = sample.image;
+        image.src = imageSrc;
         image.alt = '';
         image.width = image.height = 44;
         image.draggable = false;
         button.prepend(image);
+      } else if (!sample) {
+        // Keep custom rows aligned with built-ins when a thumb is missing.
+        const placeholder = document.createElement('span');
+        placeholder.className = 'studio-preset-sample studio-preset-sample-empty';
+        placeholder.setAttribute('aria-hidden', 'true');
+        button.prepend(placeholder);
       }
     });
     motion.open(popup);
