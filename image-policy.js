@@ -1,6 +1,6 @@
 export const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
-export const MAX_IMAGE_PIXELS = 60_000_000;
-export const MAX_IMAGE_EDGE = 16_384;
+const MAX_IMAGE_PIXELS = 60_000_000;
+const MAX_IMAGE_EDGE = 16_384;
 
 const HEADER_READ_BYTES = 2 * 1024 * 1024;
 

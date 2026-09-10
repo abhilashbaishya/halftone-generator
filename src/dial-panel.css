@@ -428,12 +428,6 @@
   line-height: 1.4;
 }
 
-.dial-panel-loading {
-  padding: 20px;
-  color: var(--label);
-  font-size: 14px;
-}
-
 .export-controls-mount,
 .export-dialkit {
   height: auto;

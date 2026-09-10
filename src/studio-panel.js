@@ -43,7 +43,7 @@ function useCssColorPlane(popup) {
 
 // Measure once per toggle so the controls retain their natural layout while
 // the section opens. A quick reversal starts at the currently visible height.
-export function mountStudioFolder(host, title, defaultOpen = true, root = false) {
+function mountStudioFolder(host, title, defaultOpen = true, root = false) {
   const folder = element("div", `dialkit-folder${root ? " dialkit-folder-root" : " studio-folder"}`);
   const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header" : ""}`);
   const trigger = element(root ? "div" : "button", "dialkit-folder-header-top");

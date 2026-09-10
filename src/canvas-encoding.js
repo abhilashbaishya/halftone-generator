@@ -1,4 +1,4 @@
-export async function nativeCanvasBlob(canvas, mimeType, quality) {
+async function nativeCanvasBlob(canvas, mimeType, quality) {
   if (typeof canvas.convertToBlob === 'function') return canvas.convertToBlob({ type: mimeType, quality });
   if (typeof canvas.toBlob !== 'function') throw new Error('Image export is not supported in this browser.');
   return new Promise((resolve, reject) => {
@@ -9,7 +9,7 @@ export async function nativeCanvasBlob(canvas, mimeType, quality) {
 // Probe a tiny clean canvas before asking a native encoder to process the full
 // artwork. Unsupported WebP often silently encodes PNG instead, wasting work.
 const nativeWebpSupport = new WeakMap();
-export function supportsNativeWebp(canvas) {
+function supportsNativeWebp(canvas) {
   const owner = canvas.ownerDocument || (typeof OffscreenCanvas === 'function' ? OffscreenCanvas : null);
   if (!owner) return Promise.resolve(undefined); // Non-browser adapters may not provide a probe factory.
   if (!nativeWebpSupport.has(owner)) {
