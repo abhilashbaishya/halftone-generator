@@ -226,7 +226,7 @@ export function mountStudioPanel(studio) {
   uploadError.setAttribute("role", "alert");
   uploadError.setAttribute("aria-live", "assertive");
   uploadError.setAttribute("aria-atomic", "true");
-  const warning = createStudioIcon('circle-alert', { class: 'studio-upload-warning', width: 18, height: 18 });
+  const warning = createStudioIcon('circle-alert', { class: 'studio-upload-warning', width: 20, height: 20 });
   const errorBody = element("div", "");
   const errorText = element("p", "");
   errorBody.append(element("strong", "", "Image not uploaded"), errorText);
