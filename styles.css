@@ -111,6 +111,11 @@ html {
   --control-font: 0.8125rem;
   --font-sans: "ABC Diatype", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Strong curves for intentional UI motion (Emil): avoid weak built-in ease. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-press: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* ── Light theme ── */
@@ -201,7 +206,6 @@ html.light .preview-stage {
 
 * {
   box-sizing: border-box;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 html.theme-switching,
@@ -383,7 +387,7 @@ h2 {
   user-select: none;
   -webkit-user-select: none;
   list-style: none;
-  transition: background-color 0.16s ease, box-shadow 0.16s ease;
+  transition: background-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
 }
 
 .advanced-controls summary::-webkit-details-marker {
@@ -397,15 +401,17 @@ h2 {
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg) translate(-2px, -2px);
-  transition: transform 0.16s ease;
+  transition: transform 0.16s var(--ease-out);
 }
 
 .advanced-controls[open] summary::after {
   transform: rotate(225deg) translate(-2px, -2px);
 }
 
-.advanced-controls summary:hover {
-  background: var(--btn-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .advanced-controls summary:hover {
+    background: var(--btn-hover-bg);
+  }
 }
 
 .advanced-controls summary:focus-visible {
@@ -462,13 +468,19 @@ input[type="range"] {
   padding: 0 16px;
   cursor: pointer;
   box-shadow: var(--btn-shadow);
-  transition: background-color 0.16s ease;
+  transition: background-color 0.16s var(--ease-out), transform 0.12s var(--ease-press);
   gap: 0;
   margin-bottom: 8px;
 }
 
-.file-field:hover {
-  background: var(--btn-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .file-field:hover {
+    background: var(--btn-hover-bg);
+  }
+}
+
+.file-field:active {
+  transform: scale(0.97);
 }
 
 .file-field:focus-within {
@@ -518,6 +530,11 @@ input[type="range"] {
   cursor: pointer;
   text-align: left;
   outline: none;
+  transition: transform 0.12s var(--ease-press);
+}
+
+.csel-trigger:active {
+  transform: scale(0.97);
 }
 
 .csel-trigger:focus-visible,
@@ -529,7 +546,7 @@ input[type="range"] {
 .csel-trigger svg {
   flex-shrink: 0;
   color: var(--muted);
-  transition: transform 0.15s ease;
+  transition: transform 0.15s var(--ease-out);
 }
 
 /* Pushes the badge and chevron to the right without restyling the label. */
@@ -603,8 +620,10 @@ input[type="range"] {
   min-height: 40px;
 }
 
-.csel-item:hover {
-  background: var(--csel-item-hover);
+@media (hover: hover) and (pointer: fine) {
+  .csel-item:hover {
+    background: var(--csel-item-hover);
+  }
 }
 
 .button,
@@ -762,8 +781,10 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   cursor: pointer;
 }
 
-.cpick-swatch-button:hover {
-  background: var(--btn-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .cpick-swatch-button:hover {
+    background: var(--btn-hover-bg);
+  }
 }
 
 .cpick-swatch-button:focus-visible,
@@ -956,7 +977,7 @@ output {
   background: var(--csel-trigger-bg);
   border-radius: calc(var(--radius) - 3px);
   box-shadow: 0 1px 2px #00000038;
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s var(--ease-out);
 }
 
 html.light .segmented-thumb {
@@ -976,12 +997,17 @@ html.light .segmented-thumb {
   font-weight: 500;
   color: var(--label);
   cursor: pointer;
-  transition: color 0.16s ease;
+  transition: color 0.16s var(--ease-out);
 }
 
-.segmented-item:hover,
 .segmented-item[aria-checked="true"] {
   color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .segmented-item:hover {
+    color: var(--text);
+  }
 }
 
 .segmented-item:focus-visible {
@@ -1052,8 +1078,10 @@ html.light .segmented-thumb {
   color: var(--label);
 }
 
-.button.preset-cancel:hover {
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .button.preset-cancel:hover {
+    color: var(--text);
+  }
 }
 
 .preset-cancel svg {
@@ -1115,11 +1143,18 @@ html.light .segmented-thumb {
   box-shadow: var(--btn-shadow);
   appearance: none;
   -webkit-appearance: none;
-  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+  transition: background-color 0.16s var(--ease-out), color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out), transform 0.12s var(--ease-press);
 }
 
-.button:hover {
-  background: var(--btn-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .button:hover {
+    background: var(--btn-hover-bg);
+  }
+
+  .button-primary:hover {
+    background: var(--btn-primary-hover);
+    border-color: var(--btn-primary-hover);
+  }
 }
 
 .button:focus-visible {
@@ -1128,7 +1163,7 @@ html.light .segmented-thumb {
 }
 
 .button:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .button:disabled {
@@ -1145,11 +1180,6 @@ html.light .segmented-thumb {
   color: var(--btn-primary-color);
   border-color: var(--btn-primary-bg);
   box-shadow: var(--btn-primary-shadow);
-}
-
-.button-primary:hover {
-  background: var(--btn-primary-hover);
-  border-color: var(--btn-primary-hover);
 }
 
 /* Toolbar-only. Rail buttons all use the full .button size. */

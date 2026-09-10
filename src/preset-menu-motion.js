@@ -1,18 +1,20 @@
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
 const DEFAULT_MOTION = {
-  enterDuration: 300,
-  exitDuration: 240,
-  enterTransform: 'translateY(-6px)',
-  exitTransform: 'translateY(-6px)',
-  enterEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
-  exitEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+  enterDuration: 200,
+  exitDuration: 150,
+  enterTransform: 'translateY(-4px) scale(0.97)',
+  exitTransform: 'translateY(-4px) scale(0.97)',
+  enterEasing: EASE_OUT,
+  exitEasing: EASE_OUT
 };
 
 const PHONE_SHEET_MOTION = {
-  enterDuration: 260,
-  exitDuration: 180,
-  enterTransform: 'translateY(14px)',
-  exitTransform: 'translateY(10px)',
-  enterEasing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  enterDuration: 220,
+  exitDuration: 160,
+  enterTransform: 'translateY(14px) scale(0.98)',
+  exitTransform: 'translateY(10px) scale(0.98)',
+  enterEasing: EASE_OUT,
   exitEasing: 'cubic-bezier(0.4, 0, 1, 1)'
 };
 
@@ -20,6 +22,28 @@ const phoneSheetDismissals = new WeakSet();
 
 export function isPhoneSheetDismissal(event) {
   return phoneSheetDismissals.has(event);
+}
+
+function anchorTransformOrigin(popup, trigger) {
+  if (popup.classList.contains('studio-phone-sheet')) {
+    popup.style.transformOrigin = 'center bottom';
+    return;
+  }
+  const popupRect = popup.getBoundingClientRect();
+  const triggerRect = trigger.getBoundingClientRect();
+  if (!popupRect.width || !popupRect.height) {
+    popup.style.transformOrigin = '50% 0%';
+    return;
+  }
+  const x = Math.min(
+    Math.max(triggerRect.left + triggerRect.width / 2 - popupRect.left, 0),
+    popupRect.width
+  );
+  const y = Math.min(
+    Math.max(triggerRect.top + triggerRect.height / 2 - popupRect.top, 0),
+    popupRect.height
+  );
+  popup.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
 }
 
 // DialKit owns focus and selection. A non-interactive visual copy lets its
@@ -89,6 +113,7 @@ function mountPopupMotion(host, trigger, {
       }
       exiting = copy;
       const motion = motionFor(copy);
+      copy.style.transformOrigin = popup.style.transformOrigin || copy.style.transformOrigin;
       const animation = copy.animate([from, { opacity: 0, transform: motion.exitTransform }], {
         duration: motion.exitDuration, easing: motion.exitEasing, fill: 'forwards'
       });
@@ -109,6 +134,7 @@ function mountPopupMotion(host, trigger, {
       entering?.cancel();
       current = popup;
       if (!canAnimate(popup)) return;
+      anchorTransformOrigin(popup, trigger);
       entering = popup.animate([from, { opacity: 1, transform: 'none' }], {
         duration: motion.enterDuration, easing: motion.enterEasing
       });
