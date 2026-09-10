@@ -164,7 +164,7 @@ test('preset menu fades out without keeping interactive options and clears an in
   const trigger = document.querySelector('.dialkit-select-trigger');
   trigger.click();
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
-  assert.equal(animations[0].options.duration, 300);
+  assert.equal(animations[0].options.duration, 200);
   assert.equal(trigger.getAttribute('aria-expanded'), 'true');
   document.querySelector('.studio-preset-option').click();
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
@@ -174,7 +174,7 @@ test('preset menu fades out without keeping interactive options and clears an in
   assert.equal(exit.getAttribute('aria-hidden'), 'true');
   assert.equal(exit.hasAttribute('role'), false);
   assert.equal(exit.querySelectorAll('[id]').length, 0);
-  assert.equal(animations[1].options.duration, 240);
+  assert.equal(animations[1].options.duration, 150);
   assert.equal(trigger.getAttribute('aria-expanded'), 'false');
   trigger.click();
   assert.equal(document.querySelector('.studio-preset-menu-exit'), null);
@@ -673,10 +673,10 @@ test('phone sheets use a slower entrance and a shorter exit', async (t) => {
   document.querySelector('.mobile-editor-tabs').children[1].click();
   const trigger = document.querySelector('.dialkit-select-trigger');
   trigger.click();
-  assert.equal(animations.at(-1).options.duration, 260);
+  assert.equal(animations.at(-1).options.duration, 220);
   document.querySelector('.studio-preset-option').click();
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
-  assert.equal(animations.at(-1).options.duration, 180);
+  assert.equal(animations.at(-1).options.duration, 160);
   const presetExit = document.querySelector('.studio-preset-menu-exit');
   assert.equal(presetExit.classList.contains('studio-phone-sheet'), true);
   assert.equal(presetExit.classList.contains('studio-phone-sheet-exit'), true);
@@ -684,11 +684,11 @@ test('phone sheets use a slower entrance and a shorter exit', async (t) => {
   document.querySelector('.mobile-editor-tabs').children[2].click();
   const swatch = document.querySelector('.dialkit-color-swatch');
   swatch.click();
-  assert.equal(animations.at(-1).options.duration, 260);
+  assert.equal(animations.at(-1).options.duration, 220);
   const plane = document.querySelector('.dialkit-color-plane');
   key(plane, 'Escape');
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
-  assert.equal(animations.at(-1).options.duration, 180);
+  assert.equal(animations.at(-1).options.duration, 160);
   assert.ok(document.querySelector('.dialkit-color-popover.studio-phone-sheet-exit'));
 });
 
