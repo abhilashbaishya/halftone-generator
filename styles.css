@@ -100,8 +100,9 @@ html {
   --panel-shadow: 0 8px 32px #0006;
   --control-ring: none;
 
-  /* Floating overlays: the rail top-left, the zoom toolbar top-right. */
-  --rail-radius: 15px;
+  /* Floating overlays: the rail top-left, the zoom toolbar top-right.
+     18 = control radius 8 + rail padding 10 (concentric corners). */
+  --rail-radius: 18px;
   --rail-inset: 16px;
   --rail-w: 400px;
   --rail-shadow: 0 26px 70px -22px rgba(0, 0, 0, 0.92);
