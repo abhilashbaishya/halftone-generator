@@ -2,6 +2,8 @@
 
 A browser-based halftone image generator for brand design and print-style graphics. Upload any image, adjust tone and dot parameters, and export high-resolution halftone artwork.
 
+**Live:** [abhilashbaishya.com/tools/halftone-studio](https://abhilashbaishya.com/tools/halftone-studio/)
+
 ## Features
 
 - **Real-time preview** with before/after split comparison
