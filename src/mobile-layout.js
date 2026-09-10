@@ -49,6 +49,24 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
   };
   phoneLandscape.addEventListener("change", syncPhoneLandscape);
   syncPhoneLandscape();
+
+  // Shrink the control sheet with the keyboard instead of letting iOS shove it.
+  const phone = window.matchMedia(PHONE_LAYOUT);
+  const root = document.documentElement;
+  const syncKeyboardInset = () => {
+    if (!phone.matches || !window.visualViewport) {
+      root.style.removeProperty("--phone-keyboard-inset");
+      return;
+    }
+    const vv = window.visualViewport;
+    const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    root.style.setProperty("--phone-keyboard-inset", `${inset}px`);
+  };
+  window.visualViewport?.addEventListener("resize", syncKeyboardInset);
+  window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
+  phone.addEventListener("change", syncKeyboardInset);
+  syncKeyboardInset();
+
   const nav = document.createElement("nav");
   nav.className = "mobile-editor-tabs";
   nav.setAttribute("aria-label", "Editor controls");
@@ -89,6 +107,10 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     for (const node of [panel, actions, rail]) node.removeEventListener('scroll', onScroll);
     media.removeEventListener("change", sync);
     phoneLandscape.removeEventListener("change", syncPhoneLandscape);
+    window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
+    window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
+    phone.removeEventListener("change", syncKeyboardInset);
+    root.style.removeProperty("--phone-keyboard-inset");
     if (workspace) workspace.inert = false;
     panel.hidden = actions.hidden = false;
     Object.values(groups).flat().forEach((section) => { section.hidden = false; });

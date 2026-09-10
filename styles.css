@@ -204,6 +204,27 @@ html.light .preview-stage {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: studio-theme-crossfade 0.16s ease both;
+  mix-blend-mode: normal;
+}
+
+@keyframes studio-theme-crossfade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Any class setting `display` outranks the UA's [hidden] rule, so the
    attribute silently stops working. Pin it once, globally. */
 [hidden] {
@@ -1451,7 +1472,7 @@ canvas {
   .workspace {
     height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(0, var(--phone-control-height));
+    grid-template-rows: minmax(0, 1fr) minmax(0, max(0px, calc(var(--phone-control-height) - var(--phone-keyboard-inset, 0px))));
   }
   .preview-stage {
     grid-row: 1;

@@ -2,7 +2,7 @@ import { mountSlider, mountColorControl } from "dialkit/vanilla";
 import { mountPresetSelect } from "./preset-select.js";
 import { EXPORT_FORMAT_OPTIONS } from "../export-formats.js";
 import { mountTouchSlider } from "./touch-slider.js";
-import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT } from "./mobile-layout.js";
+import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT, TOUCH_LAYOUT } from "./mobile-layout.js";
 import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 
@@ -22,6 +22,23 @@ function button(label, onClick, className = "") {
   const node = element("button", `dialkit-button ${className}`, label);
   node.addEventListener("click", onClick);
   return node;
+}
+
+// DialKit paints the SV field in JS (252×160 OKLCH pixels) on every hue tick.
+// Collapse that canvas and drive the plane with CSS, like the old local picker.
+function useCssColorPlane(popup) {
+  const plane = popup.querySelector(".dialkit-color-plane");
+  const canvas = popup.querySelector(".dialkit-color-canvas");
+  const hue = popup.querySelector(".dialkit-color-hue");
+  if (!plane || !canvas || !hue) return;
+  canvas.width = 1;
+  canvas.height = 1;
+  canvas.hidden = true;
+  const sync = () => {
+    plane.style.setProperty("--studio-plane-hue", `hsl(${Number(hue.value)} 100% 50%)`);
+  };
+  hue.addEventListener("input", sync);
+  sync();
 }
 
 // Measure once per toggle so the controls retain their natural layout while
@@ -201,7 +218,10 @@ export function mountStudioPanel(studio) {
     fileInput.value = "";
     if (file) studio.openImageFile(file);
   });
+  // One button only: swapping Upload ↔ Replace/Restore side-by-side still
+  // hitching under preview render, so keep a single stable control.
   const upload = button("Upload image", () => fileInput.click(), "studio-upload-button");
+  upload.classList.add("dialkit-button-primary");
   const uploadError = element("div", "dialkit-upload-error");
   uploadError.setAttribute("role", "alert");
   uploadError.setAttribute("aria-live", "assertive");
@@ -224,18 +244,23 @@ export function mountStudioPanel(studio) {
   controls.push(select);
   const actions = element("div", "dialkit-preset-actions");
   const namer = element("form", "dialkit-preset-namer");
-  const nameRow = element("label", "dialkit-text-control");
-  const nameInput = element("input", "dialkit-text-input");
+  // Match the Preset select row — DialKit's text control uses different type
+  // metrics and fights the phone 16px zoom rule.
+  const nameRow = element("label", "studio-preset-name-field");
+  const nameInputWrap = element("span", "studio-preset-name-input-wrap");
+  const nameInput = element("input", "studio-preset-name-input");
   nameInput.type = "text";
   nameInput.maxLength = 40;
   nameInput.placeholder = "Preset name";
   nameInput.autocomplete = "off";
-  nameRow.append(element("span", "dialkit-text-label", "Name"), nameInput);
+  nameInput.setAttribute("aria-label", "Preset name");
+  nameInputWrap.append(nameInput);
+  nameRow.append(element("span", "studio-preset-name-label", "Name"), nameInputWrap);
   const nameError = element("p", "dialkit-inline-error");
   nameError.id = "studio-preset-error";
   nameError.setAttribute("role", "alert");
   nameInput.setAttribute("aria-describedby", nameError.id);
-  const nameActions = element("div", "dialkit-preset-actions");
+  const nameActions = element("div", "studio-preset-namer-actions");
   const confirm = button("Save", () => {}, "dialkit-button-primary");
   confirm.type = "submit";
   const cancel = button("Cancel", () => closeNamer());
@@ -248,23 +273,38 @@ export function mountStudioPanel(studio) {
       nameError.textContent = result.message;
       nameError.hidden = false;
       nameInput.setAttribute("aria-invalid", "true");
-      nameInput.focus();
+      nameInput.focus({ preventScroll: true });
     } else closeNamer();
   });
   nameInput.addEventListener("input", () => {
     nameError.hidden = true;
     nameInput.removeAttribute("aria-invalid");
   });
+  // Keep the sheet from scrolling when the keyboard opens.
+  nameInput.addEventListener("focus", () => {
+    const scroller = document.getElementById("dialPanelRoot");
+    if (!scroller) return;
+    const top = scroller.scrollTop;
+    requestAnimationFrame(() => { scroller.scrollTop = top; });
+  });
   namer.addEventListener("keydown", (event) => {
     if (event.key === "Escape") { event.preventDefault(); closeNamer(); }
   });
   const save = button("Save preset", () => {
+    // Custom + edited: overwrite in place. Built-in: ask for a new name.
+    if (state.isCustomPreset) {
+      studio.savePreset(state.selectedPreset);
+      return;
+    }
     naming = true;
-    nameInput.value = state.isCustomPreset ? state.selectedPreset : "";
+    nameInput.value = "";
     nameError.hidden = true;
     nameInput.removeAttribute("aria-invalid");
     updateSource();
-    nameInput.focus();
+    // Touch: opening the keyboard here jumps the whole phone sheet. Let the
+    // user tap the name field when they want to type. Desktop still focuses.
+    if (window.matchMedia(TOUCH_LAYOUT).matches) return;
+    nameInput.focus({ preventScroll: true });
     nameInput.select();
   });
   const revert = button("Revert", () => { studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
@@ -274,10 +314,13 @@ export function mountStudioPanel(studio) {
   function closeNamer(focus = true) {
     naming = false;
     updateSource();
-    if (focus) (save.disabled ? selectHost.querySelector("button") : save)?.focus();
+    if (focus) (save.disabled ? selectHost.querySelector("button") : save)?.focus({ preventScroll: true });
   }
   function updateSource() {
-    upload.classList.toggle("dialkit-button-primary", !state.hasUserImage);
+    const userImage = Boolean(state.hasUserImage);
+    const nextLabel = userImage ? "Replace image" : "Upload image";
+    if (upload.textContent !== nextLabel) upload.textContent = nextLabel;
+    upload.classList.toggle("dialkit-button-primary", !userImage);
     uploadError.hidden = !state.uploadError;
     if (errorText.textContent !== state.uploadError) errorText.textContent = state.uploadError;
     const nextSelect = selectProps();
@@ -288,6 +331,7 @@ export function mountStudioPanel(studio) {
     }
     namer.hidden = !naming;
     actions.hidden = naming;
+    actions.classList.toggle("has-revert", Boolean(state.presetModified));
     save.disabled = !state.presetModified;
     save.textContent = state.isCustomPreset && state.presetModified ? "Update preset" : "Save preset";
     save.classList.toggle("dialkit-button-primary", state.presetModified);
@@ -357,6 +401,7 @@ export function mountStudioPanel(studio) {
       popup.classList.toggle('studio-phone-sheet', window.matchMedia(PHONE_LAYOUT).matches);
       sheetMotion.open(popup);
       popup.querySelector('.dialkit-color-format-row').hidden = true;
+      useCssColorPlane(popup);
       const plane = popup.querySelector('.dialkit-color-plane');
       // DialKit normally focuses the active format tab. Start at the first
       // visible control instead, without changing a pasted CSS color value.

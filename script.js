@@ -81,6 +81,21 @@ function saveImageToDb(imageBlob) {
     transaction.onabort = transaction.onerror;
   })).catch(() => {});
 }
+function clearImageFromDb() {
+  return openDb().then((db) => new Promise((resolve, reject) => {
+    const transaction = db.transaction(DB_STORE, "readwrite");
+    transaction.objectStore(DB_STORE).delete(DB_KEY);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+    transaction.onabort = transaction.onerror;
+  })).catch(() => {});
+}
 function loadImageFromDb() {
   return openDb().then(db => new Promise((res, rej) => {
     const req = db.transaction(DB_STORE).objectStore(DB_STORE).get(DB_KEY);
@@ -510,6 +525,9 @@ function sanitizePreset(rawPreset) {
 
   // Keep older saved presets within the current control range on load.
   sanitized.cellSize = Math.min(Number(controls.cellSize.max), Math.max(Number(controls.cellSize.min), sanitized.cellSize));
+  if (typeof rawPreset.thumbnail === "string" && /^data:image\/(?:png|jpe?g|webp);base64,/i.test(rawPreset.thumbnail)) {
+    sanitized.thumbnail = rawPreset.thumbnail;
+  }
   return sanitized;
 }
 
@@ -606,6 +624,25 @@ function captureCurrentPreset() {
   return captured;
 }
 
+function capturePresetThumbnail() {
+  if (!previewCanvas.width || !previewCanvas.height) return "";
+  const size = 88;
+  const thumb = document.createElement("canvas");
+  thumb.width = size;
+  thumb.height = size;
+  const ctx = thumb.getContext("2d");
+  if (!ctx) return "";
+  const side = Math.min(previewCanvas.width, previewCanvas.height);
+  const sx = Math.floor((previewCanvas.width - side) / 2);
+  const sy = Math.floor((previewCanvas.height - side) / 2);
+  ctx.drawImage(previewCanvas, sx, sy, side, side, 0, 0, size, size);
+  try {
+    return thumb.toDataURL("image/jpeg", 0.72);
+  } catch {
+    return "";
+  }
+}
+
 function setPresetNote(message) {
   controls.presetNote.textContent = message;
 }
@@ -659,7 +696,13 @@ function syncPresetActions() {
 function openPresetNamer() {
   if (controls.savePresetBtn.disabled) return;
   const active = controls.presetSelect.value;
-  controls.presetNameInput.value = Object.prototype.hasOwnProperty.call(customPresets, active) ? active : "";
+  // Updating a custom preset overwrites it in place — no rename dialog.
+  if (Object.prototype.hasOwnProperty.call(customPresets, active)) {
+    const result = savePresetByName(active);
+    if (result.ok) emitStudioState();
+    return;
+  }
+  controls.presetNameInput.value = "";
   controls.presetActions.hidden = true;
   controls.presetNamer.hidden = false;
   setPresetNote("");
@@ -683,7 +726,11 @@ function savePresetByName(rawName) {
     return { ok: false, message: "That name belongs to a built-in preset." };
   }
 
-  customPresets[name] = captureCurrentPreset();
+  customPresets[name] = {
+    ...captureCurrentPreset(),
+    thumbnail: capturePresetThumbnail() || customPresets[name]?.thumbnail || ""
+  };
+  if (!customPresets[name].thumbnail) delete customPresets[name].thumbnail;
   persistCustomPresets();
   rebuildPresetSelect(name);
   syncPresetActions();
@@ -1175,9 +1222,9 @@ async function loadImageFromFile(file) {
         setUploadError();
         saveImageToDb(safeBlob);
         resetView();
-        requestRender();
         setRenderStatus("Ready", false);
         controls.imageInput.value = "";
+        requestRender();
       },
       onError: (error) => {
         setUploadError(getUploadErrorMessage(
@@ -1194,6 +1241,28 @@ async function loadImageFromFile(file) {
     setRenderStatus("Ready", false);
     controls.imageInput.value = "";
   }
+}
+
+function restoreSampleImage() {
+  const token = ++imageLoadToken;
+  setUploadError();
+  clearImageFromDb();
+  setRenderStatus("Loading image…", true, true);
+  loadImageSource(PLACEHOLDER_URL, {
+    token,
+    onLoad: () => {
+      setHasUserImage(false);
+      setUploadError();
+      resetView();
+      setRenderStatus("Ready", false);
+      requestRender();
+    },
+    onError: () => {
+      setHasUserImage(false);
+      drawPlaceholder();
+      setRenderStatus("Upload an image", false, true);
+    }
+  });
 }
 
 function hasPostEffects(settings = getPostProcessSettings()) {
@@ -1878,7 +1947,12 @@ function getStudioState() {
       ...Object.keys(builtInPresets).map((value) => ({ value, label: formatPresetLabel(value) })),
       ...Object.keys(customPresets)
         .sort((a, b) => a.localeCompare(b))
-        .map((value) => ({ value, label: value }))
+        .map((value) => ({
+          value,
+          label: value,
+          description: "Your saved preset",
+          image: customPresets[value].thumbnail || ""
+        }))
     ],
     settings: captureCurrentPreset(),
     export: {
@@ -1934,6 +2008,9 @@ window.halftoneStudio = Object.freeze({
   },
   openImageFile(file) {
     if (file) loadImageFromFile(file);
+  },
+  restoreSample() {
+    restoreSampleImage();
   },
   savePreset(name) {
     const result = savePresetByName(name);
