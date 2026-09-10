@@ -673,6 +673,10 @@ html.light .studio-preset-sample {
   color: inherit;
 }
 
+.halftone-dialkit .studio-folder > .dialkit-folder-header .dialkit-folder-header-top {
+  cursor: pointer;
+}
+
 .halftone-dialkit .studio-static-section > .dialkit-folder-header {
   cursor: default;
 }

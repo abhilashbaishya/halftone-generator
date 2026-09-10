@@ -7,6 +7,12 @@
     <meta name="theme-color" content="#000000" />
     <script>
       (() => {
+        // Public site is only abhilashbaishya.com. Lab/Pages is the build host
+        // behind a rewrite — send direct visits to the canonical URL.
+        if (location.hostname === "lab.abhilashbaishya.cv") {
+          location.replace("https://abhilashbaishya.com/tools/halftone-studio/" + location.search + location.hash);
+          return;
+        }
         const touch = matchMedia('(max-width: 767px), (any-pointer: coarse)').matches;
         let saved;
         try { saved = localStorage.getItem('halftone.theme'); } catch {}
@@ -17,11 +23,12 @@
       })();
     </script>
     <title>Halftone Studio</title>
+    <link rel="canonical" href="https://abhilashbaishya.com/tools/halftone-studio/" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Halftone Studio" />
     <meta property="og:description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
-    <meta property="og:url" content="https://lab.abhilashbaishya.cv/halftone-generator/" />
-    <meta property="og:image" content="https://lab.abhilashbaishya.cv/halftone-generator/og-image.png" />
+    <meta property="og:url" content="https://abhilashbaishya.com/tools/halftone-studio/" />
+    <meta property="og:image" content="https://abhilashbaishya.com/tools/halftone-studio/og-image.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -29,7 +36,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Halftone Studio" />
     <meta name="twitter:description" content="Browser-based halftone image generator with real-time preview, presets, and multi-format export." />
-    <meta name="twitter:image" content="https://lab.abhilashbaishya.cv/halftone-generator/og-image.png" />
+    <meta name="twitter:image" content="https://abhilashbaishya.com/tools/halftone-studio/og-image.png" />
     <meta name="twitter:image:alt" content="Halftone Studio in white lettering on a black background." />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
