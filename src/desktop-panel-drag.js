@@ -1,21 +1,7 @@
 import { TOUCH_LAYOUT } from './mobile-layout.js';
 
 const DESKTOP_DRAG_LAYOUT = '(min-width: 981px) and (hover: hover) and (pointer: fine)';
-const POSITION_KEY = 'halftone.panel-position.v1';
 const VIEWPORT_GUTTER = 16;
-
-function readPosition() {
-  try {
-    const value = JSON.parse(window.sessionStorage.getItem(POSITION_KEY));
-    if (Number.isFinite(value?.x) && Number.isFinite(value?.y)) return value;
-  } catch { /* Start from the default corner when storage is unavailable. */ }
-  return null;
-}
-
-function writePosition(position) {
-  if (!position) return;
-  try { window.sessionStorage.setItem(POSITION_KEY, JSON.stringify(position)); } catch { /* Position remains for this mount. */ }
-}
 
 function viewportSize() {
   return {
@@ -66,14 +52,13 @@ export function mountDesktopPanelDrag(rail, handle) {
     applyPosition(next);
   };
 
-  const finishDrag = (event, persist = true) => {
+  const finishDrag = (event) => {
     if (!drag || (event?.pointerId != null && event.pointerId !== drag.pointerId)) return;
     flushMove();
     const pointerId = drag.pointerId;
     drag = null;
     rail.classList.remove('is-panel-dragging');
     if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
-    if (persist) writePosition(position);
   };
 
   const onPointerDown = (event) => {
@@ -108,7 +93,6 @@ export function mountDesktopPanelDrag(rail, handle) {
     layoutFrame = 0;
     if (!enabled || !position || drag) return;
     applyPosition(position);
-    writePosition(position);
   };
 
   const scheduleClamp = () => {
@@ -127,7 +111,7 @@ export function mountDesktopPanelDrag(rail, handle) {
     const nextEnabled = desktop.matches && !touch.matches;
     if (nextEnabled === enabled) return;
     enabled = nextEnabled;
-    finishDrag(undefined, false);
+    finishDrag();
     cancelAnimationFrame(layoutFrame);
     layoutFrame = 0;
     if (!enabled) {
@@ -135,11 +119,6 @@ export function mountDesktopPanelDrag(rail, handle) {
       return;
     }
     rail.dataset.panelDraggable = 'true';
-    layoutFrame = requestAnimationFrame(() => {
-      layoutFrame = 0;
-      const saved = readPosition();
-      if (saved) applyPosition(saved);
-    });
   };
 
   handle.addEventListener('pointerdown', onPointerDown);
@@ -155,7 +134,7 @@ export function mountDesktopPanelDrag(rail, handle) {
   sync();
 
   return () => {
-    finishDrag(undefined, false);
+    finishDrag();
     cancelAnimationFrame(moveFrame);
     cancelAnimationFrame(layoutFrame);
     resizeObserver?.disconnect();

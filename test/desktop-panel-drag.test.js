@@ -9,7 +9,7 @@ function media(matches) {
   return target;
 }
 
-test('desktop panel dragging stays within the viewport and remembers its position for the session', async () => {
+test('desktop panel dragging stays within the viewport and resets when remounted', async () => {
   const browser = new Window({ url: 'http://localhost:5173', width: 1200, height: 800 });
   const desktop = media(true);
   const touch = media(false);
@@ -45,12 +45,17 @@ test('desktop panel dragging stays within the viewport and remembers its positio
 
   assert.equal(rail.style.getPropertyValue('--studio-panel-drag-x'), '768px');
   assert.equal(rail.style.getPropertyValue('--studio-panel-drag-y'), '268px');
-  assert.deepEqual(JSON.parse(browser.sessionStorage.getItem('halftone.panel-position.v1')), { x: 784, y: 284 });
+  assert.equal(browser.sessionStorage.getItem('halftone.panel-position.v1'), null);
   assert.equal(rail.classList.contains('is-panel-dragging'), false);
 
   unmount();
   assert.equal(rail.hasAttribute('data-panel-draggable'), false);
   assert.equal(rail.style.getPropertyValue('--studio-panel-drag-x'), '');
+
+  const remount = mountDesktopPanelDrag(rail, handle);
+  assert.equal(rail.style.getPropertyValue('--studio-panel-drag-x'), '');
+  assert.equal(rail.style.getPropertyValue('--studio-panel-drag-y'), '');
+  remount();
   await browser.happyDOM.abort();
   browser.close();
 });
