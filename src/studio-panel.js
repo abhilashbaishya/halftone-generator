@@ -49,7 +49,10 @@ function mountStudioFolder(host, title, defaultOpen = true, root = false) {
   const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header studio-panel-drag-surface" : ""}`);
   const trigger = element(root ? "div" : "button", "dialkit-folder-header-top");
   trigger.append(element("span", `dialkit-folder-title${root ? " dialkit-folder-title-root" : ""}`, title));
-  if (root) trigger.append(createStudioIcon('grip', { class: 'studio-panel-drag-grip', width: 16, height: 16 }));
+  if (root) trigger.append(createStudioIcon('grip', {
+    class: 'studio-panel-drag-grip', width: 16, height: 16,
+    title: 'Drag panel · Double-click to reset'
+  }));
   const flatHeading = root ? null : element("h2", "dialkit-folder-header-top studio-folder-static-heading");
   if (flatHeading) {
     flatHeading.append(element("span", "dialkit-folder-title", title));

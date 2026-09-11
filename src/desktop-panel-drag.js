@@ -2,6 +2,8 @@ import { TOUCH_LAYOUT } from './mobile-layout.js';
 
 const DESKTOP_DRAG_LAYOUT = '(min-width: 981px) and (hover: hover) and (pointer: fine)';
 const VIEWPORT_GUTTER = 16;
+const DOUBLE_CLICK_WINDOW = 600;
+const CLICK_SLOP = 5;
 
 function viewportSize() {
   return {
@@ -15,12 +17,16 @@ export function mountDesktopPanelDrag(rail, handle) {
 
   const desktop = window.matchMedia(DESKTOP_DRAG_LAYOUT);
   const touch = window.matchMedia(TOUCH_LAYOUT);
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const grip = handle.querySelector('.studio-panel-drag-grip');
   let enabled = false;
   let drag = null;
   let position = null;
   let pendingPosition = null;
   let moveFrame = 0;
   let layoutFrame = 0;
+  let resetTimer = 0;
+  let lastGripClick = null;
 
   const basePosition = () => {
     const style = getComputedStyle(rail);
@@ -52,6 +58,24 @@ export function mountDesktopPanelDrag(rail, handle) {
     applyPosition(next);
   };
 
+  const finishReset = () => {
+    clearTimeout(resetTimer);
+    resetTimer = 0;
+    rail.classList.remove('is-panel-resetting');
+    rail.style.removeProperty('--studio-panel-drag-x');
+    rail.style.removeProperty('--studio-panel-drag-y');
+    position = null;
+  };
+
+  const interruptReset = () => {
+    if (!rail.classList.contains('is-panel-resetting')) return;
+    const rect = rail.getBoundingClientRect();
+    clearTimeout(resetTimer);
+    resetTimer = 0;
+    rail.classList.remove('is-panel-resetting');
+    applyPosition({ x: rect.left, y: rect.top });
+  };
+
   const finishDrag = (event) => {
     if (!drag || (event?.pointerId != null && event.pointerId !== drag.pointerId)) return;
     flushMove();
@@ -63,22 +87,40 @@ export function mountDesktopPanelDrag(rail, handle) {
 
   const onPointerDown = (event) => {
     if (!enabled || event.button !== 0 || event.isPrimary === false) return;
+    const startedOnGrip = Boolean(grip?.contains(event.target));
+    // Pointer capture moves the eventual click/dblclick target to the title
+    // bar in some browsers. Detect the browser's click count before capture.
+    if (startedOnGrip && event.detail >= 2) {
+      lastGripClick = null;
+      resetPosition(event);
+      return;
+    }
+    if (!startedOnGrip) lastGripClick = null;
+    interruptReset();
     const rect = rail.getBoundingClientRect();
     drag = {
       pointerId: event.pointerId,
       pointerX: event.clientX,
       pointerY: event.clientY,
       panelX: rect.left,
-      panelY: rect.top
+      panelY: rect.top,
+      startedOnGrip,
+      moved: false
     };
     position = { x: rect.left, y: rect.top };
     rail.classList.add('is-panel-dragging');
     handle.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
+    // Keep the grip's native click sequence intact so browsers can emit the
+    // double-click reset. The rest of the title row still suppresses selection.
+    if (!startedOnGrip) event.preventDefault();
   };
 
   const onPointerMove = (event) => {
     if (!drag || event.pointerId !== drag.pointerId) return;
+    if (Math.hypot(event.clientX - drag.pointerX, event.clientY - drag.pointerY) > CLICK_SLOP) {
+      drag.moved = true;
+      if (drag.startedOnGrip) lastGripClick = null;
+    }
     pendingPosition = {
       x: drag.panelX + event.clientX - drag.pointerX,
       y: drag.panelY + event.clientY - drag.pointerY
@@ -86,7 +128,46 @@ export function mountDesktopPanelDrag(rail, handle) {
     if (!moveFrame) moveFrame = requestAnimationFrame(flushMove);
   };
 
-  const onPointerEnd = (event) => finishDrag(event);
+  const onPointerEnd = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const completedGripClick = event.type === 'pointerup' && drag.startedOnGrip && !drag.moved;
+    const click = completedGripClick ? {
+      time: window.performance.now(),
+      x: event.clientX,
+      y: event.clientY
+    } : null;
+    finishDrag(event);
+    if (!click) {
+      lastGripClick = null;
+      return;
+    }
+    const previous = lastGripClick;
+    lastGripClick = click;
+    if (!previous
+      || click.time - previous.time > DOUBLE_CLICK_WINDOW
+      || Math.hypot(click.x - previous.x, click.y - previous.y) > CLICK_SLOP) return;
+    lastGripClick = null;
+    resetPosition(event);
+  };
+
+  const resetPosition = (event) => {
+    if (!enabled || !position || rail.classList.contains('is-panel-resetting')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finishDrag();
+    clearTimeout(resetTimer);
+    rail.classList.add('is-panel-resetting');
+    applyPosition(basePosition());
+    if (reducedMotion.matches) {
+      finishReset();
+      return;
+    }
+    resetTimer = window.setTimeout(finishReset, 220);
+  };
+
+  const onResetTransitionEnd = (event) => {
+    if (event.target === rail && event.propertyName === 'transform') finishReset();
+  };
 
   const clampPosition = () => {
     cancelAnimationFrame(layoutFrame);
@@ -104,6 +185,9 @@ export function mountDesktopPanelDrag(rail, handle) {
     rail.removeAttribute('data-panel-draggable');
     rail.style.removeProperty('--studio-panel-drag-x');
     rail.style.removeProperty('--studio-panel-drag-y');
+    clearTimeout(resetTimer);
+    resetTimer = 0;
+    rail.classList.remove('is-panel-resetting');
     position = null;
   };
 
@@ -126,6 +210,7 @@ export function mountDesktopPanelDrag(rail, handle) {
   handle.addEventListener('pointerup', onPointerEnd);
   handle.addEventListener('pointercancel', onPointerEnd);
   handle.addEventListener('lostpointercapture', onPointerEnd);
+  rail.addEventListener('transitionend', onResetTransitionEnd);
   desktop.addEventListener('change', sync);
   touch.addEventListener('change', sync);
   window.addEventListener('resize', scheduleClamp);
@@ -143,6 +228,7 @@ export function mountDesktopPanelDrag(rail, handle) {
     handle.removeEventListener('pointerup', onPointerEnd);
     handle.removeEventListener('pointercancel', onPointerEnd);
     handle.removeEventListener('lostpointercapture', onPointerEnd);
+    rail.removeEventListener('transitionend', onResetTransitionEnd);
     desktop.removeEventListener('change', sync);
     touch.removeEventListener('change', sync);
     window.removeEventListener('resize', scheduleClamp);

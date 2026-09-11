@@ -102,6 +102,7 @@ html {
   --rail-inset: 16px;
   --rail-w: 400px;
   --rail-shadow: 0 26px 70px -22px rgba(0, 0, 0, 0.92);
+  --rail-drag-shadow: 0 30px 82px -20px rgba(0, 0, 0, 0.96);
 
   /* Every interactive control in the rail sits on this height. */
   --control-h: 34px;
@@ -129,6 +130,9 @@ html.light {
   --rail-shadow:
     0 1px 2px oklch(0.35 0.02 90 / 0.05),
     0 18px 50px -18px oklch(0.4 0.02 90 / 0.18);
+  --rail-drag-shadow:
+    0 2px 3px oklch(0.35 0.02 90 / 0.07),
+    0 26px 64px -16px oklch(0.4 0.02 90 / 0.24);
 
   --text: oklch(0.28 0.014 90);
   --label: oklch(0.4 0.014 90);
@@ -300,10 +304,22 @@ h1, h2, p {
 
 .control-rail[data-panel-draggable="true"] {
   transform: translate3d(var(--studio-panel-drag-x, 0), var(--studio-panel-drag-y, 0), 0);
+  transition: box-shadow 140ms var(--ease-out);
 }
 
 .control-rail.is-panel-dragging {
+  z-index: 110;
   will-change: transform;
+  box-shadow: var(--rail-drag-shadow);
+}
+
+.control-rail.is-panel-resetting {
+  transition: transform 180ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-rail[data-panel-draggable="true"],
+  .control-rail.is-panel-resetting { transition: none; }
 }
 
 .control-scroll {
