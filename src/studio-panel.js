@@ -5,6 +5,7 @@ import { mountTouchSlider } from "./touch-slider.js";
 import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT, TOUCH_LAYOUT } from "./mobile-layout.js";
 import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
+import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
   value, label: value[0].toUpperCase() + value.slice(1)
@@ -45,9 +46,10 @@ function useCssColorPlane(popup) {
 // the section opens. A quick reversal starts at the currently visible height.
 function mountStudioFolder(host, title, defaultOpen = true, root = false) {
   const folder = element("div", `dialkit-folder${root ? " dialkit-folder-root" : " studio-folder"}`);
-  const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header" : ""}`);
+  const header = element("div", `dialkit-folder-header${root ? " dialkit-panel-header studio-panel-drag-surface" : ""}`);
   const trigger = element(root ? "div" : "button", "dialkit-folder-header-top");
   trigger.append(element("span", `dialkit-folder-title${root ? " dialkit-folder-title-root" : ""}`, title));
+  if (root) trigger.append(createStudioIcon('grip', { class: 'studio-panel-drag-grip', width: 16, height: 16 }));
   const flatHeading = root ? null : element("h2", "dialkit-folder-header-top studio-folder-static-heading");
   if (flatHeading) {
     flatHeading.append(element("span", "dialkit-folder-title", title));
@@ -119,7 +121,7 @@ function mountStudioFolder(host, title, defaultOpen = true, root = false) {
   }
   setOpen(defaultOpen);
   syncDisclosure();
-  return { body, setOpen, setFlat };
+  return { body, setOpen, setFlat, header };
 }
 
 function mountStaticSection(host, title, showHeading = true) {
@@ -205,7 +207,8 @@ export function mountStudioPanel(studio) {
   panel.append(inner);
   root.append(panel);
   document.getElementById("dialPanelRoot").replaceChildren(root);
-  const folders = mountStudioFolder(inner, "Halftone Studio", true, true).body;
+  const rootFolder = mountStudioFolder(inner, "Halftone Studio", true, true);
+  const folders = rootFolder.body;
   const source = mountStaticSection(folders, "Source");
 
   const fileInput = element("input", "sr-only");
@@ -452,6 +455,7 @@ export function mountStudioPanel(studio) {
     adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
     colors: [colors.closest(".studio-folder")]
   }, { onScrollActivity: (active) => studio.setPanelScrolling?.(active) });
+  const unmountDesktopDrag = mountDesktopPanelDrag(document.querySelector('.control-rail'), rootFolder.header);
 
   // Observe only our color drag surfaces; DialKit/native ranges retain their
   // own pointer capture. This tells the renderer when to refine the preview.
@@ -486,6 +490,7 @@ export function mountStudioPanel(studio) {
     compact.removeEventListener("change", syncAdjustLayout);
     phone.removeEventListener("change", syncAdjustLayout);
     unmountMobile();
+    unmountDesktopDrag();
     colorCancel();
     document.removeEventListener("pointerdown", colorStart, true);
     document.removeEventListener("pointerup", colorEnd, true);

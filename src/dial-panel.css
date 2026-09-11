@@ -66,6 +66,37 @@
   padding-bottom: 10px;
 }
 
+.studio-panel-drag-grip {
+  display: none;
+  flex: none;
+  color: var(--ref-section);
+  transition: color 150ms var(--ease-out);
+}
+
+@media (min-width: 981px) and (hover: hover) and (pointer: fine) {
+  .control-rail[data-panel-draggable="true"] .studio-panel-drag-surface,
+  .control-rail[data-panel-draggable="true"] .studio-panel-drag-surface .dialkit-folder-header-top {
+    cursor: grab;
+  }
+
+  .control-rail[data-panel-draggable="true"] .studio-panel-drag-surface {
+    touch-action: none;
+  }
+
+  .control-rail[data-panel-draggable="true"] .studio-panel-drag-grip {
+    display: block;
+  }
+
+  .control-rail[data-panel-draggable="true"] .studio-panel-drag-surface:hover .studio-panel-drag-grip {
+    color: var(--ref-value);
+  }
+
+  .control-rail.is-panel-dragging .studio-panel-drag-surface,
+  .control-rail.is-panel-dragging .studio-panel-drag-surface .dialkit-folder-header-top {
+    cursor: grabbing;
+  }
+}
+
 .halftone-dialkit .dialkit-folder-title-root {
   letter-spacing: -0.015em;
 }

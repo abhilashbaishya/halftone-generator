@@ -298,6 +298,14 @@ h1, h2, p {
   box-shadow: var(--rail-shadow);
 }
 
+.control-rail[data-panel-draggable="true"] {
+  transform: translate3d(var(--studio-panel-drag-x, 0), var(--studio-panel-drag-y, 0), 0);
+}
+
+.control-rail.is-panel-dragging {
+  will-change: transform;
+}
+
 .control-scroll {
   flex: 1;
   min-height: 0;

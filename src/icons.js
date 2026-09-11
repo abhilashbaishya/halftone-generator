@@ -1,10 +1,11 @@
-import { createElement, ChevronDown, ChevronsLeftRight, CircleAlert, Moon, RotateCw, Sun, X } from 'lucide';
+import { createElement, ChevronDown, ChevronsLeftRight, CircleAlert, Grip, Moon, RotateCw, Sun, X } from 'lucide';
 
 // Import only the icons used by the studio. DialKit owns its dropdown chevron.
 const icons = {
   'chevron-down': ChevronDown,
   'chevrons-left-right': ChevronsLeftRight,
   'circle-alert': CircleAlert,
+  grip: Grip,
   moon: Moon,
   'rotate-cw': RotateCw,
   sun: Sun,
