@@ -7,6 +7,8 @@ import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { isPhoneSheetDismissal } from "./src/preset-menu-motion.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
+import { mountEditorSession } from "./src/editor-session.js";
+import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
@@ -328,9 +330,8 @@ const ZOOM_SLIDER_MIDPOINT = 50;
 let sourceImage = null;
 let resizeTimer = null;
 let renderFrame = null;
-let hiddenJitter = 6;
-let hiddenMicroDot = 24;
-let hiddenSeed = 0;
+const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
+let editorSession = null;
 let customPresets = {};
 
 let renderWorker = null;
@@ -524,7 +525,13 @@ function sanitizePreset(rawPreset) {
   }
 
   // Keep older saved presets within the current control range on load.
-  sanitized.cellSize = Math.min(Number(controls.cellSize.max), Math.max(Number(controls.cellSize.min), sanitized.cellSize));
+  for (const key of [...numericKeys, ...Object.keys(POSTFX_DEFAULTS)]) {
+    if (Object.hasOwn(textureSettings, key)) {
+      sanitized[key] = normalizeTextureValue(key, sanitized[key]);
+    } else if (controls[key]?.type === "range") {
+      sanitized[key] = Math.min(Number(controls[key].max), Math.max(Number(controls[key].min), sanitized[key]));
+    }
+  }
   if (typeof rawPreset.thumbnail === "string" && /^data:image\/(?:png|jpe?g|webp);base64,/i.test(rawPreset.thumbnail)) {
     sanitized.thumbnail = rawPreset.thumbnail;
   }
@@ -610,9 +617,7 @@ function captureCurrentPreset() {
     minDot: numberValue(controls.minDot, 0),
     screenAngle: numberValue(controls.screenAngle, 0),
     toneCurve: numberValue(controls.toneCurve, 1),
-    microDot: hiddenMicroDot,
-    jitter: hiddenJitter,
-    seed: hiddenSeed,
+    ...textureSettings,
     inkColor: controls.inkColor.value,
     paperColor: controls.paperColor.value
   };
@@ -647,8 +652,7 @@ function setPresetNote(message) {
   controls.presetNote.textContent = message;
 }
 
-// Fields the user can actually reach from the rail. microDot/jitter/seed come
-// from the preset and have no control, so they can never diverge.
+// Every editable value, including the reproducible texture variation.
 const PRESET_COMPARE_FIELDS = [
   "quality",
   "cellSize",
@@ -659,6 +663,9 @@ const PRESET_COMPARE_FIELDS = [
   "toneCurve",
   "inkColor",
   "paperColor",
+  "jitter",
+  "microDot",
+  "seed",
   ...Object.keys(POSTFX_DEFAULTS)
 ];
 
@@ -954,9 +961,9 @@ function getRenderSettings(width = previewCanvas.width, height = previewCanvas.h
     minDot: numberValue(controls.minDot, 0) / 100,
     angle: (numberValue(controls.screenAngle, 0) * Math.PI) / 180,
     toneCurve: numberValue(controls.toneCurve, 1),
-    microDotAmount: hiddenMicroDot / 100,
-    jitter: hiddenJitter / 100,
-    seed: hiddenSeed,
+    microDotAmount: textureSettings.microDot / 100,
+    jitter: textureSettings.jitter / 100,
+    seed: textureSettings.seed,
     quality: getQualityConfig(),
     ink: controls.inkColor.value,
     paper: controls.paperColor.value
@@ -1117,6 +1124,7 @@ function generateHalftone() {
 }
 
 function requestRender() {
+  editorSession?.schedule();
   previewIsCurrent = false;
   dropReadyExportIfStale();
   invalidateExportEstimate();
@@ -1129,10 +1137,7 @@ function requestRender() {
   });
 }
 
-function applyPreset(name) {
-  const preset = getPresetByName(name);
-  if (!preset) return;
-
+function applySettings(preset) {
   PRESET_FIELDS.forEach((key) => {
     if (!(key in controls)) return;
     if (preset[key] === undefined) return;
@@ -1143,9 +1148,15 @@ function applyPreset(name) {
     controls[key].value = String(preset[key] ?? fallback);
   });
 
-  if (preset.jitter !== undefined) hiddenJitter = preset.jitter;
-  if (preset.microDot !== undefined) hiddenMicroDot = preset.microDot;
-  if (preset.seed !== undefined) hiddenSeed = preset.seed;
+  for (const key of Object.keys(textureSettings)) {
+    textureSettings[key] = normalizeTextureValue(key, preset[key] ?? 0) ?? 0;
+  }
+}
+
+function applyPreset(name) {
+  const preset = getPresetByName(name);
+  if (!preset) return;
+  applySettings(preset);
 
   controls.presetSelect.value = name;
   updateOutputs();
@@ -1966,6 +1977,7 @@ function getStudioState() {
 }
 
 function emitStudioState() {
+  editorSession?.schedule();
   window.dispatchEvent(new CustomEvent(STUDIO_STATE_EVENT, { detail: getStudioState() }));
 }
 
@@ -1981,10 +1993,17 @@ function setHasUserImage(next) {
 }
 
 function setPanelSetting(key, value) {
-  if (!PANEL_SETTING_FIELDS.has(key) || !(key in controls)) return;
-  if ((key === "inkColor" || key === "paperColor") && !isStudioColor(value)) return;
-  if (controls[key].value === String(value)) return;
-  controls[key].value = String(value);
+  if (!PANEL_SETTING_FIELDS.has(key)) return;
+  if (Object.hasOwn(textureSettings, key)) {
+    const next = normalizeTextureValue(key, value);
+    if (next === null || textureSettings[key] === next) return;
+    textureSettings[key] = next;
+  } else {
+    if (!(key in controls)) return;
+    if ((key === "inkColor" || key === "paperColor") && !isStudioColor(value)) return;
+    if (controls[key].value === String(value)) return;
+    controls[key].value = String(value);
+  }
   updateOutputs();
   syncPresetActions();
   requestRender();
@@ -1995,6 +2014,12 @@ window.halftoneStudio = Object.freeze({
   eventName: STUDIO_STATE_EVENT,
   getState: getStudioState,
   setSetting: setPanelSetting,
+  shuffleTexture() {
+    if (!textureSettings.jitter && !textureSettings.microDot) return;
+    // Every click changes the seed, while both amount sliders stay put.
+    const next = (textureSettings.seed + 1 + Math.floor(Math.random() * MAX_TEXTURE_SEED)) % (MAX_TEXTURE_SEED + 1);
+    setPanelSetting("seed", next);
+  },
   setPreviewInteraction,
   setPanelScrolling,
   setExportFormat,
@@ -2172,6 +2197,27 @@ resetView();
 updateSplitPreview();
 updateOutputs();
 applyPreset(DEFAULT_PRESET);
+editorSession = mountEditorSession({
+  capture: () => ({
+    selectedPreset: controls.presetSelect.value,
+    settings: captureCurrentPreset(),
+    grainSeed
+  }),
+  restore: (saved) => {
+    const settings = sanitizePreset(saved.settings);
+    if (!settings) return;
+    const knownPreset = typeof saved.selectedPreset === "string"
+      && (Object.hasOwn(builtInPresets, saved.selectedPreset) || Object.hasOwn(customPresets, saved.selectedPreset));
+    controls.presetSelect.value = knownPreset ? saved.selectedPreset : DEFAULT_PRESET;
+    applySettings(settings);
+    if (typeof saved.grainSeed === "number" && saved.grainSeed >= 0 && saved.grainSeed < 1) {
+      grainSeed = saved.grainSeed;
+    }
+    updateOutputs();
+    syncPresetActions();
+    requestRender();
+  }
+});
 syncExportEmphasis();
 emitStudioState();
 

@@ -8,7 +8,7 @@ let browser, state, studio, unmount, settingsChanged, savedName;
 const defaults = {
   quality: "high", cellSize: 8, screenAngle: 28, contrast: 1.1, gamma: 1,
   toneCurve: .88, minDot: 0, inkColor: "#111111", paperColor: "#f5f5f5",
-  grainStrength: 0, bloomStrength: 0, crtStrength: 0
+  grainStrength: 0, bloomStrength: 0, crtStrength: 0, jitter: 0, microDot: 0, seed: 11
 };
 function emit() {
   browser.dispatchEvent(new browser.CustomEvent(studio.eventName, { detail: structuredClone(state) }));
@@ -63,6 +63,7 @@ beforeEach(() => {
     setSetting: (name, value) => { settingsChanged.push([name, value]); state.settings[name] = value; state.presetModified = true; emit(); },
     selectPreset: (name) => { state.selectedPreset = name; state.settings = { ...defaults }; state.presetModified = false; emit(); },
     setExportFormat: (value) => { state.export.format = value; emit(); },
+    shuffleTexture: () => { state.settings.seed += 1; state.presetModified = true; emit(); },
     savePreset: (name) => {
       if (!name.trim()) return { ok: false, message: "Give the preset a name." };
       savedName = name; state.presetModified = false; state.isCustomPreset = true; emit(); return { ok: true };
@@ -89,6 +90,29 @@ test("sliders opt out of the new keyboard shortcuts", () => {
   assert.equal(settingsChanged.length, 0);
   assert.equal(document.activeElement, slider);
   assert.equal(slider.querySelector("input").style.display, "none");
+});
+
+test('texture controls edit amounts and enable shuffle without changing the amounts', () => {
+  const shuffle = findButton('Shuffle texture');
+  assert.equal(shuffle.disabled, true);
+  for (const [label, setting, amount] of [['Dot irregularity', 'jitter', 18], ['Micro-dots', 'microDot', 24]]) {
+    const slider = document.querySelector(`[role="slider"][aria-label="${label}"]`);
+    assert.ok(slider.closest('.studio-folder').textContent.includes('Advanced'));
+    assert.equal(slider.getAttribute('aria-valuemax'), '50');
+    const pointer = (type, x) => slider.dispatchEvent(new browser.PointerEvent(type, {
+      pointerType: 'mouse', pointerId: 1, button: 0, clientX: x, clientY: 25, bubbles: true
+    }));
+    pointer('pointerdown', 30);
+    pointer('pointermove', 20 + amount / 50 * 280);
+    pointer('pointerup', 20 + amount / 50 * 280);
+    assert.equal(state.settings[setting], amount);
+  }
+  assert.equal(shuffle.disabled, false);
+  const before = { ...state.settings };
+  shuffle.click();
+  assert.deepEqual(state.settings, { ...before, seed: before.seed + 1 });
+  studio.revertPreset();
+  assert.equal(shuffle.disabled, true);
 });
 
 test("collapsing a section makes its controls inert without replacing them", () => {

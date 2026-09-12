@@ -256,6 +256,20 @@
   touch-action: manipulation;
 }
 
+.halftone-dialkit .studio-shuffle-texture {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  touch-action: manipulation;
+}
+
+.halftone-dialkit .studio-shuffle-texture:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
 .halftone-dialkit .dialkit-button {
   min-height: var(--dial-row-height);
   padding: 0 16px;

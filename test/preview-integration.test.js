@@ -72,6 +72,10 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
     const readsBeforeDrag = layoutReads;
     studio.setPreviewInteraction(true);
     studio.setSetting('contrast', 1.4);
+    studio.setSetting('jitter', 32);
+    studio.setSetting('microDot', 38);
+    studio.shuffleTexture();
+    const textureSeed = studio.getState().settings.seed;
     if (useWorker) {
       await waitUntil(() => jobs.length);
       studio.setSetting('contrast', 1.6); // newer value while one draft is busy
@@ -85,6 +89,9 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
       await waitUntil(() => jobs.length);
       assert.equal(jobs[0].width, full[0]);
       assert.equal(jobs[0].settings.contrast, 1.6);
+      assert.equal(jobs[0].settings.jitter, .32);
+      assert.equal(jobs[0].settings.microDotAmount, .38);
+      assert.equal(jobs[0].settings.seed, textureSeed);
       worker.complete();
     } else {
       await waitUntil(() => paints.at(-1)[0] < full[0]);

@@ -12,9 +12,10 @@ A browser-based halftone image generator for brand design and print-style graphi
 - **Custom ink and paper colors** — HEX, RGB/HSL, OKLCH, Display P3, and opacity; canvas output is sRGB
 - **Built-in presets** — Clean Editorial, Bold Poster, Subtle Texture, Flash Poster
 - **Save and manage custom presets** via localStorage
+- **Resume editing after refresh** — the selected preset and unsaved adjustments restore alongside the uploaded image
 - **WebP, JPEG, and lossless PNG export** with size estimates, device-safe memory limits, progress, and cancellation
 - **Web Worker rendering** keeps previews and exports responsive
-- **Seeded randomization** for reproducible results
+- **Texture controls** — dot irregularity, micro-dots, and Shuffle texture with a reproducible seed saved in each preset
 
 ## How it works
 
@@ -40,6 +41,10 @@ npm run build
 The editor uses the dependency-free DialKit 2 vanilla adapter. React and Motion are not part of the runtime. Sliders use pointer adjustment and click-to-edit numeric values; DialKit’s added slider keyboard shortcuts are disabled. Folder headers use native buttons; closed sections are removed from keyboard navigation. Preset names remain single-line.
 
 Colors keep their CSS representation in saved presets and render through the browser’s sRGB canvas. PNG and WebP support transparency; JPEG does not. Existing HEX presets and the 40 MB upload policy remain supported.
+
+Advanced includes Dot irregularity and Micro-dots (0–50%). Shuffle texture changes their arrangement while keeping both amounts fixed, and is enabled when either amount is above zero. Save/Update preset and Revert include these texture settings and their seed.
+
+The editor saves adjustments locally after a short pause and flushes pending changes when the page is hidden or left. Refresh restores the active preset and unsaved edits; panel position, split, and zoom reset. No sign-in or server storage is involved.
 
 ## Deployment (GitHub Pages)
 

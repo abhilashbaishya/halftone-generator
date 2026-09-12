@@ -160,6 +160,19 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       assert.deepEqual(Buffer.from(await downloads[1].blob.arrayBuffer()), bytes,
         'same image and settings export identically after viewport and DPR changes');
     }
+    if (nativeWebp && !nativeShare) {
+      studio.setSetting('jitter', 32);
+      studio.setSetting('microDot', 38);
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => downloads.length === 3 && !studio.getState().export.exporting);
+      const textured = Buffer.from(await downloads[2].blob.arrayBuffer());
+      assert.notDeepEqual(textured, bytes, 'texture edits reach exported pixels and invalidate the cached file');
+      studio.shuffleTexture();
+      document.getElementById('exportBtn').click();
+      await waitUntil(() => downloads.length === 4 && !studio.getState().export.exporting);
+      assert.notDeepEqual(Buffer.from(await downloads[3].blob.arrayBuffer()), textured,
+        'shuffling changes exported pixels at the same texture amounts');
+    }
     studio.setPreviewInteraction(true); // cancel deferred size estimation
   } finally {
     await browser.happyDOM.abort();
