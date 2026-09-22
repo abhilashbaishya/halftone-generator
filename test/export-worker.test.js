@@ -49,3 +49,25 @@ for (const mode of ['native', 'fallback', 'effects']) test(`export worker return
   const decoded = await loadImage(bytes);
   assert.deepEqual([decoded.width, decoded.height], [source.width, source.height]);
 });
+
+for (const paper of ['transparent', '#ffffff']) test(`PNG cutout export keeps empty source regions free of ink on ${paper} paper`, async () => {
+  nativeWebp = true;
+  const cutout = createCanvas(96, 96);
+  cutout.close = () => {};
+  const sourceContext = cutout.getContext('2d');
+  sourceContext.fillStyle = '#000';
+  sourceContext.fillRect(28, 28, 40, 40);
+  const done = new Promise((resolve) => { complete = resolve; });
+  self.onmessage({ data: { type: 'export', requestId: 2, sourceBitmap: cutout, width: 96, height: 96,
+    settings: { ...settings, ink: '#000', paper, minDot: .6 }, needsPostEffects: false,
+    encoding: { mimeType: 'image/png' } } });
+  const result = await done;
+  assert.equal(result.type, 'export-complete', result.message);
+  const decoded = await loadImage(Buffer.from(await result.blob.arrayBuffer()));
+  const output = createCanvas(96, 96).getContext('2d');
+  output.drawImage(decoded, 0, 0);
+  assert.deepEqual([...output.getImageData(8, 8, 1, 1).data],
+    paper === 'transparent' ? [0, 0, 0, 0] : [255, 255, 255, 255]);
+  const pixels = output.getImageData(30, 30, 32, 32).data;
+  assert.ok(pixels.some((value, index) => index % 4 === 3 && value > 0 && pixels[index - 1] < 100));
+});

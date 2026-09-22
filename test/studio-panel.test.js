@@ -68,6 +68,7 @@ beforeEach(() => {
       if (!name.trim()) return { ok: false, message: "Give the preset a name." };
       savedName = name; state.presetModified = false; state.isCustomPreset = true; emit(); return { ok: true };
     },
+    updatePreset: () => { savedName = state.selectedPreset; state.presetModified = false; emit(); return { ok: true }; },
     revertPreset: () => { state.settings = { ...defaults }; state.presetModified = false; emit(); },
     deletePreset() {}, openImageFile() {}, restoreSample() {}
   };
@@ -344,8 +345,8 @@ test('iPad follows the system theme and fits the preview even with a saved deskt
 
 test("Update preset overwrites a custom preset without opening the namer", () => {
   const names = [];
-  studio.savePreset = (name) => {
-    names.push(name);
+  studio.updatePreset = () => {
+    names.push(state.selectedPreset);
     state.presetModified = false;
     emit();
     return { ok: true };
@@ -369,6 +370,40 @@ test("Save preset from a built-in still opens the name form", () => {
   findButton("Save preset").click();
   assert.equal(document.querySelector('.dialkit-preset-namer')?.hidden, false);
   assert.equal(document.querySelector('.studio-preset-name-input')?.value, "");
+});
+
+test('failed Update stays editable and displays an error that clears after retry', () => {
+  state.isCustomPreset = true;
+  state.presetModified = true;
+  state.selectedPreset = 'My print';
+  emit();
+  const update = studio.updatePreset;
+  studio.updatePreset = () => ({ ok: false, field: 'storage', message: 'Storage is unavailable. Try again.' });
+  findButton('Update preset').click();
+  const error = document.querySelector('.dialkit-preset-actions + .dialkit-inline-error');
+  assert.equal(error.hidden, false);
+  assert.match(error.textContent, /Storage is unavailable/);
+  assert.equal(error.getAttribute('role'), 'alert');
+  assert.equal(findButton('Update preset').disabled, false);
+  assert.equal(document.querySelector('.dialkit-preset-namer').hidden, true);
+  studio.updatePreset = update;
+  findButton('Update preset').click();
+  assert.equal(error.hidden, true);
+  assert.equal(state.presetModified, false);
+});
+
+test('failed Save keeps the name form open and does not label a storage error as a bad name', () => {
+  studio.setSetting('cellSize', 9);
+  findButton('Save preset').click();
+  const input = document.querySelector('.studio-preset-name-input');
+  input.value = 'My print';
+  studio.savePreset = () => ({ ok: false, field: 'storage', message: 'Storage is full. Free up space and retry.' });
+  input.closest('form').dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(input.closest('form').hidden, false);
+  assert.equal(input.value, 'My print');
+  assert.equal(input.getAttribute('aria-invalid'), null);
+  assert.match(document.querySelector('#studio-preset-error').textContent, /Storage is full/);
+  assert.equal(state.presetModified, true);
 });
 
 test("preset names stay single-line, validate, save, and return focus", () => {

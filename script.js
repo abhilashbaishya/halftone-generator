@@ -560,12 +560,17 @@ function loadCustomPresets() {
   }
 }
 
-function persistCustomPresets() {
+function persistCustomPresets(nextPresets) {
   try {
-    window.localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(customPresets));
+    window.localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(nextPresets));
+    return true;
   } catch {
-    // Ignore write errors (e.g. storage blocked).
+    return false;
   }
+}
+
+function presetStorageError() {
+  return { ok: false, field: "storage", message: "Changes couldn’t be saved. Browser storage is full or unavailable. Free up space or allow site storage, then retry." };
 }
 
 function formatPresetLabel(name) {
@@ -705,8 +710,9 @@ function openPresetNamer() {
   const active = controls.presetSelect.value;
   // Updating a custom preset overwrites it in place — no rename dialog.
   if (Object.prototype.hasOwnProperty.call(customPresets, active)) {
-    const result = savePresetByName(active);
+    const result = savePresetByName(active, { update: true });
     if (result.ok) emitStudioState();
+    else setPresetNote(result.message);
     return;
   }
   controls.presetNameInput.value = "";
@@ -723,22 +729,29 @@ function closePresetNamer() {
   setPresetNote("");
 }
 
-function savePresetByName(rawName) {
+function savePresetByName(rawName, { update = false } = {}) {
   const name = rawName.trim();
   if (!name) {
-    return { ok: false, message: "Give the preset a name." };
+    return { ok: false, field: "name", message: "Give the preset a name." };
   }
 
   if (Object.prototype.hasOwnProperty.call(builtInPresets, name)) {
-    return { ok: false, message: "That name belongs to a built-in preset." };
+    return { ok: false, field: "name", message: "That name belongs to a built-in preset." };
   }
 
-  customPresets[name] = {
+  const duplicate = Object.keys(customPresets).find((existing) => existing.toLowerCase() === name.toLowerCase());
+  if (duplicate && !(update && name === duplicate && name === controls.presetSelect.value)) {
+    return { ok: false, field: "name", message: "A preset with this name already exists. Choose another name, or select it and use Update preset." };
+  }
+
+  const nextPreset = {
     ...captureCurrentPreset(),
     thumbnail: capturePresetThumbnail() || customPresets[name]?.thumbnail || ""
   };
-  if (!customPresets[name].thumbnail) delete customPresets[name].thumbnail;
-  persistCustomPresets();
+  if (!nextPreset.thumbnail) delete nextPreset.thumbnail;
+  const nextPresets = { ...customPresets, [name]: nextPreset };
+  if (!persistCustomPresets(nextPresets)) return presetStorageError();
+  customPresets = nextPresets;
   rebuildPresetSelect(name);
   syncPresetActions();
   return { ok: true, name };
@@ -758,16 +771,23 @@ function saveCurrentPreset() {
 
 function deleteCurrentPreset() {
   const selected = controls.presetSelect.value;
-  if (!Object.prototype.hasOwnProperty.call(customPresets, selected)) return;
-  if (!window.confirm(`Delete preset "${selected}"?`)) return;
+  if (!Object.prototype.hasOwnProperty.call(customPresets, selected)) return { ok: true };
+  if (!window.confirm(`Delete preset "${selected}"?`)) return { ok: true };
 
-  delete customPresets[selected];
-  persistCustomPresets();
+  const nextPresets = { ...customPresets };
+  delete nextPresets[selected];
+  if (!persistCustomPresets(nextPresets)) {
+    const error = presetStorageError();
+    setPresetNote(error.message);
+    return error;
+  }
+  customPresets = nextPresets;
   closePresetNamer();
   rebuildPresetSelect(DEFAULT_PRESET);
   applyPreset(DEFAULT_PRESET);
   syncPresetActions();
   emitStudioState();
+  return { ok: true };
 }
 
 function updateZoomOutput() {
@@ -2042,8 +2062,15 @@ window.halftoneStudio = Object.freeze({
     if (result.ok) emitStudioState();
     return result;
   },
+  updatePreset() {
+    const name = controls.presetSelect.value;
+    if (!Object.hasOwn(customPresets, name)) return { ok: false, message: "Select a saved preset to update." };
+    const result = savePresetByName(name, { update: true });
+    if (result.ok) emitStudioState();
+    return result;
+  },
   deletePreset() {
-    deleteCurrentPreset();
+    return deleteCurrentPreset();
   },
   revertPreset() {
     applyPreset(controls.presetSelect.value);

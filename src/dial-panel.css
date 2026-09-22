@@ -418,7 +418,7 @@
 
 .dialkit-inline-error {
   margin: 0;
-  color: #ff8d85;
+  color: var(--error-text);
   font-size: 13px;
   line-height: 1.35;
   text-wrap: pretty;

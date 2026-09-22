@@ -102,3 +102,55 @@ test('invalid sessions fall back safely and stored values are bounded before ren
   assert.equal(editor.studio.getState().settings.jitter, 50);
   await editor.close();
 });
+
+test('presets commit only after storage succeeds, and duplicate names require explicit Update', async () => {
+  const editor = await openEditor();
+  const { browser, studio } = editor;
+  const storage = browser.localStorage;
+  const blockWrites = () => Object.defineProperty(browser, 'localStorage', { configurable: true, value: {
+    getItem: storage.getItem.bind(storage),
+    setItem() { throw new Error('QuotaExceededError'); }
+  } });
+  const allowWrites = () => Object.defineProperty(browser, 'localStorage', { configurable: true, value: storage });
+  try {
+    studio.setSetting('contrast', 1.5);
+    blockWrites();
+    assert.equal(studio.savePreset('My print').ok, false);
+    assert.equal(studio.getState().selectedPreset, 'red');
+    assert.equal(studio.getState().presetModified, true);
+    assert.ok(!studio.getState().presets.some(({ value }) => value === 'My print'));
+    assert.equal(storage.getItem('halftone.customPresets.v1'), null);
+
+    allowWrites();
+    assert.equal(studio.savePreset('My print').ok, true);
+    const saved = storage.getItem('halftone.customPresets.v1');
+    studio.setSetting('contrast', 2);
+    blockWrites();
+    assert.equal(studio.updatePreset().ok, false);
+    assert.equal(studio.getState().presetModified, true);
+    assert.equal(storage.getItem('halftone.customPresets.v1'), saved);
+    studio.revertPreset();
+    assert.equal(studio.getState().settings.contrast, 1.5, 'failed Update cannot change the in-memory saved preset');
+    browser.confirm = () => true;
+    assert.equal(studio.deletePreset().ok, false);
+    assert.equal(studio.getState().selectedPreset, 'My print');
+
+    allowWrites();
+    studio.selectPreset('red');
+    studio.setSetting('contrast', 2);
+    for (const name of ['My print', ' my PRINT ']) {
+      const result = studio.savePreset(name);
+      assert.equal(result.ok, false);
+      assert.equal(result.field, 'name');
+      assert.equal(storage.getItem('halftone.customPresets.v1'), saved);
+    }
+    studio.selectPreset('My print');
+    studio.setSetting('contrast', 2);
+    assert.equal(studio.updatePreset().ok, true);
+    assert.equal(studio.getState().presetModified, false);
+    assert.equal(JSON.parse(storage.getItem('halftone.customPresets.v1'))['My print'].contrast, 2);
+  } finally {
+    allowWrites();
+    await editor.close();
+  }
+});

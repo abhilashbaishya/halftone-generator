@@ -44,30 +44,45 @@ function toneLuma(value, contrast, gamma) {
     : 1 - 0.5 * Math.pow((1 - corrected) * 2, contrast);
 }
 
-function fillIntegralRows(integral, data, width, startY, endY) {
+function createCoverageIntegral(data, width, height) {
+  // Opaque photos keep the existing single-integral memory footprint.
+  for (let index = 3; index < data.length; index += 4) {
+    if (data[index] !== 255) return new Float32Array((width + 1) * (height + 1));
+  }
+  return null;
+}
+
+function fillIntegralRows(integral, data, width, startY, endY, coverage) {
   const stride = width + 1;
 
   for (let y = startY; y < endY; y += 1) {
     let row = 0;
+    let coverageRow = 0;
     const integralRow = (y + 1) * stride;
     const integralPreviousRow = y * stride;
     const pixelRow = y * width * 4;
 
     for (let x = 0; x < width; x += 1) {
       const pixelIndex = pixelRow + x * 4;
-      row += pixelLuma(
+      const luma = pixelLuma(
         data[pixelIndex],
         data[pixelIndex + 1],
         data[pixelIndex + 2]
       );
+      const alpha = data[pixelIndex + 3] / 255;
+      row += alpha === 1 ? luma : 1 - alpha + luma * alpha;
       integral[integralRow + x + 1] = integral[integralPreviousRow + x + 1] + row;
+      if (coverage) {
+        coverageRow += alpha;
+        coverage[integralRow + x + 1] = coverage[integralPreviousRow + x + 1] + coverageRow;
+      }
     }
   }
 }
 
-function buildLumaIntegral(data, width, height) {
+function buildLumaIntegral(data, width, height, coverage) {
   const integral = new Float32Array((width + 1) * (height + 1));
-  fillIntegralRows(integral, data, width, 0, height);
+  fillIntegralRows(integral, data, width, 0, height, coverage);
   return integral;
 }
 
@@ -107,7 +122,7 @@ function sampleEdgeStrength(integral, width, height, centerX, centerY, radius) {
   return clamp(Math.hypot(gradientX, gradientY) * 1.4, 0, 1);
 }
 
-function createRenderState(targetCtx, integral, width, height, settings) {
+function createRenderState(targetCtx, integral, width, height, settings, coverage) {
   const { cellSize, angle, quality, ink, paper } = settings;
 
   targetCtx.clearRect(0, 0, width, height);
@@ -119,6 +134,7 @@ function createRenderState(targetCtx, integral, width, height, settings) {
   return {
     targetCtx,
     integral,
+    coverage,
     width,
     height,
     settings,
@@ -134,7 +150,7 @@ function createRenderState(targetCtx, integral, width, height, settings) {
 
 function renderGridRow(state, gridYPosition) {
   const {
-    targetCtx, integral, width, height, settings, centerX, centerY,
+    targetCtx, integral, coverage, width, height, settings, centerX, centerY,
     cosine, sine, diagonal, radiusScale, samplingRadius
   } = state;
   const { cellSize, contrast, gamma, minDot, toneCurve, microDotAmount, jitter, seed, quality } = settings;
@@ -146,7 +162,12 @@ function renderGridRow(state, gridYPosition) {
 
     const gridX = Math.round((gridXPosition + diagonal) / cellSize);
     const gridY = Math.round((gridYPosition + diagonal) / cellSize);
-    const baseLuma = sampleBoxAverage(integral, width, height, x, y, samplingRadius);
+    const alpha = coverage ? clamp(sampleBoxAverage(coverage, width, height, x, y, samplingRadius), 0, 1) : 1;
+    // Empty source regions must stay free of ink, even with dithering, minimum
+    // dot size, edge enhancement or micro-dots enabled.
+    if (alpha === 0) continue;
+    const compositeLuma = sampleBoxAverage(integral, width, height, x, y, samplingRadius);
+    const baseLuma = alpha === 1 ? compositeLuma : clamp((compositeLuma - (1 - alpha)) / alpha, 0, 1);
     const edgeStrength = sampleEdgeStrength(integral, width, height, x, y, samplingRadius);
 
     let darkness = Math.pow(1 - toneLuma(baseLuma, contrast, gamma), toneCurve);
@@ -164,7 +185,8 @@ function renderGridRow(state, gridYPosition) {
       minimumRadius * minimumRadius
       + (1 - minimumRadius * minimumRadius) * darkness
     );
-    const radius = clamp(radiusStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale);
+    const coverageScale = Math.sqrt(alpha);
+    const radius = clamp(radiusStrength * radiusScale * (1 + edgeStrength * 0.12), 0, radiusScale) * coverageScale;
     const jitterX = (hash2d(gridX, gridY, 0.1, seed) - 0.5) * cellSize * 0.5 * jitter;
     const jitterY = (hash2d(gridX, gridY, 0.9, seed) - 0.5) * cellSize * 0.5 * jitter;
 
@@ -175,7 +197,7 @@ function renderGridRow(state, gridYPosition) {
     if (microDotAmount <= 0 || darkness >= 0.6) continue;
 
     const microBase = microDotAmount * (1 - darkness);
-    const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount));
+    const microRadius = Math.max(0.35, cellSize * 0.085 * (0.4 + microDotAmount)) * coverageScale;
     const maxMicroDots = Math.min(3, Math.ceil(microBase * 3));
 
     for (let microIndex = 0; microIndex < maxMicroDots; microIndex += 1) {
@@ -195,8 +217,9 @@ function renderGridRow(state, gridYPosition) {
 }
 
 export function renderHalftoneSync(targetCtx, pixelData, width, height, settings) {
-  const integral = buildLumaIntegral(pixelData, width, height);
-  const state = createRenderState(targetCtx, integral, width, height, settings);
+  const coverage = createCoverageIntegral(pixelData, width, height);
+  const integral = buildLumaIntegral(pixelData, width, height, coverage);
+  const state = createRenderState(targetCtx, integral, width, height, settings, coverage);
 
   for (let gridY = -state.diagonal; gridY <= state.diagonal; gridY += settings.cellSize) {
     renderGridRow(state, gridY);
@@ -214,17 +237,18 @@ export async function renderHalftoneAsync(targetCtx, pixelData, width, height, s
     renderChunkRows = 8
   } = options;
   const integral = new Float32Array((width + 1) * (height + 1));
+  const coverage = createCoverageIntegral(pixelData, width, height);
 
   for (let startY = 0; startY < height; startY += integralChunkRows) {
     if (shouldCancel()) return { cancelled: true };
     const endY = Math.min(height, startY + integralChunkRows);
-    fillIntegralRows(integral, pixelData, width, startY, endY);
+    fillIntegralRows(integral, pixelData, width, startY, endY, coverage);
     onProgress((endY / height) * 0.5);
     await yieldControl();
   }
 
   if (shouldCancel()) return { cancelled: true };
-  const state = createRenderState(targetCtx, integral, width, height, settings);
+  const state = createRenderState(targetCtx, integral, width, height, settings, coverage);
   const totalGridRows = Math.floor((state.diagonal * 2) / settings.cellSize) + 1;
   let renderedGridRows = 0;
   let rowsSinceYield = 0;

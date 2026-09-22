@@ -250,6 +250,13 @@ export function mountStudioPanel(studio) {
   let previousSelect = JSON.stringify(selectProps());
   controls.push(select);
   const actions = element("div", "dialkit-preset-actions");
+  const actionError = element("p", "dialkit-inline-error");
+  actionError.setAttribute("role", "alert");
+  actionError.hidden = true;
+  function showActionResult(result) {
+    actionError.textContent = result?.ok === false ? result.message : "";
+    actionError.hidden = result?.ok !== false;
+  }
   const namer = element("form", "dialkit-preset-namer");
   // Match the Preset select row — DialKit's text control uses different type
   // metrics and fights the phone 16px zoom rule.
@@ -279,8 +286,10 @@ export function mountStudioPanel(studio) {
     if (!result.ok) {
       nameError.textContent = result.message;
       nameError.hidden = false;
-      nameInput.setAttribute("aria-invalid", "true");
-      nameInput.focus({ preventScroll: true });
+      if (result.field !== "storage") {
+        nameInput.setAttribute("aria-invalid", "true");
+        nameInput.focus({ preventScroll: true });
+      }
     } else closeNamer();
   });
   nameInput.addEventListener("input", () => {
@@ -300,9 +309,10 @@ export function mountStudioPanel(studio) {
   const save = button("Save preset", () => {
     // Custom + edited: overwrite in place. Built-in: ask for a new name.
     if (state.isCustomPreset) {
-      studio.savePreset(state.selectedPreset);
+      showActionResult(studio.updatePreset());
       return;
     }
+    showActionResult();
     naming = true;
     nameInput.value = "";
     nameError.hidden = true;
@@ -314,11 +324,12 @@ export function mountStudioPanel(studio) {
     nameInput.focus({ preventScroll: true });
     nameInput.select();
   });
-  const revert = button("Revert", () => { studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
-  const remove = button("Delete", () => { studio.deletePreset(); selectHost.querySelector("button")?.focus(); }, "dialkit-button-danger");
+  const revert = button("Revert", () => { showActionResult(); studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
+  const remove = button("Delete", () => { showActionResult(studio.deletePreset()); selectHost.querySelector("button")?.focus(); }, "dialkit-button-danger");
   actions.append(save, revert, remove);
-  presets.append(actions, namer);
+  presets.append(actions, actionError, namer);
   function closeNamer(focus = true) {
+    showActionResult();
     naming = false;
     updateSource();
     if (focus) (save.disabled ? selectHost.querySelector("button") : save)?.focus({ preventScroll: true });
