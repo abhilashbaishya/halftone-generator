@@ -842,6 +842,42 @@ output {
   overflow: hidden;
 }
 
+.image-drop-hint {
+  position: absolute;
+  inset: 16px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--text);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--preview-bg) 65%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 160ms ease-out, visibility 160ms;
+}
+
+.is-file-over .image-drop-hint {
+  opacity: 1;
+  visibility: visible;
+}
+
+.image-drop-label {
+  display: grid;
+  gap: 6px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  background: var(--rail-bg);
+  color: var(--text);
+  box-shadow: var(--rail-shadow);
+  text-align: center;
+}
+
+.image-drop-label span {
+  color: var(--muted-text);
+  font-size: 0.875rem;
+}
+
 .canvas-plane {
   position: absolute;
   top: 50%;

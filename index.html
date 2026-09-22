@@ -232,6 +232,12 @@
           <p id="renderStatus" class="render-status" aria-live="polite">Idle</p>
         </div>
         <div class="canvas-wrap" id="compareStage">
+          <div class="image-drop-hint" aria-hidden="true">
+            <div class="image-drop-label">
+              <strong>Drop image to replace</strong>
+              <span>JPEG, PNG or WebP</span>
+            </div>
+          </div>
           <div class="canvas-plane" id="canvasPlane">
             <canvas id="sourceCanvas" width="1200" height="800" role="img" aria-label="Source image preview"></canvas>
             <div class="halftone-overlay" id="halftoneOverlay">

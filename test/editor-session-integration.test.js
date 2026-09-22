@@ -154,3 +154,39 @@ test('presets commit only after storage succeeds, and duplicate names require ex
     await editor.close();
   }
 });
+
+test('preview drops use upload validation and preserve the current treatment', async () => {
+  const editor = await openEditor();
+  const { browser, studio } = editor;
+  const drop = (files) => {
+    const event = new browser.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } });
+    browser.document.getElementById('previewCanvas').dispatchEvent(event);
+    assert.equal(event.defaultPrevented, true);
+  };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+  try {
+    await settle();
+    studio.selectPreset('orange');
+    studio.setSetting('contrast', 1.55);
+    const settings = studio.getState().settings;
+    // A misleading MIME type must not bypass inspection.
+    drop([new File(['not an image file'], 'invalid.png', { type: 'image/png' })]);
+    await settle();
+    assert.match(studio.getState().uploadError, /isn’t supported/);
+    assert.equal(studio.getState().hasUserImage, false);
+    const image = new File([await readFile(new URL('../placeholder.jpg', import.meta.url))], 'photo.jpg');
+    drop([image]);
+    await settle();
+    assert.equal(studio.getState().hasUserImage, true);
+    assert.equal(studio.getState().uploadError, '');
+    assert.equal(studio.getState().selectedPreset, 'orange');
+    assert.deepEqual(studio.getState().settings, settings);
+    drop([image, image]);
+    assert.match(studio.getState().uploadError, /one image at a time/);
+    assert.equal(studio.getState().hasUserImage, true);
+    assert.deepEqual(studio.getState().settings, settings);
+  } finally {
+    await editor.close();
+  }
+});

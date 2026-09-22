@@ -1,6 +1,7 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
+import { mountImageDrop } from "./src/image-drop.js";
 import { mountStaticIcons } from "./src/icons.js";
 import { getImageCellSize } from "./src/pattern-scale.js";
 import { touchIntent } from "./src/touch-intent.js";
@@ -2084,6 +2085,11 @@ controls.imageInput.addEventListener("change", () => {
   const file = controls.imageInput.files?.[0];
   if (!file) return;
   loadImageFromFile(file);
+});
+
+mountImageDrop(canvasWrap, {
+  onFile: loadImageFromFile,
+  onError: setUploadError
 });
 
 document.addEventListener("paste", (event) => {
