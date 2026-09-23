@@ -311,7 +311,7 @@ test('mobile scrolling reports one busy interval through momentum and resumes af
   await new Promise((resolve) => setTimeout(resolve, 220));
   assert.deepEqual(calls, [true, false]);
   panel.dispatchEvent(new browser.Event('scroll'));
-  document.querySelector('.mobile-editor-tabs').children[1].click();
+  document.querySelectorAll('.mobile-editor-tabs > button')[1].click();
   assert.deepEqual(calls, [true, false, true, false]);
 });
 
@@ -571,19 +571,21 @@ test("vertical touch scrolling leaves slider values alone", () => {
 test("phone tabs keep one group visible and preserve controls across desktop resizing", () => {
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   const nav = document.querySelector('.mobile-editor-tabs');
+  const tabs = nav.querySelectorAll(':scope > button');
   const folder = (name) => document.getElementById(`studio-section-${name}`).closest('.studio-folder');
   const panel = document.getElementById('dialPanelRoot');
   const actions = document.querySelector('.rail-actions');
   const slider = folder('layout').querySelector('[role="slider"]');
   assert.equal(nav.hidden, false);
-  assert.equal(nav.children[0].textContent, "Image");
+  assert.equal(tabs[0].textContent, "Image");
+  assert.equal(nav.style.getPropertyValue('--segment-index'), '0');
   assert.equal(folder('source').hidden, false);
   assert.equal(folder('tone').hidden, true);
   assert.equal(folder('presets').hidden, true);
   assert.equal(folder('source').querySelector('.dialkit-select-trigger'), null);
   assert.ok(folder('source').querySelector('.studio-upload-button'));
   assert.equal(actions.hidden, true);
-  nav.children[1].click();
+  tabs[1].click();
   assert.equal(folder('source').hidden, true);
   for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
   for (const name of ['layout', 'tone', 'colors', 'advanced']) {
@@ -599,10 +601,10 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   }
   assert.equal(document.querySelector('button[role="heading"]'), null);
   studio.setSetting('cellSize', 12);
-  nav.children[2].click();
+  tabs[2].click();
   assert.equal(folder('colors').hidden, false);
   assert.equal(folder('tone').hidden, true);
-  nav.children[3].click();
+  tabs[3].click();
   assert.equal(panel.hidden, true);
   assert.equal(actions.hidden, false);
   browser.happyDOM.setWindowSize({ width: 1024, height: 768 });
@@ -615,8 +617,9 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(folder('layout').querySelector('h2.studio-folder-static-heading').hidden, true);
   assert.equal(folder('layout').querySelector('button.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
-  assert.equal(nav.children[3].getAttribute('aria-pressed'), 'true');
-  nav.children[1].click();
+  assert.equal(tabs[3].getAttribute('aria-pressed'), 'true');
+  assert.equal(nav.style.getPropertyValue('--segment-index'), '3');
+  tabs[1].click();
   assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
   assert.equal(state.settings.cellSize, 12);
 });
@@ -628,7 +631,7 @@ test('phone preset and color pickers open as sheets while desktop keeps popovers
   presetTrigger.click();
 
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
-  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  const tabs = document.querySelectorAll('.mobile-editor-tabs > button');
   tabs[1].click();
   presetTrigger.click();
   assert.equal(document.querySelector('.studio-preset-menu').classList.contains('studio-phone-sheet'), true);
@@ -663,7 +666,7 @@ test('entering phone landscape closes any open top-layer sheet', async () => {
   browser.matchMedia = (query) => query === PHONE_LANDSCAPE ? landscape : nativeMatchMedia(query);
   unmount = mountStudioPanel(studio);
 
-  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  const tabs = document.querySelectorAll('.mobile-editor-tabs > button');
   tabs[1].click();
   const presetTrigger = document.querySelector('.dialkit-select-trigger');
   presetTrigger.click();
@@ -692,7 +695,7 @@ test('phone landscape removes the editor from focus and restores the previous co
   browser.matchMedia = (query) => query === PHONE_LANDSCAPE ? landscape : nativeMatchMedia(query);
   unmount = mountStudioPanel(studio);
 
-  document.querySelector('.mobile-editor-tabs').children[1].click();
+  document.querySelectorAll('.mobile-editor-tabs > button')[1].click();
   const slider = document.querySelector('[role="slider"][aria-label="Cell size"]');
   const workspace = document.querySelector('.workspace');
   const heading = document.getElementById('phoneLandscapeTitle');
@@ -729,7 +732,7 @@ test('phone sheets use a slower entrance and a shorter exit', async (t) => {
     return animation;
   };
   t.after(() => { if (original) prototype.animate = original; else delete prototype.animate; });
-  document.querySelector('.mobile-editor-tabs').children[1].click();
+  document.querySelectorAll('.mobile-editor-tabs > button')[1].click();
   const trigger = document.querySelector('.dialkit-select-trigger');
   trigger.click();
   assert.equal(animations.at(-1).options.duration, 220);
@@ -740,7 +743,7 @@ test('phone sheets use a slower entrance and a shorter exit', async (t) => {
   assert.equal(presetExit.classList.contains('studio-phone-sheet'), true);
   assert.equal(presetExit.classList.contains('studio-phone-sheet-exit'), true);
 
-  document.querySelector('.mobile-editor-tabs').children[2].click();
+  document.querySelectorAll('.mobile-editor-tabs > button')[2].click();
   const swatch = document.querySelector('.dialkit-color-swatch');
   swatch.click();
   assert.equal(animations.at(-1).options.duration, 220);
@@ -761,6 +764,7 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   browser.matchMedia = (query) => query === TOUCH_LAYOUT ? touch : nativeMatchMedia(query);
   unmount = mountStudioPanel(studio);
   const tabs = document.querySelector('.mobile-editor-tabs');
+  const tabButtons = tabs.querySelectorAll('button');
   const panel = document.getElementById('dialPanelRoot');
   const actions = document.querySelector('.rail-actions');
   const folder = (name) => document.getElementById(`studio-section-${name}`).closest('.studio-folder');
@@ -768,21 +772,21 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   assert.equal(tabs.hidden, false);
   assert.equal(folder('source').hidden, false);
   assert.equal(actions.hidden, true);
-  tabs.children[1].click();
+  tabButtons[1].click();
   assert.equal(folder('source').hidden, true);
   assert.equal(folder('layout').hidden, false);
   assert.equal(folder('presets').hidden, false);
   panel.scrollTop = 140;
-  tabs.children[2].click();
+  tabButtons[2].click();
   assert.equal(folder('colors').hidden, false);
   assert.equal(folder('layout').hidden, true);
-  tabs.children[3].click();
+  tabButtons[3].click();
   assert.equal(panel.hidden, true);
   assert.equal(actions.hidden, false);
   browser.happyDOM.setWindowSize({ width: 834, height: 1194 });
   assert.equal(tabs.hidden, false);
   assert.equal(actions.hidden, false);
-  tabs.children[1].click();
+  tabButtons[1].click();
   assert.equal(panel.scrollTop, 140);
   assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
   touch.matches = false;
@@ -795,7 +799,7 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
 
 test('phone tabs restore independent scroll positions and ignore active-tab taps', () => {
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
-  const tabs = document.querySelector('.mobile-editor-tabs').children;
+  const tabs = document.querySelectorAll('.mobile-editor-tabs > button');
   const panel = document.getElementById('dialPanelRoot');
   const actions = document.querySelector('.rail-actions');
   tabs[1].click();
