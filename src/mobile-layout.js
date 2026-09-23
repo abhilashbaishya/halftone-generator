@@ -67,15 +67,30 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
   phone.addEventListener("change", syncKeyboardInset);
   syncKeyboardInset();
 
+  const labels = ["Image", "Adjust", "Colors", "Export"];
   const nav = document.createElement("nav");
-  nav.className = "mobile-editor-tabs";
+  nav.className = "mobile-editor-tabs export-format-grid";
   nav.setAttribute("aria-label", "Editor controls");
+  nav.style.setProperty("--segments", String(labels.length));
+  const surfaces = document.createElement("span");
+  surfaces.className = "export-format-surfaces";
+  surfaces.setAttribute("aria-hidden", "true");
+  labels.forEach(() => {
+    const surface = document.createElement("span");
+    surface.className = "export-format-surface";
+    surfaces.append(surface);
+  });
+  const thumb = document.createElement("span");
+  thumb.className = "export-format-thumb";
+  thumb.setAttribute("aria-hidden", "true");
+  nav.append(surfaces, thumb);
   let active = "image";
   const scrollPositions = new Map();
   const scroller = (tab) => tab === "export" ? actions : panel;
-  const buttons = ["Image", "Adjust", "Colors", "Export"].map((label) => {
+  const buttons = labels.map((label) => {
     const button = document.createElement("button");
     button.type = "button";
+    button.className = "export-format-option";
     button.textContent = label;
     button.addEventListener("click", () => {
       const next = label.toLowerCase();
@@ -89,6 +104,7 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     nav.append(button);
     return button;
   });
+  requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add("is-ready")));
   rail.insertBefore(nav, panel);
   function sync() {
     if (!media.matches) finishScroll();
@@ -98,7 +114,12 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
     for (const [name, sections] of Object.entries(groups)) {
       for (const section of sections) section.hidden = media.matches && active !== name;
     }
-    buttons.forEach((button) => button.setAttribute("aria-pressed", String(button.textContent.toLowerCase() === active)));
+    buttons.forEach((button, index) => {
+      const selected = button.textContent.toLowerCase() === active;
+      button.setAttribute("aria-pressed", String(selected));
+      button.dataset.selected = String(selected);
+      if (selected) nav.style.setProperty("--segment-index", String(index));
+    });
   }
   media.addEventListener("change", sync);
   sync();
