@@ -166,12 +166,12 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       document.getElementById('exportBtn').click();
       await waitUntil(() => downloads.length === 3 && !studio.getState().export.exporting);
       const textured = Buffer.from(await downloads[2].blob.arrayBuffer());
-      assert.notDeepEqual(textured, bytes, 'texture edits reach exported pixels and invalidate the cached file');
+      assert.deepEqual(textured, bytes, 'retired texture settings remain compatible without changing the new rendering');
       studio.shuffleTexture();
       document.getElementById('exportBtn').click();
       await waitUntil(() => downloads.length === 4 && !studio.getState().export.exporting);
-      assert.notDeepEqual(Buffer.from(await downloads[3].blob.arrayBuffer()), textured,
-        'shuffling changes exported pixels at the same texture amounts');
+      assert.deepEqual(Buffer.from(await downloads[3].blob.arrayBuffer()), textured,
+        'legacy texture seed does not change the new rendering');
     }
     studio.setPreviewInteraction(true); // cancel deferred size estimation
   } finally {

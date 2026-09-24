@@ -13,7 +13,7 @@ import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
-import { renderHalftoneAsync } from "./renderer-core.js";
+import { renderHalftoneAsync } from "./src/halftone-renderer.js";
 import { calculateExportDimensions, getExportPixelBudget } from "./export-policy.js";
 import { estimateEncodedSize } from "./export-estimator.js";
 import {

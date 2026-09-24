@@ -1,5 +1,5 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
-import { renderHalftoneAsync } from "./renderer-core.js";
+import { renderHalftoneAsync } from "./src/halftone-renderer.js";
 
 const sourceCanvas = new OffscreenCanvas(1, 1);
 const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });

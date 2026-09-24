@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { createCanvas } from '@napi-rs/canvas';
-import { renderHalftoneSync } from '../renderer-core.js';
+import { renderHalftoneSync } from '../src/halftone-renderer.js';
 import { BloomPass } from '../bloom-pass.js';
 
 const source = readFileSync(new URL('../script.js', import.meta.url), 'utf8');

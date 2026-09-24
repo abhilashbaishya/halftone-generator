@@ -33,6 +33,8 @@ for (const useWorker of [true, false]) test(`preview refines after touch (${useW
       drawImage: (source) => {
         if (this.id === 'previewCanvas') paints.push([source.width, source.height]);
       },
+      createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+      putImageData() {},
       getImageData: (_x, _y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4).fill(128) })
     });
     return contexts.get(this);

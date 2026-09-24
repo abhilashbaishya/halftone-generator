@@ -32,7 +32,7 @@ function pixelLuma(r, g, b) {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
-function toneLuma(value, contrast, gamma) {
+export function toneLuma(value, contrast, gamma) {
   const corrected = Math.pow(clamp(value, 0, 1), gamma);
   if (contrast === 1) return corrected;
 

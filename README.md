@@ -7,8 +7,8 @@ A browser-based halftone image generator for brand design and print-style graphi
 ## Features
 
 - **Real-time preview** with before/after split comparison
-- **Render profiles** — Draft, High, Ultra, and Print treatments
-- **Fine-grained controls** — Cell size, screen angle, contrast, gamma, tone curve, jitter, micro-dots, and minimum dot size
+- **Output sizes** — Draft, High, Ultra, and Print resolutions with consistent halftone treatment
+- **Fine-grained controls** — Cell size, screen angle, contrast, gamma, tone curve, grain, bloom, and CRT
 - **Custom ink and paper colors** — HEX, RGB/HSL, OKLCH, Display P3, and opacity; canvas output is sRGB
 - **Built-in presets** — Clean Editorial, Bold Poster, Subtle Texture, Flash Poster
 - **Save and manage custom presets** via localStorage
@@ -58,7 +58,7 @@ builds the Vite app, and publishes the `dist` directory.
 - `src/studio-panel.js` — DialKit 2 vanilla controls, color picker, and preset UI
 - `src/dial-panel.css` — DialKit-specific styling
 - `script.js` — Application logic, presets, and main-thread rendering fallback
-- `renderer-core.js` — Shared deterministic halftone renderer
+- `src/halftone-renderer.js` — Shared per-pixel halftone renderer for preview and export
 - `renderer-worker.js` — Web Worker for off-thread preview rendering
 - `export-worker.js` — Cancellable export worker with progress reporting
 - `styles.css` — Responsive dark-themed styles

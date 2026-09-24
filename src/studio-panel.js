@@ -6,7 +6,6 @@ import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT, TOUCH_LAYOUT } from "
 import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
-import { TEXTURE_CONTROLS } from "./texture-settings.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
   value, label: value[0].toUpperCase() + value.slice(1)
@@ -214,7 +213,6 @@ export function mountStudioPanel(studio) {
   const rootFolder = mountStudioFolder(inner, "Halftone Studio", true, true);
   const folders = rootFolder.body;
   const source = mountStaticSection(folders, "Source");
-
   const fileInput = element("input", "sr-only");
   fileInput.type = "file";
   fileInput.accept = "image/*";
@@ -393,7 +391,6 @@ export function mountStudioPanel(studio) {
   slider(tone, "contrast", "Contrast", .5, 2.5, .05);
   slider(tone, "gamma", "Gamma", .4, 2.4, .01);
   slider(tone, "toneCurve", "Tone curve", .45, 2.2, .01);
-  slider(tone, "minDot", "Minimum dot", 0, 60, 1, "%");
   const colorsFolder = mountStudioFolder(folders, "Colors");
   const colors = colorsFolder.body;
   for (const [key, label] of [["inkColor", "Ink"], ["paperColor", "Paper"]]) {
@@ -449,20 +446,6 @@ export function mountStudioPanel(studio) {
   compact.addEventListener("change", syncAdjustLayout);
   phone.addEventListener("change", syncAdjustLayout);
   syncAdjustLayout();
-  for (const { key, label, min, max } of TEXTURE_CONTROLS) {
-    slider(advanced.body, key, label, min, max, 1, "%");
-  }
-  const shuffle = button("Shuffle texture", () => studio.shuffleTexture(), "studio-shuffle-texture");
-  shuffle.prepend(createStudioIcon('shuffle', { width: 16, height: 16 }));
-  const syncShuffle = () => {
-    shuffle.disabled = !(state.settings.jitter > 0 || state.settings.microDot > 0);
-    shuffle.title = shuffle.disabled
-      ? "Increase dot irregularity or micro-dots to shuffle"
-      : "Try another dot arrangement at the same texture amounts";
-  };
-  bindings.push(syncShuffle);
-  syncShuffle();
-  advanced.body.append(shuffle);
   slider(advanced.body, "grainStrength", "Grain", 0, 100, 1, "%");
   slider(advanced.body, "bloomStrength", "Bloom", 0, 100, 1, "%");
   slider(advanced.body, "crtStrength", "CRT", 0, 100, 1, "%");
@@ -471,8 +454,8 @@ export function mountStudioPanel(studio) {
   exportRoot.dataset.mode = "inline";
   const exportControls = element("div", "export-controls");
   const qualityField = element("div", "segmented-field");
-  qualityField.append(element("span", "segmented-field-label", "Render profile"));
-  const updateQuality = mountSegments(qualityField, PROFILE_OPTIONS, "Render profile", 4, (value) => studio.setSetting("quality", value), "render-profile-grid");
+  qualityField.append(element("span", "segmented-field-label", "Output size"));
+  const updateQuality = mountSegments(qualityField, PROFILE_OPTIONS, "Output size", 4, (value) => studio.setSetting("quality", value), "render-profile-grid");
   exportControls.append(qualityField);
   const updateFormat = mountSegments(exportControls, EXPORT_FORMAT_OPTIONS, "Export format", 3, (value) => studio.setExportFormat(value));
   exportRoot.append(exportControls);

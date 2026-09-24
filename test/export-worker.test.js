@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { initializeWebp, webpWasmUrl } from '../src/webp-codec.js';
+import { renderHalftoneSync } from '../src/halftone-renderer.js';
 
 await initializeWebp({ wasmBinary: await readFile(new URL(webpWasmUrl)) });
 const source = await loadImage(await readFile(new URL('../placeholder.jpg', import.meta.url)));
@@ -20,7 +21,9 @@ globalThis.OffscreenCanvas = class {
 };
 let complete;
 let phases = [];
+let progress = [];
 globalThis.self = { postMessage(message) {
+  if (message.type === 'export-progress') progress.push(message.progress);
   if (message.type === 'export-phase') phases.push(message.phase);
   if (['export-complete', 'export-error', 'export-rendered'].includes(message.type)) complete(message);
 } };
@@ -70,4 +73,36 @@ for (const paper of ['transparent', '#ffffff']) test(`PNG cutout export keeps em
     paper === 'transparent' ? [0, 0, 0, 0] : [255, 255, 255, 255]);
   const pixels = output.getImageData(30, 30, 32, 32).data;
   assert.ok(pixels.some((value, index) => index % 4 === 3 && value > 0 && pixels[index - 1] < 100));
+});
+
+for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses preview renderer: ${format}`, async () => {
+  nativeWebp = true;
+  progress = [];
+  const width = 192, height = 240;
+  const scaled = createCanvas(width, height);
+  const ctx = scaled.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, 0, 0, width, height);
+  const expected = createCanvas(width, height).getContext('2d');
+  const altSettings = { ...settings };
+  renderHalftoneSync(expected, ctx.getImageData(0, 0, width, height).data, width, height, altSettings);
+  const done = new Promise((resolve) => { complete = resolve; });
+  self.onmessage({ data: { type: 'export', requestId: 3, sourceBitmap: source, width, height,
+    settings: altSettings, needsPostEffects: format === 'effects',
+    encoding: { mimeType: `image/${format}`, quality: .95 } } });
+  const result = await done;
+  assert.notEqual(result.type, 'export-error', result.message);
+  const image = format === 'effects' ? result.bitmap : await loadImage(Buffer.from(await result.blob.arrayBuffer()));
+  assert.deepEqual([image.width, image.height], [width, height]);
+  assert.ok(progress.some((value) => value > 4 && value < 88), 'rendering reports intermediate progress');
+  assert.ok(progress.every((value, i) => !i || value >= progress[i - 1]));
+  const actual = createCanvas(width, height).getContext('2d');
+  actual.drawImage(image, 0, 0);
+  if (format === 'png' || format === 'effects') {
+    assert.deepEqual(actual.getImageData(0, 0, width, height).data,
+      expected.getImageData(0, 0, width, height).data, 'lossless export matches preview pixels at the same resolution');
+  } else {
+    assert.equal(result.blob.type, `image/${format}`);
+  }
 });

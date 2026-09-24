@@ -15,7 +15,9 @@ async function openEditor(stored = {}) {
   document.body.innerHTML = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).match(/<body>([\s\S]*)<\/body>/)[1];
   browser.HTMLCanvasElement.prototype.getContext = (type) => type !== '2d' ? null : ({
     clearRect() {}, fillRect() {}, beginPath() {}, arc() {}, fill() {}, drawImage() {},
-    getImageData: (_x, _y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4).fill(128) })
+    createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+      putImageData() {},
+      getImageData: (_x, _y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4).fill(128) })
   });
   globalThis.Image = class {
     width = 180; height = 120; naturalWidth = 180; naturalHeight = 120;

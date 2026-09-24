@@ -1,4 +1,4 @@
-import { renderHalftoneSync } from "./renderer-core.js";
+import { renderHalftoneSync } from "./src/halftone-renderer.js";
 
 const hiddenCanvas = new OffscreenCanvas(1, 1);
 const hiddenCtx = hiddenCanvas.getContext("2d", { willReadFrequently: true });
