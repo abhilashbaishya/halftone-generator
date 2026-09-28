@@ -400,6 +400,20 @@ export function mountStudioPanel(studio) {
     const control = mountColorControl(host, props);
     controls.push(control);
     const swatch = host.querySelector('.dialkit-color-swatch');
+    const colorInputs = host.querySelector('.dialkit-color-inputs');
+    let transparencySwitch;
+    if (key === "paperColor") {
+      const row = host.querySelector('.dialkit-color-control');
+      row.classList.add('studio-paper-row');
+      transparencySwitch = element('button', 'studio-transparency-switch');
+      transparencySwitch.setAttribute('role', 'switch');
+      transparencySwitch.setAttribute('aria-label', 'Transparent paper');
+      const track = element('span', 'studio-switch-track');
+      track.setAttribute('aria-hidden', 'true');
+      transparencySwitch.append(element('span', '', 'Transparent'), track);
+      transparencySwitch.addEventListener('click', () => studio.setTransparentPaper(!state.transparentPaper));
+      row.insertBefore(transparencySwitch, colorInputs);
+    }
     const sheetMotion = mountPhoneSheetMotion(host, swatch);
     controls.push(sheetMotion);
     const closeOnPhoneLayoutChange = () => {
@@ -431,12 +445,18 @@ export function mountStudioPanel(studio) {
     });
     let previous = props.value;
     bindings.push(() => {
+      if (key === "paperColor") {
+        if (state.transparentPaper) closeOnPhoneLayoutChange();
+        colorInputs.inert = Boolean(state.transparentPaper);
+        colorInputs.classList.toggle("studio-paper-disabled", Boolean(state.transparentPaper));
+        transparencySwitch.setAttribute('aria-checked', String(Boolean(state.transparentPaper)));
+      }
       if (previous === state.settings[key]) return;
       previous = state.settings[key];
       control.update({ ...props, value: previous });
     });
   }
-  colors.append(element("p", "studio-color-note", "Colors export in sRGB"));
+  colors.append(element("p", "studio-color-note", "Colors export in sRGB. PNG and WebP support transparency."));
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
   const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, advanced];
   const syncAdjustLayout = () => {
@@ -458,6 +478,9 @@ export function mountStudioPanel(studio) {
   const updateQuality = mountSegments(qualityField, PROFILE_OPTIONS, "Output size", 4, (value) => studio.setSetting("quality", value), "render-profile-grid");
   exportControls.append(qualityField);
   const updateFormat = mountSegments(exportControls, EXPORT_FORMAT_OPTIONS, "Export format", 3, (value) => studio.setExportFormat(value));
+  const jpegNote = element("p", "studio-color-note studio-jpeg-note", "JPEG fills transparent areas with white.");
+  exportControls.append(jpegNote);
+  bindings.push(() => { jpegNote.hidden = state.export.format !== "jpeg"; });
   exportRoot.append(exportControls);
   document.getElementById("exportControlsRoot").replaceChildren(exportRoot);
   bindings.push(() => { updateQuality(state.settings.quality); updateFormat(state.export.format, state.export.exporting); });

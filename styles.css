@@ -1228,3 +1228,12 @@ canvas {
     background: var(--rail-bg);
   }
 }
+
+/* The processed layer needs its own opaque checkerboard so the original image
+   below it cannot show through gaps in the ink. CSS is never exported. */
+#sourceCanvas,
+.halftone-overlay {
+  background-color: #e5e5e5;
+  background-image: repeating-conic-gradient(#dbdbdb 0% 25%, transparent 0% 50%);
+  background-size: 16px 16px;
+}

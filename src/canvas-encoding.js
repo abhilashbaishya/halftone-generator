@@ -33,6 +33,18 @@ function supportsNativeWebp(canvas) {
 
 export async function encodeCanvas(canvas, mimeType, quality, { encodeWebp, signal, allowFallback = true } = {}) {
   signal?.throwIfAborted();
+  // Callers pass disposable export/estimate canvases, never the live preview.
+  // JPEG has no alpha: explicitly matte white instead of the browser's black.
+  if (mimeType === 'image/jpeg') {
+    const context = canvas.getContext('2d');
+    context.save();
+    context.resetTransform();
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'destination-over';
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.restore();
+  }
   let blob;
   const nativeSupported = mimeType === 'image/webp' ? await supportsNativeWebp(canvas) : true;
   signal?.throwIfAborted();

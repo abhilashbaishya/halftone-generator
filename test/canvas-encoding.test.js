@@ -37,7 +37,7 @@ for (const mode of ['native', 'png-substitution', 'null', 'unsupported']) test(`
 test('JPEG and PNG stay native; security errors are not disguised as codec errors', async () => {
   const canvas = createCanvas(16, 12);
   const fallback = () => { assert.fail('Unexpected WebP fallback'); };
-  for (const type of ['image/jpeg', 'image/png']) assert.equal((await encodeCanvas({ toBlob: canvas.toBlob.bind(canvas) }, type, .9, { encodeWebp: fallback })).type, type);
+  for (const type of ['image/jpeg', 'image/png']) assert.equal((await encodeCanvas({ width: canvas.width, height: canvas.height, getContext: canvas.getContext.bind(canvas), toBlob: canvas.toBlob.bind(canvas) }, type, .9, { encodeWebp: fallback })).type, type);
   await assert.rejects(encodeCanvas({ convertToBlob() { throw new DOMException('Tainted canvas', 'SecurityError'); } }, 'image/webp', .9, { encodeWebp: fallback }), { name: 'SecurityError' });
 });
 
@@ -78,4 +78,22 @@ test('unsupported WebP is detected once on a tiny canvas without full-size PNG e
   assert.equal(fallbacks, 2);
   await assert.rejects(encodeCanvas(canvas, 'image/webp', .9, { encodeWebp, allowFallback: false }));
   assert.equal(fallbacks, 2, 'background estimates must not launch WASM encodes');
+});
+
+for (const type of ['image/png', 'image/webp', 'image/jpeg']) test(`${type} preserves ink and handles transparent paper correctly`, async () => {
+  const canvas = createCanvas(64, 64);
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#ff0000';
+  context.fillRect(32, 0, 32, 64);
+  const blob = await encodeCanvas({
+    width: 64, height: 64, getContext: () => context, toBlob: canvas.toBlob.bind(canvas)
+  }, type, .95, { encodeWebp: encodeWebpPixels });
+  const decoded = await loadImage(Buffer.from(await blob.arrayBuffer()));
+  const output = createCanvas(64, 64).getContext('2d');
+  output.drawImage(decoded, 0, 0);
+  const background = [...output.getImageData(8, 32, 1, 1).data];
+  if (type === 'image/jpeg') assert.deepEqual(background, [255, 255, 255, 255]);
+  else assert.equal(background[3], 0);
+  const ink = [...output.getImageData(48, 32, 1, 1).data];
+  assert.ok(ink[0] > 240 && ink[1] < 15 && ink[2] < 15 && ink[3] === 255);
 });

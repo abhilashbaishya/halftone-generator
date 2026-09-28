@@ -54,7 +54,7 @@ beforeEach(() => {
   settingsChanged = [];
   savedName = null;
   state = {
-    settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
+    transparentPaper: false, settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
     isCustomPreset: false, presets: [{ value: "Default", label: "Default" }, { value: "Poster", label: "Poster" }],
     export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false
   };
@@ -62,6 +62,7 @@ beforeEach(() => {
     eventName: "halftone:test", getState: () => structuredClone(state),
     setSetting: (name, value) => { settingsChanged.push([name, value]); state.settings[name] = value; state.presetModified = true; emit(); },
     selectPreset: (name) => { state.selectedPreset = name; state.settings = { ...defaults }; state.presetModified = false; emit(); },
+    setTransparentPaper: (value) => { state.transparentPaper = value; emit(); },
     setExportFormat: (value) => { state.export.format = value; emit(); },
     shuffleTexture: () => { state.settings.seed += 1; state.presetModified = true; emit(); },
     savePreset: (name) => {
@@ -1020,4 +1021,21 @@ test('theme changes use one coordinated snapshot transition', async () => {
   await Promise.resolve();
   assert.equal(document.documentElement.classList.contains('theme-switching'), false);
   dispose();
+});
+
+test("transparent paper disables its color picker and JPEG explains its matte", () => {
+  const toggle = document.querySelector('[role="switch"][aria-label="Transparent paper"]');
+  assert.ok(toggle.closest('.dialkit-color-control'));
+  assert.equal(toggle.getAttribute('aria-checked'), 'false');
+  toggle.click();
+  assert.equal(toggle.getAttribute('aria-checked'), 'true');
+  assert.equal(toggle.closest('[inert]'), null);
+  assert.equal(state.transparentPaper, true);
+  assert.equal(document.querySelector('.studio-paper-disabled').inert, true);
+  assert.equal(document.querySelector('.studio-jpeg-note').hidden, true);
+  studio.setExportFormat('jpeg');
+  assert.equal(document.querySelector('.studio-jpeg-note').hidden, false);
+  toggle.click();
+  assert.equal(state.transparentPaper, false);
+  assert.equal(document.querySelector('.studio-paper-disabled'), null);
 });

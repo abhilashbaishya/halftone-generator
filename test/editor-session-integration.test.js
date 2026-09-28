@@ -192,3 +192,23 @@ test('preview drops use upload validation and preserve the current treatment', a
     await editor.close();
   }
 });
+
+test('transparent paper survives preset changes and refresh without modifying the preset', async () => {
+  let editor = await openEditor();
+  editor.studio.setTransparentPaper(true);
+  editor.studio.selectPreset('orange');
+  let state = editor.studio.getState();
+  assert.equal(state.transparentPaper, true);
+  assert.equal(state.presetModified, false);
+  const paper = state.settings.paperColor;
+  const stored = await editor.close();
+  editor = await openEditor(stored);
+  state = editor.studio.getState();
+  assert.equal(state.transparentPaper, true);
+  assert.equal(state.settings.paperColor, paper);
+  editor.studio.setTransparentPaper(false);
+  assert.equal(editor.studio.getState().transparentPaper, false);
+  assert.equal(editor.studio.getState().settings.paperColor, paper);
+  assert.equal(editor.studio.getState().presetModified, false);
+  await editor.close();
+});

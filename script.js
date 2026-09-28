@@ -333,6 +333,7 @@ let resizeTimer = null;
 let renderFrame = null;
 const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
 let editorSession = null;
+let transparentPaper = false;
 let customPresets = {};
 
 let renderWorker = null;
@@ -987,7 +988,7 @@ function getRenderSettings(width = previewCanvas.width, height = previewCanvas.h
     seed: textureSettings.seed,
     quality: getQualityConfig(),
     ink: controls.inkColor.value,
-    paper: controls.paperColor.value
+    paper: transparentPaper ? "transparent" : controls.paperColor.value
   };
 }
 
@@ -1348,6 +1349,7 @@ function getExportSignature(plan = getExportPlan(), format = getExportFormat(exp
     format: format.value,
     encoderQuality: format.encoderQuality ?? null,
     grainSeed,
+    transparentPaper,
     settings: captureCurrentPreset()
   });
 }
@@ -1974,6 +1976,7 @@ function getStudioState() {
     theme: document.documentElement.classList.contains("light") ? "light" : "dark",
     selectedPreset,
     presetModified: isPresetModified(),
+    transparentPaper,
     isCustomPreset: Object.prototype.hasOwnProperty.call(customPresets, selectedPreset),
     presets: [
       ...Object.keys(builtInPresets).map((value) => ({ value, label: formatPresetLabel(value) })),
@@ -2035,6 +2038,13 @@ window.halftoneStudio = Object.freeze({
   eventName: STUDIO_STATE_EVENT,
   getState: getStudioState,
   setSetting: setPanelSetting,
+  setTransparentPaper(value) {
+    if (typeof value !== "boolean" || value === transparentPaper) return;
+    transparentPaper = value;
+    requestRender();
+    updateOutputs();
+    emitStudioState();
+  },
   shuffleTexture() {
     if (!textureSettings.jitter && !textureSettings.microDot) return;
     // Every click changes the seed, while both amount sliders stay put.
@@ -2234,7 +2244,8 @@ editorSession = mountEditorSession({
   capture: () => ({
     selectedPreset: controls.presetSelect.value,
     settings: captureCurrentPreset(),
-    grainSeed
+    grainSeed,
+    transparentPaper
   }),
   restore: (saved) => {
     const settings = sanitizePreset(saved.settings);
@@ -2243,6 +2254,7 @@ editorSession = mountEditorSession({
       && (Object.hasOwn(builtInPresets, saved.selectedPreset) || Object.hasOwn(customPresets, saved.selectedPreset));
     controls.presetSelect.value = knownPreset ? saved.selectedPreset : DEFAULT_PRESET;
     applySettings(settings);
+    transparentPaper = saved.transparentPaper === true;
     if (typeof saved.grainSeed === "number" && saved.grainSeed >= 0 && saved.grainSeed < 1) {
       grainSeed = saved.grainSeed;
     }
