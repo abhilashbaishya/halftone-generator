@@ -150,8 +150,6 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       await waitUntil(() => shares.length === 3 && downloads.length === 1
         && !studio.getState().export.exporting);
       assert.equal(document.getElementById('renderStatus').textContent, 'Export complete');
-      studio.setTransparentPaper(true);
-      assert.equal(studio.getState().export.readyToShare, false, 'paper changes invalidate a prepared export');
       studio.setSetting('contrast', 1.45);
       assert.equal(studio.getState().export.readyToShare, false);
       assert.equal(document.getElementById('exportBtn').textContent, 'Export WebP');
@@ -176,7 +174,6 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
         'legacy texture seed does not change the new rendering');
     }
     if (nativeWebp && !nativeShare) {
-      studio.setTransparentPaper(true);
       studio.setSetting('quality', 'draft');
       studio.setExportFormat('png');
       const count = downloads.length;
@@ -186,7 +183,7 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       const output = createCanvas(image.width, image.height).getContext('2d');
       output.drawImage(image, 0, 0);
       const rgba = output.getImageData(0, 0, image.width, image.height).data;
-      assert.ok(rgba.some((value, index) => index % 4 === 3 && value === 0), 'app exports gaps as transparent pixels');
+      assert.ok(rgba.every((value, index) => index % 4 !== 3 || value === 255), 'opaque uploads keep paper between dots');
       assert.ok(rgba.some((value, index) => index % 4 === 3 && value === 255), 'app retains opaque ink');
     }
     studio.setPreviewInteraction(true); // cancel deferred size estimation

@@ -193,22 +193,18 @@ test('preview drops use upload validation and preserve the current treatment', a
   }
 });
 
-test('transparent paper survives preset changes and refresh without modifying the preset', async () => {
+test('old transparent-paper sessions restore the preset without the retired override', async () => {
   let editor = await openEditor();
-  editor.studio.setTransparentPaper(true);
   editor.studio.selectPreset('orange');
-  let state = editor.studio.getState();
-  assert.equal(state.transparentPaper, true);
-  assert.equal(state.presetModified, false);
-  const paper = state.settings.paperColor;
+  const settings = editor.studio.getState().settings;
   const stored = await editor.close();
+  const saved = JSON.parse(stored[EDITOR_SESSION_KEY]);
+  saved.transparentPaper = true;
+  stored[EDITOR_SESSION_KEY] = JSON.stringify(saved);
   editor = await openEditor(stored);
-  state = editor.studio.getState();
-  assert.equal(state.transparentPaper, true);
-  assert.equal(state.settings.paperColor, paper);
-  editor.studio.setTransparentPaper(false);
-  assert.equal(editor.studio.getState().transparentPaper, false);
-  assert.equal(editor.studio.getState().settings.paperColor, paper);
+  assert.deepEqual(editor.studio.getState().settings, settings);
   assert.equal(editor.studio.getState().presetModified, false);
-  await editor.close();
+  assert.equal('transparentPaper' in editor.studio.getState(), false);
+  const updated = await editor.close();
+  assert.equal('transparentPaper' in JSON.parse(updated[EDITOR_SESSION_KEY]), false);
 });

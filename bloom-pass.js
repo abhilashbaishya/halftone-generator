@@ -28,6 +28,13 @@ export class BloomPass {
     ctx.drawImage(src, 0, 0);
     ctx.restore();
 
+    // Keep the original alpha, including soft edges; bloom must not fill a
+    // cutout's empty background. Opaque images retain the same screen blend.
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-atop";
+    ctx.drawImage(src, 0, 0);
+    ctx.restore();
+
     return this._canvas;
   }
 

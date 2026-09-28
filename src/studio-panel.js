@@ -400,20 +400,6 @@ export function mountStudioPanel(studio) {
     const control = mountColorControl(host, props);
     controls.push(control);
     const swatch = host.querySelector('.dialkit-color-swatch');
-    const colorInputs = host.querySelector('.dialkit-color-inputs');
-    let transparencySwitch;
-    if (key === "paperColor") {
-      const row = host.querySelector('.dialkit-color-control');
-      row.classList.add('studio-paper-row');
-      transparencySwitch = element('button', 'studio-transparency-switch');
-      transparencySwitch.setAttribute('role', 'switch');
-      transparencySwitch.setAttribute('aria-label', 'Transparent paper');
-      const track = element('span', 'studio-switch-track');
-      track.setAttribute('aria-hidden', 'true');
-      transparencySwitch.append(element('span', '', 'Transparent'), track);
-      transparencySwitch.addEventListener('click', () => studio.setTransparentPaper(!state.transparentPaper));
-      row.insertBefore(transparencySwitch, colorInputs);
-    }
     const sheetMotion = mountPhoneSheetMotion(host, swatch);
     controls.push(sheetMotion);
     const closeOnPhoneLayoutChange = () => {
@@ -445,12 +431,6 @@ export function mountStudioPanel(studio) {
     });
     let previous = props.value;
     bindings.push(() => {
-      if (key === "paperColor") {
-        if (state.transparentPaper) closeOnPhoneLayoutChange();
-        colorInputs.inert = Boolean(state.transparentPaper);
-        colorInputs.classList.toggle("studio-paper-disabled", Boolean(state.transparentPaper));
-        transparencySwitch.setAttribute('aria-checked', String(Boolean(state.transparentPaper)));
-      }
       if (previous === state.settings[key]) return;
       previous = state.settings[key];
       control.update({ ...props, value: previous });

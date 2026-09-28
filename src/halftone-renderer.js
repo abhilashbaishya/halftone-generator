@@ -35,13 +35,15 @@ function* renderRows(ctx, source, width, height, settings) {
       const darkness = Math.pow(1 - toneLuma(luma, settings.contrast, settings.gamma), settings.toneCurve);
       let mask = Math.max(0, Math.min(1, (darkness - threshold + softness) / (2 * softness)));
       mask = darkness === 0 ? 0 : darkness === 1 ? 1 : mask * mask * (3 - 2 * mask);
-      const alpha = mask * source[i + 3] / 255 * ink[3] / 255;
+      // Compose the preset's ink and paper inside the image, then apply the
+      // source alpha to the entire treatment so cutouts and soft edges survive.
+      const alpha = mask * ink[3] / 255;
       const background = paper[3] / 255 * (1 - alpha);
       const total = alpha + background;
       for (let channel = 0; channel < 3; channel++) {
         out[i + channel] = total ? (ink[channel] * alpha + paper[channel] * background) / total : 0;
       }
-      out[i + 3] = total * 255;
+      out[i + 3] = total * source[i + 3];
     }
     if (y % 24 === 23) yield (y + 1) / height;
   }
