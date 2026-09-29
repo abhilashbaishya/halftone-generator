@@ -1,4 +1,5 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
+import { getPresetThumbnail, PRESET_THUMBNAIL_VERSION } from "./src/preset-preview.js";
 import { serializePreset, parsePreset, uniquePresetName, MAX_PRESET_FILE_BYTES } from "./src/preset-transfer.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
@@ -541,6 +542,7 @@ function sanitizePreset(rawPreset) {
   }
   if (typeof rawPreset.thumbnail === "string" && /^data:image\/(?:png|jpe?g|webp);base64,/i.test(rawPreset.thumbnail)) {
     sanitized.thumbnail = rawPreset.thumbnail;
+    if (rawPreset.thumbnailVersion === PRESET_THUMBNAIL_VERSION) sanitized.thumbnailVersion = PRESET_THUMBNAIL_VERSION;
   }
   return sanitized;
 }
@@ -641,25 +643,6 @@ function captureCurrentPreset() {
   return captured;
 }
 
-function capturePresetThumbnail() {
-  if (!previewCanvas.width || !previewCanvas.height) return "";
-  const size = 88;
-  const thumb = document.createElement("canvas");
-  thumb.width = size;
-  thumb.height = size;
-  const ctx = thumb.getContext("2d");
-  if (!ctx) return "";
-  const side = Math.min(previewCanvas.width, previewCanvas.height);
-  const sx = Math.floor((previewCanvas.width - side) / 2);
-  const sy = Math.floor((previewCanvas.height - side) / 2);
-  ctx.drawImage(previewCanvas, sx, sy, side, side, 0, 0, size, size);
-  try {
-    return thumb.toDataURL("image/jpeg", 0.72);
-  } catch {
-    return "";
-  }
-}
-
 function setPresetNote(message) {
   controls.presetNote.textContent = message;
 }
@@ -751,9 +734,11 @@ function savePresetByName(rawName, { update = false } = {}) {
     return { ok: false, field: "name", message: "A preset with this name already exists. Choose another name, or select it and use Update preset." };
   }
 
+  const settings = captureCurrentPreset();
   const nextPreset = {
-    ...captureCurrentPreset(),
-    thumbnail: capturePresetThumbnail() || customPresets[name]?.thumbnail || ""
+    ...settings,
+    thumbnail: getPresetThumbnail(settings),
+    thumbnailVersion: PRESET_THUMBNAIL_VERSION
   };
   if (!nextPreset.thumbnail) delete nextPreset.thumbnail;
   const nextPresets = { ...customPresets, [name]: nextPreset };
@@ -2012,7 +1997,7 @@ function getStudioState() {
           value,
           label: value,
           description: "Your saved preset",
-          image: customPresets[value].thumbnail || ""
+          image: getPresetThumbnail(customPresets[value])
         }))
     ],
     settings: captureCurrentPreset(),
