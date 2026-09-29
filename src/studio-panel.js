@@ -5,6 +5,7 @@ import { mountTouchSlider } from "./touch-slider.js";
 import { mountMobileLayout, PHONE_LANDSCAPE, PHONE_LAYOUT, TOUCH_LAYOUT } from "./mobile-layout.js";
 import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
+import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
 
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
@@ -325,7 +326,9 @@ export function mountStudioPanel(studio) {
   const revert = button("Revert", () => { showActionResult(); studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
   const remove = button("Delete", () => { showActionResult(studio.deletePreset()); selectHost.querySelector("button")?.focus(); }, "dialkit-button-danger");
   actions.append(save, revert, remove);
-  presets.append(actions, actionError, namer);
+  const presetToolbar = element("div", "studio-preset-toolbar");
+  presetToolbar.append(actions);
+  presets.append(presetToolbar, actionError, namer);
   function closeNamer(focus = true) {
     showActionResult();
     naming = false;
@@ -346,6 +349,7 @@ export function mountStudioPanel(studio) {
       select.update(nextSelect);
     }
     namer.hidden = !naming;
+    presetToolbar.hidden = naming;
     actions.hidden = naming;
     actions.classList.toggle("has-revert", Boolean(state.presetModified));
     save.disabled = !state.presetModified;
@@ -500,7 +504,9 @@ export function mountStudioPanel(studio) {
   };
   window.addEventListener(studio.eventName, update);
   update();
+  const unmountHistory = mountHistoryControls(studio, presetToolbar);
   return () => {
+    unmountHistory();
     window.removeEventListener(studio.eventName, update);
     compact.removeEventListener("change", syncAdjustLayout);
     phone.removeEventListener("change", syncAdjustLayout);

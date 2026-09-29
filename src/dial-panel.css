@@ -991,3 +991,46 @@ html.light .studio-preset-sample {
 .halftone-dialkit .studio-jpeg-note {
   margin-bottom: 0;
 }
+
+.studio-preset-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.studio-preset-toolbar > .dialkit-preset-actions {
+  flex: 1;
+  min-width: 0;
+}
+.studio-history {
+  display: flex;
+  gap: 4px;
+}
+.halftone-dialkit .studio-history-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+.studio-preset-toolbar .dialkit-preset-actions > button {
+  min-height: 40px;
+}
+
+/* Let Save/Revert stack within their column before crowding the history icons. */
+.studio-preset-toolbar .dialkit-preset-actions.has-revert {
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+}
+.studio-history {
+  flex-shrink: 0;
+}
+@media (max-width: 767px), (any-pointer: coarse) {
+  .halftone-dialkit .studio-history-button {
+    width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  .studio-preset-toolbar .dialkit-preset-actions > button {
+    min-height: 44px;
+  }
+}

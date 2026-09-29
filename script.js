@@ -8,6 +8,7 @@ import { touchIntent } from "./src/touch-intent.js";
 import { mountStudioTheme } from "./src/theme.js";
 import { isPhoneSheetDismissal } from "./src/preset-menu-motion.js";
 import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy.js";
+import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
 import { GrainPass } from "./grain-pass.js";
@@ -333,6 +334,8 @@ let resizeTimer = null;
 let renderFrame = null;
 const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
 let editorSession = null;
+let editHistory = null;
+let historyEnabled = false;
 let customPresets = {};
 
 let renderWorker = null;
@@ -413,12 +416,14 @@ function isIOS() {
 function setSourceImage(image) {
   sourceImage = image;
   sourceToken += 1;
+  editHistory?.reset(captureEdit());
   previewGeneration += 1;
   scaledSourceKey = "";
   previewIsCurrent = false;
   dropReadyExportIfStale();
   invalidateExportEstimate();
   updateExportMeta();
+  emitStudioState();
 }
 
 function loadImageSource(source, { token = ++imageLoadToken, onLoad, onError } = {}) {
@@ -754,6 +759,7 @@ function savePresetByName(rawName, { update = false } = {}) {
   if (!persistCustomPresets(nextPresets)) return presetStorageError();
   customPresets = nextPresets;
   rebuildPresetSelect(name);
+  editHistory?.reset(captureEdit());
   syncPresetActions();
   return { ok: true, name };
 }
@@ -786,6 +792,7 @@ function deleteCurrentPreset() {
   closePresetNamer();
   rebuildPresetSelect(DEFAULT_PRESET);
   applyPreset(DEFAULT_PRESET);
+  editHistory?.reset(captureEdit());
   syncPresetActions();
   emitStudioState();
   return { ok: true };
@@ -1968,6 +1975,21 @@ function endSplitDrag(event) {
 const STUDIO_STATE_EVENT = "halftone:state";
 const PANEL_SETTING_FIELDS = new Set(PRESET_COMPARE_FIELDS);
 
+function captureEdit() {
+  return { selectedPreset: controls.presetSelect.value, settings: captureCurrentPreset() };
+}
+
+function restoreEdit(snapshot) {
+  if (!snapshot) return;
+  controls.presetSelect.value = snapshot.selectedPreset;
+  applySettings(snapshot.settings);
+  closePresetNamer();
+  updateOutputs();
+  syncPresetActions();
+  requestRender();
+  emitStudioState();
+}
+
 function getStudioState() {
   const selectedPreset = controls.presetSelect.value || DEFAULT_PRESET;
   return {
@@ -1987,6 +2009,7 @@ function getStudioState() {
         }))
     ],
     settings: captureCurrentPreset(),
+    history: editHistory?.getState() ?? { canUndo: false, canRedo: false },
     export: {
       format: exportFormat,
       exporting: Boolean(activeExport || sharingExport),
@@ -1998,6 +2021,8 @@ function getStudioState() {
 }
 
 function emitStudioState() {
+  if (historyEnabled) editHistory?.record(captureEdit());
+  else editHistory?.reset(captureEdit());
   editorSession?.schedule();
   window.dispatchEvent(new CustomEvent(STUDIO_STATE_EVENT, { detail: getStudioState() }));
 }
@@ -2035,6 +2060,20 @@ window.halftoneStudio = Object.freeze({
   eventName: STUDIO_STATE_EVENT,
   getState: getStudioState,
   setSetting: setPanelSetting,
+  setHistoryEnabled(value) {
+    if (historyEnabled === Boolean(value)) return;
+    historyEnabled = Boolean(value);
+    editHistory?.reset(captureEdit());
+    emitStudioState();
+  },
+  beginEdit() { if (historyEnabled) editHistory?.begin(); },
+  endEdit() {
+    if (!historyEnabled) return;
+    editHistory?.end();
+    emitStudioState();
+  },
+  undo() { if (historyEnabled) restoreEdit(editHistory?.undo()); },
+  redo() { if (historyEnabled) restoreEdit(editHistory?.redo()); },
   shuffleTexture() {
     if (!textureSettings.jitter && !textureSettings.microDot) return;
     // Every click changes the seed, while both amount sliders stay put.
@@ -2251,6 +2290,7 @@ editorSession = mountEditorSession({
     requestRender();
   }
 });
+editHistory = createEditHistory(captureEdit());
 syncExportEmphasis();
 emitStudioState();
 

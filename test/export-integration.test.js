@@ -97,6 +97,10 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
     await import(`../script.js?export-test=${nativeWebp}-${nativeShare}`);
     const studio = browser.halftoneStudio;
     await waitUntil(() => document.getElementById('exportMeta').textContent.includes('2084 × 2100'));
+    if (nativeShare) {
+      studio.setHistoryEnabled(true);
+      studio.setSetting('contrast', 1.25);
+    }
     studio.setExportFormat('webp');
     document.getElementById('exportBtn').click();
     await waitUntil(() => !studio.getState().export.exporting);
@@ -150,6 +154,9 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       await waitUntil(() => shares.length === 3 && downloads.length === 1
         && !studio.getState().export.exporting);
       assert.equal(document.getElementById('renderStatus').textContent, 'Export complete');
+      studio.undo();
+      assert.equal(studio.getState().export.readyToShare, false, 'Undo invalidates the prepared file');
+      assert.equal(studio.getState().history.canRedo, true);
       studio.setSetting('contrast', 1.45);
       assert.equal(studio.getState().export.readyToShare, false);
       assert.equal(document.getElementById('exportBtn').textContent, 'Export WebP');

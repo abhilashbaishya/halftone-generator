@@ -60,6 +60,7 @@ beforeEach(() => {
   };
   studio = {
     eventName: "halftone:test", getState: () => structuredClone(state),
+    setHistoryEnabled() {}, beginEdit() {}, endEdit() {}, undo() {}, redo() {},
     setSetting: (name, value) => { settingsChanged.push([name, value]); state.settings[name] = value; state.presetModified = true; emit(); },
     selectPreset: (name) => { state.selectedPreset = name; state.settings = { ...defaults }; state.presetModified = false; emit(); },
     setExportFormat: (value) => { state.export.format = value; emit(); },
@@ -357,7 +358,7 @@ test('failed Update stays editable and displays an error that clears after retry
   const update = studio.updatePreset;
   studio.updatePreset = () => ({ ok: false, field: 'storage', message: 'Storage is unavailable. Try again.' });
   findButton('Update preset').click();
-  const error = document.querySelector('.dialkit-preset-actions + .dialkit-inline-error');
+  const error = document.querySelector('.studio-preset-toolbar + .dialkit-inline-error');
   assert.equal(error.hidden, false);
   assert.match(error.textContent, /Storage is unavailable/);
   assert.equal(error.getAttribute('role'), 'alert');
@@ -565,6 +566,12 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   tabs[1].click();
   assert.equal(folder('source').hidden, true);
   for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
+  const history = folder('presets').querySelector('[aria-label="Edit history"]');
+  assert.ok(history);
+  assert.equal(history.hidden, false);
+  assert.equal(history.closest('[hidden]'), null);
+  assert.ok(history.querySelector('[aria-label="Undo"]'));
+  assert.ok(history.querySelector('[aria-label="Redo"]'));
   for (const name of ['layout', 'tone', 'colors', 'advanced']) {
     const group = folder(name);
     const trigger = group.querySelector('button.dialkit-folder-header-top');

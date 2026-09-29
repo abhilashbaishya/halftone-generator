@@ -208,3 +208,82 @@ test('old transparent-paper sessions restore the preset without the retired over
   const updated = await editor.close();
   assert.equal('transparentPaper' in JSON.parse(updated[EDITOR_SESSION_KEY]), false);
 });
+
+test('desktop history restores edits, preset selection, and Revert as complete steps', async () => {
+  const editor = await openEditor();
+  const { studio } = editor;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  studio.setHistoryEnabled(true);
+  const original = studio.getState();
+  studio.beginEdit();
+  studio.setSetting('cellSize', 6);
+  studio.setSetting('cellSize', 7);
+  studio.setSetting('cellSize', 9);
+  studio.endEdit();
+  studio.undo();
+  assert.deepEqual(studio.getState().settings, original.settings);
+  assert.equal(studio.getState().history.canUndo, false);
+  studio.redo();
+  assert.equal(studio.getState().settings.cellSize, 9);
+  studio.setSetting('inkColor', '#123456');
+  const edited = studio.getState();
+  studio.selectPreset('orange');
+  studio.undo();
+  assert.equal(studio.getState().selectedPreset, original.selectedPreset);
+  assert.deepEqual(studio.getState().settings, edited.settings);
+  assert.equal(studio.getState().presetModified, true);
+  studio.revertPreset();
+  assert.equal(studio.getState().presetModified, false);
+  studio.undo();
+  assert.deepEqual(studio.getState().settings, edited.settings);
+  studio.setHistoryEnabled(false);
+  studio.setSetting('cellSize', 12);
+  studio.undo();
+  assert.equal(studio.getState().settings.cellSize, 12, 'disabled history does not undo edits');
+  studio.setHistoryEnabled(true);
+  assert.deepEqual(studio.getState().history, { canUndo: false, canRedo: false });
+  await editor.close();
+});
+
+test('history clears on successful image replacement and saved-preset changes', async () => {
+  const editor = await openEditor();
+  const { studio } = editor;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  studio.setHistoryEnabled(true);
+  studio.setSetting('contrast', 1.6);
+  assert.equal(studio.getState().history.canUndo, true);
+  const image = new File([await readFile(new URL('../placeholder.jpg', import.meta.url))], 'photo.jpg');
+  studio.openImageFile(image);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(studio.getState().hasUserImage, true);
+  assert.deepEqual(studio.getState().history, { canUndo: false, canRedo: false });
+  assert.equal(studio.getState().settings.contrast, 1.6);
+  studio.setSetting('gamma', 1.7);
+  assert.equal(studio.savePreset('History test').ok, true);
+  assert.deepEqual(studio.getState().history, { canUndo: false, canRedo: false });
+  await editor.close();
+});
+
+test('failed uploads and failed preset saves retain history; refresh starts a new history', async () => {
+  let editor = await openEditor();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  let { studio, browser } = editor;
+  studio.setHistoryEnabled(true);
+  studio.setSetting('contrast', 1.6);
+  studio.openImageFile(new File(['invalid'], 'photo.png', { type: 'image/png' }));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(studio.getState().history.canUndo, true);
+  const storage = browser.localStorage;
+  Object.defineProperty(browser, 'localStorage', { configurable: true, value: {
+    getItem: storage.getItem.bind(storage), setItem() { throw new Error('Storage full'); }
+  } });
+  assert.equal(studio.savePreset('Cannot save').ok, false);
+  assert.equal(studio.getState().history.canUndo, true);
+  Object.defineProperty(browser, 'localStorage', { configurable: true, value: storage });
+  const saved = await editor.close();
+  editor = await openEditor(saved);
+  editor.studio.setHistoryEnabled(true);
+  assert.equal(editor.studio.getState().settings.contrast, 1.6);
+  assert.deepEqual(editor.studio.getState().history, { canUndo: false, canRedo: false });
+  await editor.close();
+});
