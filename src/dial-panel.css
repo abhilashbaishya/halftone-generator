@@ -325,10 +325,6 @@
   white-space: nowrap;
 }
 
-.dialkit-preset-actions.has-revert > .dialkit-button-danger {
-  grid-column: 1 / -1;
-}
-
 .studio-preset-namer-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -819,15 +815,24 @@ html.light .studio-preset-sample {
   display: none;
 }
 
-/* GPU gradients instead of DialKit's per-pixel OKLCH canvas. */
-.halftone-dialkit .dialkit-color-plane {
-  background:
-    linear-gradient(to top, #000, transparent),
-    linear-gradient(to right, #fff, var(--studio-plane-hue, #f00));
-}
-
-.halftone-dialkit .dialkit-color-canvas {
-  display: none;
+/* Keep a stable rainbow instead of DialKit's selection-dependent inline track.
+   Stops follow its OKLCH hue angles; an HSL rainbow would mislabel the hues. */
+.halftone-dialkit .dialkit-color-hue {
+  --dial-color-track-bg: linear-gradient(to right in oklab,
+    oklch(0.75 0.16 0),
+    oklch(0.75 0.16 30),
+    oklch(0.75 0.16 60),
+    oklch(0.75 0.16 90),
+    oklch(0.75 0.16 120),
+    oklch(0.75 0.16 150),
+    oklch(0.75 0.16 180),
+    oklch(0.75 0.16 210),
+    oklch(0.75 0.16 240),
+    oklch(0.75 0.16 270),
+    oklch(0.75 0.16 300),
+    oklch(0.75 0.16 330),
+    oklch(0.75 0.16 360)
+  ) !important;
 }
 
 .halftone-dialkit .dialkit-color-swatch {
@@ -993,13 +998,18 @@ html.light .studio-preset-sample {
 }
 
 .studio-preset-toolbar {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 7px;
 }
 .studio-preset-toolbar > .dialkit-preset-actions {
-  flex: 1;
   min-width: 0;
+}
+.studio-preset-toolbar > .dialkit-button-danger {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 40px;
 }
 .studio-history {
   display: flex;
@@ -1030,7 +1040,72 @@ html.light .studio-preset-sample {
     min-height: 44px;
     touch-action: manipulation;
   }
+  .studio-preset-toolbar > .dialkit-button-danger,
   .studio-preset-toolbar .dialkit-preset-actions > button {
     min-height: 44px;
   }
+}
+
+.studio-preset-menu-actions {
+  margin-top: 6px;
+  padding: 8px 4px 4px;
+  border-top: 1px solid var(--ref-hairline);
+}
+.studio-preset-file-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.studio-preset-file-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ref-value);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.studio-preset-file-action:disabled {
+  opacity: .4;
+  cursor: default;
+}
+.studio-preset-file-action:focus-visible {
+  outline: 2px solid var(--ref-label);
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .studio-preset-file-action:hover:not(:disabled) { background: var(--dial-surface-hover); }
+}
+.studio-preset-transfer-hint {
+  margin: 4px 6px;
+  color: var(--ref-label);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Keep file actions visible; only the preset choices consume scroll space. */
+.halftone-dialkit .studio-preset-menu,
+.halftone-dialkit .studio-preset-menu-exit {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.studio-preset-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ref-hairline) transparent;
+}
+.studio-preset-menu-actions {
+  flex: 0 0 auto;
 }

@@ -1,4 +1,5 @@
 import { encodeCanvas } from "./src/canvas-encoding.js";
+import { serializePreset, parsePreset, uniquePresetName, MAX_PRESET_FILE_BYTES } from "./src/preset-transfer.js";
 import { createExportFilename } from "./src/export-filename.js";
 import { mountMobilePreview } from "./src/mobile-preview.js";
 import { mountImageDrop } from "./src/image-drop.js";
@@ -2122,6 +2123,37 @@ window.halftoneStudio = Object.freeze({
     applyPreset(controls.presetSelect.value);
     closePresetNamer();
     emitStudioState();
+  },
+  exportPreset() {
+    const name = controls.presetSelect.value;
+    if (!Object.hasOwn(customPresets, name) || isPresetModified()) {
+      return { ok: false, message: "Save your preset before exporting it." };
+    }
+    const file = serializePreset(name, customPresets[name]);
+    downloadExport(new Blob([file.text], { type: "application/json" }), file.filename);
+    return { ok: true, name };
+  },
+  async importPreset(file) {
+    if (!file || file.size > MAX_PRESET_FILE_BYTES) {
+      return { ok: false, message: "Choose a preset file smaller than 64 KB." };
+    }
+    try {
+      const imported = parsePreset(await file.text(), isStudioColor);
+      const name = uniquePresetName(imported.name, [
+        ...Object.keys(builtInPresets), ...Object.values(PRESET_LABELS), ...Object.keys(customPresets)
+      ]);
+      const nextPresets = { ...customPresets, [name]: imported.settings };
+      if (!persistCustomPresets(nextPresets)) return presetStorageError();
+      customPresets = nextPresets;
+      rebuildPresetSelect(name);
+      applyPreset(name);
+      closePresetNamer();
+      editHistory?.reset(captureEdit());
+      emitStudioState();
+      return { ok: true, name };
+    } catch (error) {
+      return { ok: false, message: error?.message || "This preset file couldn’t be opened." };
+    }
   },
   exportImage
 });

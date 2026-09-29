@@ -17,7 +17,7 @@ export function mountHistoryControls(studio, toolbar) {
     group.append(button);
     return button;
   });
-  toolbar.append(group);
+  toolbar.insertBefore(group, toolbar.querySelector(':scope > .dialkit-button-danger'));
   const pointers = new Set();
   const update = () => {
     const history = studio.getState().history;

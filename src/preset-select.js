@@ -1,3 +1,4 @@
+import { mountPresetMenuActions } from './preset-menu-actions.js';
 import { mountSelectControl } from 'dialkit/vanilla';
 import { mountPresetMenuMotion } from './preset-menu-motion.js';
 import { PHONE_LANDSCAPE, PHONE_LAYOUT } from './mobile-layout.js';
@@ -14,6 +15,7 @@ const samples = {
 // the option contents; style samples are static and never compete with rendering.
 export function mountPresetSelect(host, initial) {
   let props = initial;
+  let menuActions;
   const phone = window.matchMedia(PHONE_LAYOUT);
   const phoneLandscape = window.matchMedia(PHONE_LANDSCAPE);
   const control = mountSelectControl(host, props);
@@ -67,6 +69,10 @@ export function mountPresetSelect(host, initial) {
         button.prepend(placeholder);
       }
     });
+    if (!popup.querySelector('.studio-preset-menu-actions')) {
+      menuActions?.destroy();
+      menuActions = mountPresetMenuActions(popup, trigger, () => props);
+    } else menuActions.update();
     motion.open(popup);
   };
   trigger.addEventListener('click', decorate);
@@ -78,6 +84,7 @@ export function mountPresetSelect(host, initial) {
   return {
     update(next) { props = next; control.update(next); decorate(); },
     destroy() {
+      menuActions?.destroy();
       motion.destroy();
       for (const media of [phone, phoneLandscape]) media.removeEventListener('change', closeOnPhoneLayoutChange);
       trigger.removeEventListener('click', decorate);

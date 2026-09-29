@@ -287,3 +287,45 @@ test('failed uploads and failed preset saves retain history; refresh starts a ne
   assert.deepEqual(editor.studio.getState().history, { canUndo: false, canRedo: false });
   await editor.close();
 });
+
+test('preset import persists a copy, applies it, and leaves the uploaded image alone', async () => {
+  const { serializePreset } = await import('../src/preset-transfer.js');
+  const editor = await openEditor();
+  const { studio } = editor;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const original = studio.getState();
+  const file = serializePreset('Fine Screen', { ...original.settings, inkColor: '#123456' });
+  const input = { size: file.text.length, text: async () => file.text };
+  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Fine Screen (2)' });
+  assert.equal(studio.getState().isCustomPreset, true);
+  assert.equal(studio.getState().presetModified, false);
+  assert.equal(studio.getState().settings.inkColor, '#123456');
+  assert.equal(studio.getState().hasUserImage, original.hasUserImage);
+  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Fine Screen (3)' });
+  const before = studio.getState();
+  assert.equal((await studio.importPreset({ size: 100000, text() { assert.fail('oversized file must not be read'); } })).ok, false);
+  assert.equal((await studio.importPreset({ size: 1, text: async () => '{' })).ok, false);
+  assert.deepEqual(studio.getState(), before);
+  const stored = await editor.close();
+  const restored = await openEditor(stored);
+  assert.equal(restored.studio.getState().selectedPreset, 'Fine Screen (3)');
+  assert.equal(restored.studio.getState().settings.inkColor, '#123456');
+  await restored.close();
+});
+
+test('preset import does not change the editor if storage fails', async () => {
+  const { serializePreset } = await import('../src/preset-transfer.js');
+  const editor = await openEditor();
+  const { studio, browser } = editor;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const before = studio.getState();
+  const file = serializePreset('My preset', before.settings);
+  const storage = browser.localStorage;
+  Object.defineProperty(browser, 'localStorage', { configurable: true, value: {
+    getItem: storage.getItem.bind(storage), setItem() { throw new Error('Storage full'); }
+  } });
+  assert.equal((await studio.importPreset({ size: file.text.length, text: async () => file.text })).ok, false);
+  assert.deepEqual(studio.getState(), before);
+  Object.defineProperty(browser, 'localStorage', { configurable: true, value: storage });
+  await editor.close();
+});

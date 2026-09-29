@@ -87,6 +87,7 @@ function mountPopupMotion(host, trigger, {
     const from = appearance(popup);
     const copy = popup.cloneNode(true);
     const scrollTop = popup.scrollTop;
+    const listScrollTop = popup.querySelector('.studio-preset-list')?.scrollTop;
     pending = popup;
     // Native events can checkpoint microtasks between capture and bubble
     // listeners. Wait for the whole event before checking DialKit's removal.
@@ -107,6 +108,7 @@ function mountPopupMotion(host, trigger, {
       copy.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
       host.closest('.dialkit-root').append(copy);
       copy.scrollTop = scrollTop;
+      if (listScrollTop !== undefined) copy.querySelector('.studio-preset-list').scrollTop = listScrollTop;
       if (typeof copy.showPopover === 'function') {
         copy.setAttribute('popover', 'manual');
         copy.showPopover();
@@ -152,7 +154,7 @@ function mountPopupMotion(host, trigger, {
 
 export function mountPresetMenuMotion(host, trigger) {
   return mountPopupMotion(host, trigger, {
-    optionSelector: '.dialkit-select-option',
+    optionSelector: '.dialkit-select-option, .studio-preset-file-action',
     liveClass: 'studio-preset-menu',
     exitClass: 'studio-preset-menu-exit'
   });

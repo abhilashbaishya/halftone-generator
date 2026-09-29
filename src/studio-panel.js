@@ -26,23 +26,6 @@ function button(label, onClick, className = "") {
   return node;
 }
 
-// DialKit paints the SV field in JS (252×160 OKLCH pixels) on every hue tick.
-// Collapse that canvas and drive the plane with CSS, like the old local picker.
-function useCssColorPlane(popup) {
-  const plane = popup.querySelector(".dialkit-color-plane");
-  const canvas = popup.querySelector(".dialkit-color-canvas");
-  const hue = popup.querySelector(".dialkit-color-hue");
-  if (!plane || !canvas || !hue) return;
-  canvas.width = 1;
-  canvas.height = 1;
-  canvas.hidden = true;
-  const sync = () => {
-    plane.style.setProperty("--studio-plane-hue", `hsl(${Number(hue.value)} 100% 50%)`);
-  };
-  hue.addEventListener("input", sync);
-  sync();
-}
-
 // Measure once per toggle so the controls retain their natural layout while
 // the section opens. A quick reversal starts at the currently visible height.
 function mountStudioFolder(host, title, defaultOpen = true, root = false) {
@@ -241,10 +224,27 @@ export function mountStudioPanel(studio) {
 
   const presets = mountStaticSection(folders, "Presets", false);
   let naming = false;
+  let importing = false;
+  const importInput = element("input", "sr-only");
+  importInput.type = "file";
+  importInput.accept = ".json,application/json";
+  importInput.tabIndex = -1;
+  importInput.setAttribute("aria-hidden", "true");
+  const transferStatus = element("p", "studio-color-note studio-preset-transfer-status");
+  transferStatus.setAttribute("role", "status");
+  transferStatus.hidden = true;
   const selectHost = element("div", "studio-control-host");
   presets.append(selectHost);
   const selectProps = () => ({ label: state.presetModified ? "Preset · Edited" : "Preset", value: state.selectedPreset,
-    options: state.presets, onChange: (value) => { closeNamer(false); studio.selectPreset(value); } });
+    options: state.presets,
+    canExport: state.isCustomPreset && !state.presetModified,
+    exportHint: state.presetModified ? "Save your changes to export" : "Save a custom preset to export",
+    importing,
+    onExport: () => {
+      showActionResult(studio.exportPreset());
+    },
+    onImport: () => importInput.click(),
+    onChange: (value) => { closeNamer(false); studio.selectPreset(value); } });
   const select = mountPresetSelect(selectHost, selectProps());
   let previousSelect = JSON.stringify(selectProps());
   controls.push(select);
@@ -325,10 +325,27 @@ export function mountStudioPanel(studio) {
   });
   const revert = button("Revert", () => { showActionResult(); studio.revertPreset(); selectHost.querySelector("button")?.focus(); });
   const remove = button("Delete", () => { showActionResult(studio.deletePreset()); selectHost.querySelector("button")?.focus(); }, "dialkit-button-danger");
-  actions.append(save, revert, remove);
+  actions.append(save, revert);
   const presetToolbar = element("div", "studio-preset-toolbar");
-  presetToolbar.append(actions);
-  presets.append(presetToolbar, actionError, namer);
+  presetToolbar.append(actions, remove);
+  presets.append(presetToolbar, actionError, namer, importInput, transferStatus);
+  importInput.addEventListener("change", async () => {
+    const file = importInput.files?.[0];
+    importInput.value = "";
+    if (!file || importing) return;
+    importing = true;
+    showActionResult();
+    transferStatus.hidden = false;
+    transferStatus.textContent = "Importing preset…";
+    updateSource();
+    const result = await studio.importPreset(file);
+    importing = false;
+    showActionResult(result);
+    transferStatus.hidden = !result.ok;
+    transferStatus.textContent = result.ok ? `Imported “${result.name}”` : "";
+    if (result.ok) closeNamer(false);
+    updateSource();
+  });
   function closeNamer(focus = true) {
     showActionResult();
     naming = false;
@@ -420,7 +437,6 @@ export function mountStudioPanel(studio) {
       popup.classList.toggle('studio-phone-sheet', window.matchMedia(PHONE_LAYOUT).matches);
       sheetMotion.open(popup);
       popup.querySelector('.dialkit-color-format-row').hidden = true;
-      useCssColorPlane(popup);
       const plane = popup.querySelector('.dialkit-color-plane');
       // DialKit normally focuses the active format tab. Start at the first
       // visible control instead, without changing a pasted CSS color value.

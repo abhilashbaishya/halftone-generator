@@ -1,6 +1,7 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { Window } from "happy-dom";
+import { createCanvas } from "@napi-rs/canvas";
 import { mountStudioPanel } from "../src/studio-panel.js";
 import { mountPresetMenuMotion } from "../src/preset-menu-motion.js";
 
@@ -429,6 +430,8 @@ test("custom preset actions stay full-width and Delete stays readable", () => {
   assert.equal(actions.classList.contains("has-revert"), false);
   assert.equal(save.disabled, true);
   assert.equal(remove.hidden, false);
+  assert.equal(remove.parentElement.className, "studio-preset-toolbar");
+  assert.equal(remove.previousElementSibling.className, "studio-history");
   state.presetModified = true;
   emit();
   assert.equal(actions.classList.contains("has-revert"), true);
@@ -478,20 +481,51 @@ test("color picker starts at the color field without format tabs and returns foc
   assert.equal(document.activeElement, swatch);
 });
 
-test("color picker uses a CSS hue plane instead of DialKit's live OKLCH canvas", () => {
+test("color field pixels match the selected color after typing, dragging, hue changes, and state restoration", async () => {
+  const canvases = new WeakMap();
+  browser.HTMLCanvasElement.prototype.getContext = function() {
+    if (!canvases.has(this)) canvases.set(this, createCanvas(this.width, this.height));
+    return canvases.get(this).getContext('2d');
+  };
+  studio.setSetting('inkColor', '#fbc1bc');
   document.querySelector('[aria-label="Pick ink color"]').click();
   const popup = document.querySelector('.dialkit-color-popover');
   const canvas = popup.querySelector('.dialkit-color-canvas');
   const plane = popup.querySelector('.dialkit-color-plane');
+  const marker = popup.querySelector('.dialkit-color-marker');
   const hue = popup.querySelector('[aria-label="Hue"]');
-  assert.equal(canvas.hidden, true);
-  assert.equal(canvas.width, 1);
-  assert.equal(canvas.height, 1);
-  assert.match(plane.style.getPropertyValue('--studio-plane-hue'), /^hsl\(/);
+  const output = popup.querySelector('[aria-label="CSS color"]');
+  assert.equal(canvas.hidden, false);
+  assert.equal(canvas.width, 252);
+  assert.equal(canvas.height, 160);
+  const check = async () => {
+    await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+    const x = Math.round(parseFloat(marker.style.left) / 100 * (canvas.width - 1));
+    const y = Math.round(parseFloat(marker.style.top) / 100 * (canvas.height - 1));
+    const pixel = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+    const hex = state.settings.inkColor;
+    assert.match(hex, /^#[0-9a-f]{6}$/i);
+    const rgb = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+    // The field is rasterized; allow rounding to the nearest field pixel.
+    rgb.forEach((value, index) => assert.ok(Math.abs(pixel[index] - value) <= 5,
+      `field ${[...pixel]} must match ${hex} at its marker`));
+  };
+  await check();
+  for (const hex of ['#00aaff', '#55aa55', '#999999']) {
+    output.value = hex;
+    output.dispatchEvent(new browser.Event('change', { bubbles: true }));
+    await check();
+  }
+  plane.dispatchEvent(new browser.PointerEvent('pointerdown', { pointerId: 12, button: 0, clientX: 160, clientY: 37, bubbles: true }));
+  plane.dispatchEvent(new browser.PointerEvent('pointerup', { pointerId: 12, button: 0, bubbles: true }));
+  await check();
   hue.value = '180';
   hue.dispatchEvent(new browser.Event('input', { bubbles: true }));
-  assert.equal(plane.style.getPropertyValue('--studio-plane-hue'), 'hsl(180 100% 50%)');
-  key(document.activeElement, 'Escape');
+  await check();
+  // Undo/Redo restores values through this same state-update path.
+  studio.setSetting('inkColor', '#fbc1bc');
+  await check();
+  key(plane, 'Escape');
 });
 
 test("Image action is one button that retitles from Upload to Replace", () => {
@@ -1037,4 +1071,59 @@ test("paper stays editable without a transparency switch and JPEG explains its m
   assert.equal(document.querySelector('.studio-jpeg-note').hidden, true);
   studio.setExportFormat('jpeg');
   assert.equal(document.querySelector('.studio-jpeg-note').hidden, false);
+});
+
+test('preset dropdown file actions are keyboard reachable without becoming preset choices', async () => {
+  let exported = 0;
+  studio.exportPreset = () => { exported++; return { ok: true }; };
+  state.isCustomPreset = true;
+  emit();
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  await new Promise((resolve) => browser.requestAnimationFrame(resolve));
+  await Promise.resolve();
+  let popup = document.querySelector('.studio-preset-menu');
+  assert.equal(popup.getAttribute('role'), 'dialog');
+  assert.equal(popup.querySelector('[role="listbox"]').querySelectorAll('[role="option"]').length, state.presets.length);
+  const [exportButton, importButton] = popup.querySelectorAll('.studio-preset-file-action');
+  assert.equal(exportButton.disabled, false);
+  key(document.activeElement, 'Tab');
+  assert.equal(document.activeElement, exportButton);
+  key(exportButton, 'Tab');
+  assert.equal(document.activeElement, importButton);
+  key(importButton, 'Tab', { shiftKey: true });
+  assert.equal(document.activeElement, exportButton);
+  exportButton.click();
+  assert.equal(exported, 1);
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(state.selectedPreset, 'Default');
+  state.presetModified = true;
+  emit();
+  trigger.click();
+  popup = document.querySelector('.studio-preset-menu');
+  assert.equal(popup.querySelector('.studio-preset-file-action').disabled, true);
+  assert.match(popup.querySelector('.studio-preset-transfer-hint').textContent, /Save your changes/);
+});
+
+test('phone preset import opens the file picker from the same tap and reports the result', async () => {
+  browser.happyDOM.setWindowSize({ width: 390, height: 844 });
+  document.querySelectorAll('.mobile-editor-tabs > button')[1].click();
+  const input = document.querySelector('input[accept=".json,application/json"]');
+  let opened = 0;
+  input.click = () => { opened++; };
+  studio.importPreset = async () => ({ ok: true, name: 'Imported look' });
+  const trigger = document.querySelector('.dialkit-select-trigger');
+  trigger.click();
+  const popup = document.querySelector('.studio-preset-menu');
+  assert.equal(popup.classList.contains('studio-phone-sheet'), true);
+  popup.querySelectorAll('.studio-preset-file-action')[1].click();
+  assert.equal(opened, 1);
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  Object.defineProperty(input, 'files', { configurable: true, value: [new browser.File(['{}'], 'preset.json')] });
+  input.dispatchEvent(new browser.Event('change'));
+  await Promise.resolve();
+  assert.equal(document.querySelector('.studio-preset-transfer-status').textContent, 'Imported “Imported look”');
+  trigger.click();
+  document.querySelectorAll('.studio-preset-menu .studio-preset-file-action')[1].click();
+  assert.equal(opened, 2, 'cancel/retry does not leave the picker disabled');
 });
