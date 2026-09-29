@@ -119,7 +119,7 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       ({ blob, name } = downloads[0]);
     }
     assert.equal(blob.type, 'image/webp');
-    assert.match(name, /^Halftone Studio - \d{4}-\d{2}-\d{2}\.webp$/);
+    assert.equal(name, 'Halftone Studio - Crimson Poster - Ultra.webp');
     const bytes = Buffer.from(await blob.arrayBuffer());
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
     const decoded = await loadImage(bytes);
@@ -154,6 +154,7 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       await waitUntil(() => shares.length === 3 && downloads.length === 1
         && !studio.getState().export.exporting);
       assert.equal(document.getElementById('renderStatus').textContent, 'Export complete');
+      assert.equal(downloads[0].name, shares[0].files[0].name, 'share fallback preserves the filename');
       studio.undo();
       assert.equal(studio.getState().export.readyToShare, false, 'Undo invalidates the prepared file');
       assert.equal(studio.getState().history.canRedo, true);
@@ -185,7 +186,9 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       studio.setExportFormat('png');
       const count = downloads.length;
       document.getElementById('exportBtn').click();
+      studio.selectPreset('orange'); // Changing controls mid-export must not rename the running job.
       await waitUntil(() => downloads.length === count + 1 && !studio.getState().export.exporting);
+      assert.equal(downloads.at(-1).name, 'Halftone Studio - Crimson Poster - Draft.png');
       const image = await loadImage(Buffer.from(await downloads.at(-1).blob.arrayBuffer()));
       const output = createCanvas(image.width, image.height).getContext('2d');
       output.drawImage(image, 0, 0);

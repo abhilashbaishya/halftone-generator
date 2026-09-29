@@ -51,9 +51,25 @@ test('cancelled encoding cannot return a downloadable result', async () => {
   }), { name: 'AbortError' });
 });
 
-test('download names use a readable brand and local calendar date', () => {
-  assert.equal(createExportFilename('webp', new Date(2026, 8, 7, 0, 15)), 'Halftone Studio - 2026-09-07.webp');
-  assert.equal(createExportFilename('jpg', new Date(2026, 0, 2)), 'Halftone Studio - 2026-01-02.jpg');
+test('download names identify the preset and each output size', () => {
+  for (const quality of ['draft', 'high', 'ultra', 'print']) {
+    const label = quality[0].toUpperCase() + quality.slice(1);
+    for (const extension of ['png', 'jpg', 'webp']) {
+      assert.equal(createExportFilename(extension, { preset: 'Fine Screen', quality }),
+        `Halftone Studio - Fine Screen - ${label}.${extension}`);
+    }
+  }
+});
+
+test('custom preset filenames are safe, readable, and bounded', () => {
+  assert.equal(createExportFilename('png', { preset: '  Portrait / Blue: No. 2  ', quality: 'high' }),
+    'Halftone Studio - Portrait - Blue- No. 2 - High.png');
+  assert.equal(createExportFilename('jpg', { preset: '印刷 Café', quality: 'print' }),
+    'Halftone Studio - 印刷 Café - Print.jpg');
+  const long = createExportFilename('webp', { preset: '🎨'.repeat(1000), quality: 'ultra' });
+  assert.ok(new TextEncoder().encode(long).length < 200);
+  assert.equal(createExportFilename('../bad', { preset: '...', quality: 'invalid' }),
+    'Halftone Studio - Custom - High.png');
 });
 
 test('unsupported WebP is detected once on a tiny canvas without full-size PNG encodes', async () => {

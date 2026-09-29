@@ -759,6 +759,7 @@ function savePresetByName(rawName, { update = false } = {}) {
   if (!persistCustomPresets(nextPresets)) return presetStorageError();
   customPresets = nextPresets;
   rebuildPresetSelect(name);
+  dropReadyExportIfStale();
   editHistory?.reset(captureEdit());
   syncPresetActions();
   return { ok: true, name };
@@ -1350,6 +1351,7 @@ function getExportSignature(plan = getExportPlan(), format = getExportFormat(exp
   if (!plan) return "";
   return JSON.stringify({
     sourceToken,
+    preset: controls.presetSelect.value,
     width: plan.dimensions.width,
     height: plan.dimensions.height,
     format: format.value,
@@ -1373,12 +1375,12 @@ function dropReadyExportIfStale() {
   if (!activeExport && !sharingExport) syncExportButtonLabel();
 }
 
-function createShareableExport(blob, format, signature) {
+function createShareableExport(blob, format, signature, filename) {
   if (!window.matchMedia("(any-pointer: coarse)").matches
     || typeof File !== "function"
     || typeof navigator.share !== "function"
     || typeof navigator.canShare !== "function") return null;
-  const file = new File([blob], createExportFilename(format.extension), {
+  const file = new File([blob], filename, {
     type: format.mimeType,
     lastModified: Date.now()
   });
@@ -1593,11 +1595,11 @@ function canvasToBlob(canvas, mimeType = "image/png", quality, signal) {
   });
 }
 
-function downloadExport(blob, format) {
+function downloadExport(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = createExportFilename(format.extension);
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1634,7 +1636,7 @@ async function shareExport(record) {
   sharingExport = false;
   controls.exportBtn.removeAttribute("aria-busy");
   if (outcome === "fallback") {
-    downloadExport(record.blob, record.format);
+    downloadExport(record.blob, record.file.name);
     setRenderStatus("Export complete", false, true);
     setExportFeedback(`Exported · ${formatFileSize(record.blob.size)}`);
   } else if (outcome === "shared") {
@@ -1795,6 +1797,10 @@ async function exportImage() {
     encodingController: new AbortController(),
     worker: null,
     format,
+    filename: createExportFilename(format.extension, {
+      preset: formatPresetLabel(controls.presetSelect.value || DEFAULT_PRESET),
+      quality: controls.quality.value
+    }),
     plan,
     sourceImage,
     settings,
@@ -1866,14 +1872,14 @@ async function exportImage() {
     setCachedValue(exactExportSizeCache, job.exportSignature, blob.size);
     updateExportMeta();
     const shareable = job.exportSignature === getExportSignature()
-      ? createShareableExport(blob, job.format, job.exportSignature)
+      ? createShareableExport(blob, job.format, job.exportSignature, job.filename)
       : null;
     if (shareable) {
       readyExport = shareable;
       job.readyToShare = true;
       setRenderStatus("Ready to save or share", false, true);
     } else {
-      downloadExport(blob, job.format);
+      downloadExport(blob, job.filename);
       setRenderStatus("Export complete", false, true);
       setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
     }
