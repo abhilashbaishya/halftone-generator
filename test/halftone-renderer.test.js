@@ -39,6 +39,46 @@ test('halftone fallback matches worker output and can cancel', async () => {
   assert.deepEqual(progress, [0.5], 'cancellation interrupts rendering between chunks');
 });
 
+test('every dot shape tracks tone from clean paper to solid ink, and invert flips it', () => {
+  const width = 48, height = 48;
+  const grey = (value) => {
+    const data = new Uint8ClampedArray(width * height * 4).fill(value);
+    for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    return data;
+  };
+  const inkShare = (data, extra) => {
+    const ctx = createCanvas(width, height).getContext('2d');
+    renderHalftoneSync(ctx, data, width, height, { ...settings, ...extra });
+    const out = ctx.getImageData(0, 0, width, height).data;
+    let ink = 0;
+    for (let i = 0; i < out.length; i += 4) ink += 1 - out[i] / 255;
+    return ink / (width * height);
+  };
+  for (const dotShape of ['round', 'square', 'diamond', 'line']) {
+    assert.equal(inkShare(grey(255), { dotShape }), 0, `${dotShape} leaves white paper clean`);
+    assert.equal(inkShare(grey(0), { dotShape }), 1, `${dotShape} reaches solid ink`);
+    const mid = inkShare(grey(128), { dotShape });
+    assert.ok(mid > 0.35 && mid < 0.65, `${dotShape} midtone coverage ${mid}`);
+    assert.equal(inkShare(grey(255), { dotShape, invert: true }), 1, `${dotShape} inverted fills highlights`);
+  }
+});
+
+test('texture settings vary dots per seed without changing plain screens', () => {
+  const width = 48, height = 48;
+  const data = new Uint8ClampedArray(width * height * 4).fill(200);
+  for (let i = 3; i < data.length; i += 4) data[i] = 255;
+  const render = (extra) => {
+    const ctx = createCanvas(width, height).getContext('2d');
+    renderHalftoneSync(ctx, data, width, height, { ...settings, ...extra });
+    return ctx.getImageData(0, 0, width, height).data;
+  };
+  const plain = render({});
+  assert.deepEqual(render({ jitter: 0, microDotAmount: 0, seed: 7 }), plain);
+  const textured = render({ jitter: 0.18, microDotAmount: 0.24, seed: 42 });
+  assert.notDeepEqual(textured, plain);
+  assert.notDeepEqual(render({ jitter: 0.18, microDotAmount: 0.24, seed: 43 }), textured);
+});
+
 test('source transparency masks both ink and paper, preserving soft edges', () => {
   const width = 48, height = 48;
   const source = new Uint8ClampedArray(width * height * 4);

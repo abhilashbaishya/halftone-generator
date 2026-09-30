@@ -13,6 +13,7 @@ import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy
 import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
+import { SCREEN_DEFAULTS, normalizeScreenValue } from "./src/screen-settings.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
@@ -209,6 +210,7 @@ const controls = {
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
   exportBtn: document.getElementById("exportBtn"),
+  copyBtn: document.getElementById("copyBtn"),
   exportMeta: document.getElementById("exportMeta"),
   savePresetBtn: document.getElementById("savePresetBtn"),
   deletePresetBtn: document.getElementById("deletePresetBtn"),
@@ -252,7 +254,7 @@ const builtInPresets = {
     inkColor: "#b8202a",
     paperColor: "#f5f5f5"
   },
-  // A coarser diagonal screen with irregular dots and grain on warm paper.
+  // A coarser diagonal screen of irregular diamonds and grain on warm paper.
   orange: {
     quality: "high",
     cellSize: 7,
@@ -264,11 +266,12 @@ const builtInPresets = {
     microDot: 24,
     jitter: 18,
     seed: 42,
+    dotShape: "diamond",
     inkColor: "#ad551e",
     paperColor: "#f3dfbc",
     grainStrength: 14
   },
-  // A luminous negative: bright dots on dark paper, with restrained glow.
+  // A luminous negative: bright scan lines on dark paper, with restrained glow.
   neon: {
     quality: "ultra",
     cellSize: 5,
@@ -280,11 +283,12 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 99,
+    dotShape: "line",
     inkColor: "#b5ff3d",
     paperColor: "#101510",
     bloomStrength: 8
   },
-  // A fine, axis-aligned screen with pale ink on deep blue paper.
+  // A fine, axis-aligned grid of square dots in pale ink on deep blue paper.
   blue: {
     quality: "high",
     cellSize: 5,
@@ -296,6 +300,7 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 256,
+    dotShape: "square",
     inkColor: "#d8edff",
     paperColor: "#15358a"
   },
@@ -335,6 +340,7 @@ let sourceImage = null;
 let resizeTimer = null;
 let renderFrame = null;
 const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
+const screenSettings = { ...SCREEN_DEFAULTS };
 let editorSession = null;
 let editHistory = null;
 let historyEnabled = false;
@@ -522,6 +528,9 @@ function sanitizePreset(rawPreset) {
     const parsed = Number(rawPreset[key]);
     sanitized[key] = Number.isFinite(parsed) ? parsed : fallback;
   });
+  for (const key of Object.keys(SCREEN_DEFAULTS)) {
+    sanitized[key] = normalizeScreenValue(key, rawPreset[key]);
+  }
 
   if (!QUALITY_MODES[sanitized.quality]) {
     sanitized.quality = DEFAULT_QUALITY;
@@ -632,6 +641,7 @@ function captureCurrentPreset() {
     screenAngle: numberValue(controls.screenAngle, 0),
     toneCurve: numberValue(controls.toneCurve, 1),
     ...textureSettings,
+    ...screenSettings,
     inkColor: controls.inkColor.value,
     paperColor: controls.paperColor.value
   };
@@ -661,7 +671,8 @@ const PRESET_COMPARE_FIELDS = [
   "jitter",
   "microDot",
   "seed",
-  ...Object.keys(POSTFX_DEFAULTS)
+  ...Object.keys(POSTFX_DEFAULTS),
+  ...Object.keys(SCREEN_DEFAULTS)
 ];
 
 function isPresetModified() {
@@ -672,7 +683,8 @@ function isPresetModified() {
 
   return PRESET_COMPARE_FIELDS.some((key) => {
     const mine = current[key];
-    const theirs = key in POSTFX_DEFAULTS ? preset[key] ?? POSTFX_DEFAULTS[key] : preset[key];
+    const theirs = key in POSTFX_DEFAULTS ? preset[key] ?? POSTFX_DEFAULTS[key]
+      : key in SCREEN_DEFAULTS ? preset[key] ?? SCREEN_DEFAULTS[key] : preset[key];
 
     return typeof mine === "number"
       ? mine !== Number(theirs)
@@ -979,6 +991,8 @@ function getRenderSettings(width = previewCanvas.width, height = previewCanvas.h
     microDotAmount: textureSettings.microDot / 100,
     jitter: textureSettings.jitter / 100,
     seed: textureSettings.seed,
+    dotShape: screenSettings.dotShape,
+    invert: screenSettings.invert,
     quality: getQualityConfig(),
     ink: controls.inkColor.value,
     paper: controls.paperColor.value
@@ -1165,6 +1179,10 @@ function applySettings(preset) {
 
   for (const key of Object.keys(textureSettings)) {
     textureSettings[key] = normalizeTextureValue(key, preset[key] ?? 0) ?? 0;
+  }
+
+  for (const key of Object.keys(screenSettings)) {
+    screenSettings[key] = normalizeScreenValue(key, preset[key]);
   }
 }
 
@@ -1539,19 +1557,53 @@ function setExportFormat(nextFormat) {
   emitStudioState();
 }
 
+function getJobButton(job) {
+  return job.copy ? controls.copyBtn : controls.exportBtn;
+}
+
+function getJobName(job) {
+  return job.copy ? "copy" : `${job.format.label} export`;
+}
+
 function setExportProgress(job, progress, label = "Cancel") {
   if (activeExport !== job) return;
   const percent = Math.min(100, Math.max(0, Math.round(progress)));
-  controls.exportBtn.textContent = `${label} · ${percent}%`;
-  controls.exportBtn.setAttribute("aria-label", `Cancel ${job.format.label} export, ${percent}% complete`);
-  setRenderStatus(`Exporting… ${percent}%`, true, true);
+  const button = getJobButton(job);
+  button.textContent = `${label} · ${percent}%`;
+  button.setAttribute("aria-label", `Cancel ${getJobName(job)}, ${percent}% complete`);
+  setRenderStatus(`${job.copy ? "Copying" : "Exporting"}… ${percent}%`, true, true);
 }
 
 function setExportEncoding(job) {
   if (activeExport !== job || job.cancelled) return;
-  controls.exportBtn.textContent = "Cancel · Encoding…";
-  controls.exportBtn.setAttribute("aria-label", `Cancel ${job.format.label} encoding`);
+  const button = getJobButton(job);
+  button.textContent = "Cancel · Encoding…";
+  button.setAttribute("aria-label", `Cancel ${getJobName(job)} encoding`);
   setRenderStatus(`Encoding ${job.format.label}…`, true, true);
+}
+
+function canCopyImage() {
+  return Boolean(window.isSecureContext && navigator.clipboard?.write && typeof ClipboardItem === "function");
+}
+
+let copyFeedbackTimer = null;
+
+function setCopyFeedback(text, resetDelay = 2200) {
+  clearTimeout(copyFeedbackTimer);
+  controls.copyBtn.textContent = text;
+  controls.copyBtn.removeAttribute("aria-busy");
+  controls.copyBtn.removeAttribute("aria-label");
+  copyFeedbackTimer = setTimeout(() => {
+    if (activeExport?.copy) return;
+    controls.copyBtn.textContent = "Copy image";
+  }, resetDelay);
+}
+
+// While one output job runs, the other action waits instead of starting a second render.
+function syncOutputActions() {
+  controls.copyBtn.hidden = !canCopyImage();
+  controls.copyBtn.disabled = Boolean(activeExport && !activeExport.copy) || sharingExport;
+  controls.exportBtn.disabled = Boolean(activeExport?.copy);
 }
 
 function setExportFeedback(text, resetDelay = 2200) {
@@ -1746,9 +1798,10 @@ function cancelExport() {
   if (!job || job.cancelled) return;
   job.cancelled = true;
   job.encodingController.abort();
-  controls.exportBtn.textContent = "Cancelling…";
-  controls.exportBtn.setAttribute("aria-label", `Cancelling ${job.format.label} export`);
-  setRenderStatus("Cancelling export…", true, true);
+  const button = getJobButton(job);
+  button.textContent = "Cancelling…";
+  button.setAttribute("aria-label", `Cancelling ${getJobName(job)}`);
+  setRenderStatus(`Cancelling ${job.copy ? "copy" : "export"}…`, true, true);
 
   if (job.worker) {
     job.worker.postMessage({ type: "cancel-export", requestId: job.id });
@@ -1762,26 +1815,51 @@ async function exportImage() {
     await shareExport(cached);
     return;
   }
-  if (sharingExport) return;
+  if (sharingExport || activeExport?.copy) return;
   if (activeExport) {
     cancelExport();
     return;
   }
-  if (!sourceImage) return;
+  await renderOutput();
+}
 
+// Clipboard writes must begin inside the click, before any await, so the
+// clipboard receives a pending PNG that resolves when rendering finishes.
+function copyImage() {
+  if (activeExport?.copy) {
+    cancelExport();
+    return;
+  }
+  if (activeExport || sharingExport || !sourceImage || !canCopyImage()) return;
+  const copy = {};
+  const blob = new Promise((resolve, reject) => Object.assign(copy, { resolve, reject }));
+  try {
+    copy.written = navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  } catch (error) {
+    copy.written = Promise.reject(error);
+  }
+  copy.written.catch(() => {});
+  renderOutput(copy);
+}
+
+async function renderOutput(copy = null) {
   const postProcessSettings = getPostProcessSettings();
   const plan = getExportPlan(postProcessSettings);
-  if (!plan) return;
-  const format = getExportFormat(exportFormat);
+  if (!plan) {
+    copy?.reject(new Error("No image to copy."));
+    return;
+  }
+  const format = getExportFormat(copy ? "png" : exportFormat);
   const settings = getRenderSettings(plan.dimensions.width, plan.dimensions.height);
   const exportSignature = getExportSignature(plan, format);
 
-  clearTimeout(exportFeedbackTimer);
+  clearTimeout(copy ? copyFeedbackTimer : exportFeedbackTimer);
   const job = {
     id: ++exportRequestId,
     cancelled: false,
     encodingController: new AbortController(),
     worker: null,
+    copy,
     format,
     filename: createExportFilename(format.extension, {
       preset: formatPresetLabel(controls.presetSelect.value || DEFAULT_PRESET),
@@ -1795,8 +1873,9 @@ async function exportImage() {
   };
   activeExport = job;
   invalidateExportEstimate();
-  controls.exportBtn.dataset.exporting = "true";
-  controls.exportBtn.setAttribute("aria-busy", "true");
+  getJobButton(job).dataset.exporting = "true";
+  getJobButton(job).setAttribute("aria-busy", "true");
+  syncOutputActions();
   setExportProgress(job, 0);
   emitStudioState();
 
@@ -1857,6 +1936,13 @@ async function exportImage() {
     setExportProgress(job, 100);
     setCachedValue(exactExportSizeCache, job.exportSignature, blob.size);
     updateExportMeta();
+    if (job.copy) {
+      job.copy.resolve(blob);
+      await job.copy.written;
+      setRenderStatus("Copied to clipboard", false, true);
+      setCopyFeedback("Copied");
+      return;
+    }
     const shareable = job.exportSignature === getExportSignature()
       ? createShareableExport(blob, job.format, job.exportSignature, job.filename)
       : null;
@@ -1872,10 +1958,16 @@ async function exportImage() {
   } catch (error) {
     if (!job.cancelled) {
       console.error(error);
-      setRenderStatus(error.message || "Export failed", false, true);
-      setExportFeedback("Export failed · Retry", 3000);
+      if (job.copy) {
+        setRenderStatus("Couldn’t copy. Allow clipboard access or use Export.", false, true);
+        setCopyFeedback("Copy failed", 3000);
+      } else {
+        setRenderStatus(error.message || "Export failed", false, true);
+        setExportFeedback("Export failed · Retry", 3000);
+      }
     }
   } finally {
+    job.copy?.reject(new Error("Copy did not finish."));
     clearTimeout(job.forceCancelTimer);
     job.worker?.terminate();
     outputBitmap?.close?.();
@@ -1886,7 +1978,12 @@ async function exportImage() {
     Object.values(exportPasses).forEach((pass) => pass.release());
 
     if (activeExport === job) activeExport = null;
-    if (job.cancelled) {
+    getJobButton(job).dataset.exporting = "false";
+    syncOutputActions();
+    if (job.cancelled && job.copy) {
+      setRenderStatus("Copy cancelled", false, true);
+      setCopyFeedback("Copy cancelled", 1600);
+    } else if (job.cancelled) {
       setRenderStatus("Export cancelled", false, true);
       setExportFeedback("Export cancelled", 1600);
     } else if (job.readyToShare) {
@@ -2016,6 +2113,7 @@ function emitStudioState() {
   if (historyEnabled) editHistory?.record(captureEdit());
   else editHistory?.reset(captureEdit());
   editorSession?.schedule();
+  syncOutputActions();
   window.dispatchEvent(new CustomEvent(STUDIO_STATE_EVENT, { detail: getStudioState() }));
 }
 
@@ -2036,6 +2134,10 @@ function setPanelSetting(key, value) {
     const next = normalizeTextureValue(key, value);
     if (next === null || textureSettings[key] === next) return;
     textureSettings[key] = next;
+  } else if (Object.hasOwn(screenSettings, key)) {
+    const next = normalizeScreenValue(key, value);
+    if (screenSettings[key] === next) return;
+    screenSettings[key] = next;
   } else {
     if (!(key in controls)) return;
     if ((key === "inkColor" || key === "paperColor") && !isStudioColor(value)) return;
@@ -2265,6 +2367,7 @@ window.addEventListener("resize", () => {
 });
 
 controls.exportBtn.addEventListener("click", exportImage);
+controls.copyBtn.addEventListener("click", copyImage);
 
 controls.grainStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });
 controls.bloomStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });

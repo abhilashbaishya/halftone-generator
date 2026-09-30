@@ -174,12 +174,12 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
       document.getElementById('exportBtn').click();
       await waitUntil(() => downloads.length === 3 && !studio.getState().export.exporting);
       const textured = Buffer.from(await downloads[2].blob.arrayBuffer());
-      assert.deepEqual(textured, bytes, 'retired texture settings remain compatible without changing the new rendering');
+      assert.ok(!textured.equals(bytes), 'preset texture settings change the rendering');
       studio.shuffleTexture();
       document.getElementById('exportBtn').click();
       await waitUntil(() => downloads.length === 4 && !studio.getState().export.exporting);
-      assert.deepEqual(Buffer.from(await downloads[3].blob.arrayBuffer()), textured,
-        'legacy texture seed does not change the new rendering');
+      assert.ok(!Buffer.from(await downloads[3].blob.arrayBuffer()).equals(textured),
+        'a new texture seed rearranges the texture');
     }
     if (nativeWebp && !nativeShare) {
       studio.setSetting('quality', 'draft');

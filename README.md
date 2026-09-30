@@ -8,18 +8,19 @@ A browser-based halftone image generator for brand design and print-style graphi
 
 - **Real-time preview** with before/after split comparison
 - **Output sizes** — Draft, High, Ultra, and Print resolutions with consistent halftone treatment
-- **Fine-grained controls** — Cell size, screen angle, contrast, gamma, tone curve, grain, bloom, and CRT
+- **Dot shapes** — Round, square, diamond, and line screens
+- **Fine-grained controls** — Cell size, screen angle, contrast, gamma, tone curve, invert tone, grain, bloom, and CRT
 - **Custom ink and paper colors** — HEX, RGB/HSL, OKLCH, Display P3, and opacity; canvas output is sRGB
-- **Built-in presets** — Clean Editorial, Bold Poster, Subtle Texture, Flash Poster
-- **Save and manage custom presets** via localStorage
+- **Built-in presets** — Crimson Poster, Amber Press, Electric, Blueprint, Fine Screen
+- **Save, import, and export custom presets** via localStorage and JSON files
 - **Resume editing after refresh** — the selected preset and unsaved adjustments restore alongside the uploaded image
 - **WebP, JPEG, and lossless PNG export** with size estimates, device-safe memory limits, progress, and cancellation
+- **Copy image** — puts a PNG at the selected output size on the clipboard
 - **Web Worker rendering** keeps previews and exports responsive
-- **Texture controls** — dot irregularity, micro-dots, and Shuffle texture with a reproducible seed saved in each preset
 
 ## How it works
 
-The engine converts images to a luminance map using an integral image for O(1) box sampling, then places dots on a rotated grid. Each dot's size is driven by local darkness, Sobel edge detection, and 8x8 Bayer dithering. Stratified micro-dots fill in highlight detail.
+The renderer works per pixel on a rotated screen. Each pixel's darkness, after contrast, gamma, and tone curve, is compared with how much of its cell the chosen dot shape would cover at that point. So detail finer than a cell survives, and every shape grows continuously from clean paper to solid ink. Optional preset texture offsets each dot and adds seeded micro-dots in highlights.
 
 ## Local development
 
@@ -42,7 +43,7 @@ The editor uses the dependency-free DialKit 2 vanilla adapter. React and Motion 
 
 Colors keep their CSS representation in saved presets and render through the browser’s sRGB canvas. PNG and WebP support transparency; JPEG does not. Existing HEX presets and the 40 MB upload policy remain supported.
 
-Advanced includes Dot irregularity and Micro-dots (0–50%). Shuffle texture changes their arrangement while keeping both amounts fixed, and is enabled when either amount is above zero. Save/Update preset and Revert include these texture settings and their seed.
+Presets may carry dot irregularity, micro-dots, and a texture seed (Amber Press does). These have no panel controls; they are saved, imported, and exported with the preset.
 
 The editor saves adjustments locally after a short pause and flushes pending changes when the page is hidden or left. Refresh restores the active preset and unsaved edits; panel position, split, and zoom reset. No sign-in or server storage is involved.
 

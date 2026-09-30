@@ -7,10 +7,12 @@ import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
+import { DOT_SHAPES } from "./screen-settings.js";
 
-const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({
-  value, label: value[0].toUpperCase() + value.slice(1)
-}));
+const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
+const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({ value, label: titleCase(value) }));
+const SHAPE_OPTIONS = DOT_SHAPES.map((value) => ({ value, label: titleCase(value) }));
+const INVERT_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -423,6 +425,14 @@ export function mountStudioPanel(studio) {
   }
   const layoutFolder = mountStudioFolder(folders, "Layout");
   const layout = layoutFolder.body;
+  function segmentedSetting(host, key, label, options) {
+    const field = element("div", "segmented-field");
+    field.append(element("span", "segmented-field-label", label));
+    const update = mountSegments(field, options, label, options.length, (value) => studio.setSetting(key, value));
+    host.append(field);
+    bindings.push(() => update(state.settings[key]));
+  }
+  segmentedSetting(layout, "dotShape", "Dot shape", SHAPE_OPTIONS);
   slider(layout, "cellSize", "Cell size", 3, 12, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
   const toneFolder = mountStudioFolder(folders, "Tone");
@@ -430,6 +440,7 @@ export function mountStudioPanel(studio) {
   slider(tone, "contrast", "Contrast", .5, 2.5, .05);
   slider(tone, "gamma", "Gamma", .4, 2.4, .01);
   slider(tone, "toneCurve", "Tone curve", .45, 2.2, .01);
+  segmentedSetting(tone, "invert", "Invert tone", INVERT_OPTIONS);
   const colorsFolder = mountStudioFolder(folders, "Colors");
   const colors = colorsFolder.body;
   for (const [key, label] of [["inkColor", "Ink"], ["paperColor", "Paper"]]) {

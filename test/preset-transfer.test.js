@@ -16,6 +16,22 @@ test('preset files round-trip only settings, never image bytes or thumbnails', (
   for (const key of Object.keys(settings)) assert.equal(parsed.settings[key], settings[key]);
 });
 
+test('dot shape, invert, and texture round-trip, and older files default them', () => {
+  const styled = { ...settings, dotShape: 'diamond', invert: true, jitter: 18, microDot: 24, seed: 42 };
+  const parsed = parsePreset(serializePreset('Styled', styled).text, isColor);
+  for (const key of ['dotShape', 'invert', 'jitter', 'microDot', 'seed']) assert.equal(parsed.settings[key], styled[key]);
+  const legacy = JSON.parse(serializePreset('Old', settings).text);
+  for (const key of ['dotShape', 'invert', 'jitter', 'microDot', 'seed']) delete legacy.settings[key];
+  assert.deepEqual(
+    ['dotShape', 'invert', 'jitter', 'microDot', 'seed'].map((key) => parsePreset(JSON.stringify(legacy), isColor).settings[key]),
+    ['round', false, 0, 0, 0]
+  );
+  const valid = JSON.parse(serializePreset('Test', settings).text);
+  for (const bad of [{ dotShape: 'star' }, { invert: 'yes' }, { jitter: 80 }]) {
+    assert.throws(() => parsePreset(JSON.stringify({ ...valid, settings: { ...valid.settings, ...bad } }), isColor));
+  }
+});
+
 test('invalid, unsupported, unsafe, and out-of-range preset files are rejected', () => {
   const valid = JSON.parse(serializePreset('Test', settings).text);
   for (const text of ['not JSON', '{}', '[]', JSON.stringify({ ...valid, version: 99 }),
