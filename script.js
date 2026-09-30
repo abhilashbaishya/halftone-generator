@@ -288,7 +288,7 @@ const builtInPresets = {
     paperColor: "#101510",
     bloomStrength: 8
   },
-  // A fine, axis-aligned grid of square dots in pale ink on deep blue paper.
+  // A fine, axis-aligned screen with pale ink on deep blue paper.
   blue: {
     quality: "high",
     cellSize: 5,
@@ -300,7 +300,6 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 256,
-    dotShape: "square",
     inkColor: "#d8edff",
     paperColor: "#15358a"
   },
