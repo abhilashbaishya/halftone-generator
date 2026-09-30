@@ -1137,7 +1137,13 @@ test('phone preset import opens the file picker from the same tap and reports th
   const input = document.querySelector('input[accept=".json,application/json"]');
   let opened = 0;
   input.click = () => { opened++; };
-  studio.importPreset = async () => ({ ok: true, name: 'Imported look' });
+  studio.importPreset = async () => {
+    state.selectedPreset = 'Imported look';
+    state.presets.push({ value: 'Imported look', label: 'Imported look' });
+    state.isCustomPreset = true;
+    emit();
+    return { ok: true, name: 'Imported look' };
+  };
   const trigger = document.querySelector('.dialkit-select-trigger');
   trigger.click();
   const popup = document.querySelector('.studio-preset-menu');
@@ -1152,4 +1158,55 @@ test('phone preset import opens the file picker from the same tap and reports th
   trigger.click();
   document.querySelectorAll('.studio-preset-menu .studio-preset-file-action')[1].click();
   assert.equal(opened, 2, 'cancel/retry does not leave the picker disabled');
+});
+
+test('import confirmation clears after deletion, navigation, editing, or its timeout', async () => {
+  const notice = document.querySelector('.studio-preset-transfer-status');
+  const input = document.querySelector('input[accept=".json,application/json"]');
+  let expire;
+  const setTimeout = browser.setTimeout.bind(browser);
+  browser.setTimeout = (callback, delay, ...args) => {
+    if (delay === 5000) { expire = callback; return 0; }
+    return setTimeout(callback, delay, ...args);
+  };
+  studio.importPreset = async () => {
+    state.presets = [...state.presets.filter(({ value }) => value !== 'Imported look'), { value: 'Imported look', label: 'Imported look' }];
+    state.selectedPreset = 'Imported look';
+    state.isCustomPreset = true;
+    state.presetModified = false;
+    emit();
+    return { ok: true, name: 'Imported look' };
+  };
+  let confirmDelete = false;
+  studio.deletePreset = () => {
+    if (!confirmDelete) return { ok: true };
+    state.presets = state.presets.filter(({ value }) => value !== 'Imported look');
+    state.isCustomPreset = false;
+    studio.selectPreset('Default');
+    return { ok: true };
+  };
+  Object.defineProperty(input, 'files', { value: [new browser.File(['{}'], 'preset.json')] });
+  const importPreset = async () => {
+    input.dispatchEvent(new browser.Event('change'));
+    await Promise.resolve();
+    assert.equal(notice.hidden, false);
+    assert.equal(notice.textContent, 'Imported “Imported look”');
+  };
+  await importPreset();
+  findButton('Delete').click();
+  assert.equal(notice.hidden, false, 'cancelled deletion keeps the preset and its notice');
+  confirmDelete = true;
+  findButton('Delete').click();
+  assert.equal(notice.hidden, true);
+  assert.equal(notice.textContent, '');
+  await importPreset();
+  studio.selectPreset('Default');
+  assert.equal(notice.hidden, true);
+  await importPreset();
+  studio.setSetting('contrast', 1.5);
+  assert.equal(notice.hidden, true);
+  await importPreset();
+  expire();
+  assert.equal(notice.hidden, true);
+  assert.equal(notice.textContent, '');
 });

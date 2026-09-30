@@ -233,6 +233,16 @@ export function mountStudioPanel(studio) {
   const transferStatus = element("p", "studio-color-note studio-preset-transfer-status");
   transferStatus.setAttribute("role", "status");
   transferStatus.hidden = true;
+  let importedPreset = null;
+  let importNoticeTimer = 0;
+  function clearImportNotice() {
+    window.clearTimeout(importNoticeTimer);
+    importNoticeTimer = 0;
+    importedPreset = null;
+    transferStatus.hidden = true;
+    transferStatus.textContent = "";
+  }
+  controls.push({ destroy: clearImportNotice });
   const selectHost = element("div", "studio-control-host");
   presets.append(selectHost);
   const selectProps = () => ({ label: state.presetModified ? "Preset · Edited" : "Preset", value: state.selectedPreset,
@@ -333,17 +343,23 @@ export function mountStudioPanel(studio) {
     const file = importInput.files?.[0];
     importInput.value = "";
     if (!file || importing) return;
+    clearImportNotice();
     importing = true;
     showActionResult();
     transferStatus.hidden = false;
     transferStatus.textContent = "Importing preset…";
     updateSource();
     const result = await studio.importPreset(file);
+    if (!root.isConnected) return;
     importing = false;
     showActionResult(result);
     transferStatus.hidden = !result.ok;
     transferStatus.textContent = result.ok ? `Imported “${result.name}”` : "";
-    if (result.ok) closeNamer(false);
+    if (result.ok) {
+      importedPreset = result.name;
+      importNoticeTimer = window.setTimeout(clearImportNotice, 5000);
+      closeNamer(false);
+    }
     updateSource();
   });
   function closeNamer(focus = true) {
@@ -353,6 +369,8 @@ export function mountStudioPanel(studio) {
     if (focus) (save.disabled ? selectHost.querySelector("button") : save)?.focus({ preventScroll: true });
   }
   function updateSource() {
+    if (importedPreset && (state.selectedPreset !== importedPreset || state.presetModified
+      || !state.presets.some(({ value }) => value === importedPreset))) clearImportNotice();
     const userImage = Boolean(state.hasUserImage);
     const nextLabel = userImage ? "Replace image" : "Upload image";
     if (upload.textContent !== nextLabel) upload.textContent = nextLabel;
