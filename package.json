@@ -15,7 +15,7 @@
     "lucide": "1.42.0"
   },
   "devDependencies": {
-    "@napi-rs/canvas": "1.0.8",
+    "@napi-rs/canvas": "1.0.9",
     "happy-dom": "20.14.0",
     "vite": "8.2.2"
   }
