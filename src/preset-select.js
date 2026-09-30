@@ -21,32 +21,12 @@ export function mountPresetSelect(host, initial) {
   const control = mountSelectControl(host, props);
   const trigger = host.querySelector('.dialkit-select-trigger');
   trigger.classList.add('studio-preset-trigger');
-  let keyboardFocus = false;
-  const setFocusMode = (keyboard) => {
-    keyboardFocus = keyboard;
-    trigger.dataset.keyboardFocus = String(keyboard);
-    host.closest('.dialkit-root')?.querySelector('.studio-preset-menu')?.setAttribute('data-keyboard-focus', String(keyboard));
-  };
-  const pointerFocus = () => setFocusMode(false);
-  const keyboardFocusChange = (event) => {
-    // Screenshot shortcuts and modifier keys aren't menu navigation. Browsers
-    // may nevertheless promote programmatic focus to :focus-visible for them.
-    if (event.altKey || event.metaKey || event.ctrlKey) return;
-    const inside = trigger.contains(event.target) || event.target.closest?.('.studio-preset-menu');
-    if (event.key === 'Tab' || (inside && (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(event.key) || event.key.length === 1))) {
-      setFocusMode(true);
-    }
-  };
-  setFocusMode(false);
-  document.addEventListener('pointerdown', pointerFocus, true);
-  document.addEventListener('keydown', keyboardFocusChange, true);
   const motion = mountPresetMenuMotion(host, trigger);
   const decorate = () => {
     if (trigger.getAttribute('aria-expanded') !== 'true') return;
     const popup = host.closest('.dialkit-root')?.querySelector('.dialkit-select-dropdown:not(.studio-preset-menu-exit)');
     if (!popup) return;
     popup.classList.add('studio-preset-menu');
-    popup.dataset.keyboardFocus = String(keyboardFocus);
     popup.classList.toggle('studio-phone-sheet', phone.matches);
     popup.querySelectorAll('.dialkit-select-option').forEach((button, index) => {
       if (button.classList.contains('studio-preset-option')) return;
@@ -64,15 +44,6 @@ export function mountPresetSelect(host, initial) {
       text.append(name, description);
       button.classList.add('studio-preset-option');
       button.replaceChildren(text);
-      button.addEventListener('click', (event) => {
-        if (event.detail === 0) return;
-        // DialKit correctly restores the trigger for keyboard selection. A
-        // pointer selection does not need that focus, and leaving it there
-        // makes the macOS screenshot shortcut surface a misleading ring.
-        queueMicrotask(() => {
-          if (document.activeElement === trigger) trigger.blur();
-        });
-      });
       if (imageSrc) {
         const image = document.createElement('img');
         image.className = 'studio-preset-sample';
@@ -104,8 +75,6 @@ export function mountPresetSelect(host, initial) {
   return {
     update(next) { props = next; control.update(next); decorate(); },
     destroy() {
-      document.removeEventListener('pointerdown', pointerFocus, true);
-      document.removeEventListener('keydown', keyboardFocusChange, true);
       menuActions?.destroy();
       motion.destroy();
       for (const media of [phone, phoneLandscape]) media.removeEventListener('change', closeOnPhoneLayoutChange);

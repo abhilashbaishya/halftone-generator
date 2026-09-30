@@ -121,30 +121,29 @@ test("preset dropdown supports keyboard selection and restores trigger focus", a
   assert.equal(document.querySelector('[role="listbox"]'), null);
 });
 
-test('screenshot shortcuts do not add preset focus rings, while navigation still enables them', async () => {
+test('screenshot shortcuts never add focus rings after a click, while keyboard navigation does', async () => {
+  const focusSource = () => document.documentElement.dataset.keyboardFocus;
   const trigger = document.querySelector('.dialkit-select-trigger');
   trigger.dispatchEvent(new browser.PointerEvent('pointerdown', { pointerType: 'mouse', bubbles: true }));
   trigger.click();
   await new Promise((resolve) => browser.requestAnimationFrame(resolve));
-  const popup = document.querySelector('.studio-preset-menu');
   const option = document.activeElement;
   assert.ok(option.matches('.studio-preset-option'));
-  assert.equal(popup.dataset.keyboardFocus, 'false');
+  assert.equal(focusSource(), 'false');
   key(option, 'Meta', { metaKey: true });
   key(option, 'Shift', { shiftKey: true, metaKey: true });
   key(option, '4', { shiftKey: true, metaKey: true });
-  assert.equal(popup.dataset.keyboardFocus, 'false');
+  assert.equal(focusSource(), 'false');
   assert.equal(document.activeElement, option, 'keep focus so keyboard navigation remains available');
   key(option, 'ArrowDown');
-  assert.equal(popup.dataset.keyboardFocus, 'true');
+  assert.equal(focusSource(), 'true');
   assert.notEqual(document.activeElement, option);
   document.activeElement.dispatchEvent(new browser.PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }));
-  assert.equal(popup.dataset.keyboardFocus, 'false');
+  assert.equal(focusSource(), 'false');
   key(document.activeElement, 'Tab');
-  assert.equal(popup.dataset.keyboardFocus, 'true');
+  assert.equal(focusSource(), 'true');
   key(document.activeElement, 'Escape');
   assert.equal(document.activeElement, trigger);
-  assert.equal(trigger.dataset.keyboardFocus, 'true');
 });
 
 test('visual preset options preserve selection and distinguish built-in samples from saved presets', async () => {

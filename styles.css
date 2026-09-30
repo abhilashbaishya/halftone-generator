@@ -726,6 +726,16 @@ output {
   outline-offset: 2px;
 }
 
+/* Set by src/focus-source.js until the keyboard is used for navigation, so
+   shortcuts such as screenshots never reveal a ring after a click. */
+html[data-keyboard-focus="false"] :focus-visible {
+  outline: none !important;
+}
+
+html[data-keyboard-focus="false"] #zoomRange:focus-visible {
+  box-shadow: none;
+}
+
 .button:active:not(:disabled) {
   transform: scale(0.97);
 }

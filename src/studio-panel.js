@@ -8,6 +8,7 @@ import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
 import { DOT_SHAPES } from "./screen-settings.js";
+import { mountFocusSource } from "./focus-source.js";
 
 const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({ value, label: titleCase(value) }));
@@ -182,6 +183,7 @@ function mountSegments(host, options, label, columns, onChange, className = "") 
 
 export function mountStudioPanel(studio) {
   let state = studio.getState();
+  const unmountFocusSource = mountFocusSource();
   const bindings = [];
   const controls = [];
   const compact = window.matchMedia("(max-width: 980px)");
@@ -551,6 +553,7 @@ export function mountStudioPanel(studio) {
   update();
   const unmountHistory = mountHistoryControls(studio, presetToolbar);
   return () => {
+    unmountFocusSource();
     unmountHistory();
     window.removeEventListener(studio.eventName, update);
     compact.removeEventListener("change", syncAdjustLayout);

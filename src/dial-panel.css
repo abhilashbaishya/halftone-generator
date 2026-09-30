@@ -644,13 +644,6 @@ html.light .halftone-dialkit .dialkit-color-popover.studio-phone-sheet-exit {
   transition-duration: 140ms;
 }
 
-/* Keep focus available to keyboard users without showing a ring when a
-   screenshot shortcut follows a pointer-opened preset menu. */
-.halftone-dialkit .studio-preset-trigger[data-keyboard-focus="false"]:focus-visible,
-.halftone-dialkit .studio-preset-menu[data-keyboard-focus="false"] :focus-visible {
-  outline: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .studio-preset-trigger .dialkit-select-chevron { transition: none; }
 }
