@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@napi-rs/canvas": "1.0.8",
-    "happy-dom": "20.14.0",
+    "happy-dom": "20.14.5",
     "vite": "8.2.2"
   }
 }
