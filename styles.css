@@ -60,7 +60,8 @@ html {
   --control-surface-hover: var(--ref-row-hover);
   --control-surface-active: var(--ref-fill);
   --segment-selected-bg: var(--ref-fill-active);
-  --segment-selected-ring: var(--ref-hairline);
+  /* The selected fill already separates in dark mode; a ring only outlines it. */
+  --segment-selected-ring: transparent;
   --input-bg: var(--control-surface);
   --input-border: var(--ref-hairline);
   --track: var(--ref-row);

@@ -582,7 +582,7 @@
 @media (max-width: 767px), (any-pointer: coarse) {
   .export-format-thumb {
     background: var(--ref-fill-active);
-    box-shadow: inset 0 0 0 1px var(--ref-hairline);
+    box-shadow: inset 0 0 0 1px var(--segment-selected-ring);
   }
 }
 
