@@ -279,7 +279,7 @@
   }
 
   .halftone-dialkit .dialkit-button-danger:hover {
-    color: #ffb4ae;
+    color: oklch(0.83902063 0.08849347 24.23370144);
   }
 }
 
@@ -477,8 +477,8 @@
 }
 
 .export-format-grid {
-  --segment-gap: 2px;
-  --segment-inset: 3px;
+  --segment-gap: 0px;
+  --segment-inset: 0px;
   --segments: 3;
   --segment-index: 0;
   position: relative;
@@ -488,15 +488,14 @@
   gap: var(--segment-gap);
   padding: var(--segment-inset);
   border-radius: calc(var(--radius) + var(--segment-inset));
-  background: var(--control-surface);
-  box-shadow: var(--control-ring);
+  background: var(--segment-track-bg);
 }
 
 .render-profile-grid {
   --segments: 4;
 }
 
-/* One shared track with a sliding selection beneath transparent labels. */
+/* Flush segments share a track; only the sliding selection carries a border. */
 .export-format-thumb {
   position: absolute;
   top: var(--segment-inset);
@@ -527,7 +526,7 @@
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--muted-text);
+  color: var(--segment-inactive-text);
   font: 500 var(--control-font)/1 var(--font-sans);
   appearance: none;
   -webkit-appearance: none;
@@ -537,12 +536,12 @@
 }
 
 .export-format-option[data-selected="true"] {
-  color: var(--text);
+  color: var(--segment-active-text);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .export-format-option:hover:not(:disabled) {
-    color: var(--text);
+    color: var(--segment-active-text);
   }
 }
 
@@ -580,15 +579,15 @@
 .halftone-dialkit .studio-preset-menu-exit,
 .halftone-dialkit .dialkit-color-popover.studio-phone-sheet,
 .halftone-dialkit .dialkit-color-popover.studio-phone-sheet-exit {
-  --preset-glass: rgb(32 32 30 / 32%);
-  --dial-surface-hover: rgb(255 255 255 / 6%);
-  --dial-surface-active: rgb(255 255 255 / 7%);
+  --preset-glass: oklch(0.2427649 0.00372784 106.67403552 / 0.32);
+  --dial-surface-hover: oklch(1 0 0 / 0.06);
+  --dial-surface-active: oklch(1 0 0 / 0.07);
   background: var(--preset-glass);
   /* Keep the standard property last so production CSS retains it. */
   -webkit-backdrop-filter: blur(16px) saturate(145%);
   backdrop-filter: blur(16px) saturate(145%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%),
-    0 12px 32px rgb(0 0 0 / 20%), 0 3px 8px rgb(0 0 0 / 12%);
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.07),
+    0 12px 32px oklch(0 0 0 / 0.2), 0 3px 8px oklch(0 0 0 / 0.12);
   border-radius: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -599,9 +598,9 @@ html.light .studio-preset-menu,
 html.light .studio-preset-menu-exit,
 html.light .halftone-dialkit .dialkit-color-popover.studio-phone-sheet,
 html.light .halftone-dialkit .dialkit-color-popover.studio-phone-sheet-exit {
-  --preset-glass: rgb(255 255 252 / 42%);
-  --dial-surface-hover: rgb(0 0 0 / 4%);
-  --dial-surface-active: rgb(0 0 0 / 7%);
+  --preset-glass: oklch(0.99917179 0.00393987 106.47053611 / 0.42);
+  --dial-surface-hover: oklch(0 0 0 / 0.04);
+  --dial-surface-active: oklch(0 0 0 / 0.07);
 }
 
 .studio-preset-menu-exit {
@@ -663,7 +662,7 @@ html.light .halftone-dialkit .dialkit-color-popover.studio-phone-sheet-exit {
   height: 44px;
   border-radius: 5px;
   object-fit: cover;
-  outline: 1px solid rgb(255 255 255 / 10%);
+  outline: 1px solid oklch(1 0 0 / 0.1);
   outline-offset: -1px;
 }
 
@@ -671,14 +670,14 @@ html.light .halftone-dialkit .dialkit-color-popover.studio-phone-sheet-exit {
   display: block;
   box-sizing: border-box;
   background:
-    linear-gradient(135deg, rgb(255 255 255 / 8%) 25%, transparent 25%) -6px 0 / 12px 12px,
-    linear-gradient(225deg, rgb(255 255 255 / 8%) 25%, transparent 25%) -6px 0 / 12px 12px,
-    linear-gradient(45deg, rgb(255 255 255 / 8%) 25%, transparent 25%) 0 0 / 12px 12px,
-    linear-gradient(315deg, rgb(255 255 255 / 8%) 25%, #2a2a28 25%) 0 0 / 12px 12px;
+    linear-gradient(135deg, oklch(1 0 0 / 0.08) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(225deg, oklch(1 0 0 / 0.08) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(45deg, oklch(1 0 0 / 0.08) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(315deg, oklch(1 0 0 / 0.08) 25%, oklch(0.28427353 0.00358682 106.62554482) 25%) 0 0 / 12px 12px;
 }
 
 html.light .studio-preset-sample {
-  outline-color: rgb(0 0 0 / 10%);
+  outline-color: oklch(0 0 0 / 0.1);
 }
 
 .studio-preset-text {

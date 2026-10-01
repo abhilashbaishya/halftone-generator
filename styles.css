@@ -26,48 +26,51 @@ html {
   /* The floating rail only reads as an object if the surface behind it is
      mid-dark — a shadow painted over near-black is invisible. Page, rail, and
      row fills therefore sit within a few points of each other. */
-  --body-bg: #1e1d1e;
-  --rail-bg: #1b1b19;
-  --rail-border: #ffffff13;
-  --panel-border: #ffffff1a;
-  --preview-bg: #1e1d1e;
-  --toolbar-bg: #1212168c;
-  --toolbar-border: #ffffff12;
+  --body-bg: oklch(0.23225809 0.00241755 325.65443443);
+  --rail-bg: oklch(0.2213437 0.00381253 106.70701246);
+  --rail-border: oklch(1 0 0 / 0.0745098);
+  --panel-border: oklch(1 0 0 / 0.10196078);
+  --preview-bg: oklch(0.23225809 0.00241755 325.65443443);
+  --toolbar-bg: oklch(0.1840397 0.00810051 285.57683054 / 0.54901961);
+  --toolbar-border: oklch(1 0 0 / 0.07058824);
   --glass-blur: blur(24px) saturate(1.4);
 
-  --text: #ffffffe6;
+  --text: oklch(1 0 0 / 0.90196078);
   --label: oklch(1 0 0 / 0.58);
   /* --muted is for decorative glyphs (chevrons, ticks); anything that is
      actually read uses --muted-text, which is held above 4.5:1. */
-  --muted: #ffffff40;
+  --muted: oklch(1 0 0 / 0.25098039);
   --muted-text: oklch(1 0 0 / 0.64);
   --heading: oklch(1 0 0 / 0.64);
 
   /* Warm neutral control palette, shared by the rail chrome and the DialKit
      panel so both halves of the UI stay in one family. */
-  --ref-row: rgb(35, 35, 33);
-  --ref-row-hover: rgb(43, 43, 40);
-  --ref-fill: rgb(50, 50, 46);
-  --ref-fill-active: rgb(62, 62, 57);
-  --ref-label: rgb(198, 196, 189);
-  --ref-value: rgb(241, 239, 232);
-  --ref-section: rgb(126, 124, 117);
-  --ref-dropdown: rgb(38, 38, 35);
-  --ref-hairline: rgba(255, 255, 255, 0.07);
-  --ref-dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --ref-row: oklch(0.25539182 0.00368203 106.65743723);
+  --ref-row-hover: oklch(0.28798031 0.00535213 106.7309645);
+  --ref-fill: oklch(0.31571247 0.00696544 106.791961);
+  --ref-fill-active: oklch(0.36214164 0.00840966 106.81222682);
+  --ref-label: oklch(0.81992223 0.00990817 93.5909137);
+  --ref-value: oklch(0.95173934 0.00955316 93.5705563);
+  --ref-section: oklch(0.58591763 0.0107495 93.65120226);
+  --ref-dropdown: oklch(0.26750186 0.00544834 106.76226838);
+  --ref-hairline: oklch(1 0 0 / 0.07);
+  --ref-dropdown-shadow: 0 8px 24px oklch(0 0 0 / 0.5);
 
   --control-surface: var(--ref-row);
   --control-surface-hover: var(--ref-row-hover);
   --control-surface-active: var(--ref-fill);
-  --segment-selected-bg: var(--ref-fill-active);
-  /* The selected fill already separates in dark mode; a ring only outlines it. */
-  --segment-selected-ring: transparent;
+  /* Match the light theme's warm-neutral hue; vary lightness, not hue. */
+  --segment-track-bg: oklch(0.27 0.006 95);
+  --segment-inactive-text: oklch(0.675 0.006 95);
+  --segment-active-text: oklch(0.95 0.006 95);
+  --segment-selected-bg: oklch(0.34 0.006 95);
+  --segment-selected-ring: oklch(0.39 0.006 95);
   --input-bg: var(--control-surface);
   --input-border: var(--ref-hairline);
   --track: var(--ref-row);
   --slider-fill: var(--ref-value);
-  --focus-color: #eeeeee;
-  --focus-ring: #ffffff4d;
+  --focus-color: oklch(0.94911925 0 0);
+  --focus-ring: oklch(1 0 0 / 0.30196078);
   --thumb-bg: var(--ref-value);
 
   --btn-border: var(--ref-hairline);
@@ -76,25 +79,25 @@ html {
   --btn-hover-border: var(--ref-fill-active);
   --btn-hover-bg: var(--control-surface-hover);
   --btn-primary-bg: var(--ref-value);
-  --btn-primary-color: #080808;
-  --btn-primary-hover: rgb(222, 220, 212);
+  --btn-primary-color: oklch(0.13440923 0 0);
+  --btn-primary-hover: oklch(0.89382312 0.01101177 95.17622967);
   --btn-shadow: none;
   --btn-primary-shadow: none;
 
   --divider: var(--ref-hairline);
-  --status-idle: #7b7b7b;
+  --status-idle: oklch(0.58291567 0 0);
   --status-busy: oklch(65% 0.12 165);
-  --error-surface: #2a1718;
-  --error-ring: #ff71694d;
-  --error-text: #ffe2df;
-  --error-muted: #ffaaa5;
-  --error-icon: #ff817a;
+  --error-surface: oklch(0.23083136 0.03090946 16.32041007);
+  --error-ring: oklch(0.71908312 0.17496631 25.65088015 / 0.30196078);
+  --error-text: oklch(0.93569168 0.03235139 24.79368212);
+  --error-muted: oklch(0.81954944 0.10111505 23.20725751);
+  --error-icon: oklch(0.74468972 0.15461896 24.75138869);
 
   --csel-trigger-bg: var(--control-surface);
   --csel-border: 0 0 0 1px var(--ref-hairline);
 
   --radius: 8px;
-  --panel-shadow: 0 8px 32px #0006;
+  --panel-shadow: 0 8px 32px oklch(0 0 0 / 0.4);
   --control-ring: none;
 
   /* Floating overlays: the rail top-left, the zoom toolbar top-right.
@@ -102,8 +105,8 @@ html {
   --rail-radius: 18px;
   --rail-inset: 16px;
   --rail-w: 400px;
-  --rail-shadow: 0 26px 70px -22px rgba(0, 0, 0, 0.92);
-  --rail-drag-shadow: 0 30px 82px -20px rgba(0, 0, 0, 0.96);
+  --rail-shadow: 0 26px 70px -22px oklch(0 0 0 / 0.92);
+  --rail-drag-shadow: 0 30px 82px -20px oklch(0 0 0 / 0.96);
 
   /* Every interactive control in the rail sits on this height. */
   --control-h: 34px;
@@ -157,6 +160,9 @@ html.light {
   --control-surface: var(--ref-row);
   --control-surface-hover: var(--ref-row-hover);
   --control-surface-active: var(--ref-fill);
+  --segment-track-bg: var(--control-surface);
+  --segment-inactive-text: var(--muted-text);
+  --segment-active-text: var(--text);
   --segment-selected-bg: oklch(0.995 0.002 95);
   --segment-selected-ring: var(--ref-hairline);
   --input-bg: var(--control-surface);
@@ -503,20 +509,20 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 3px;
   border: none;
   background: var(--thumb-bg);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.7);
   cursor: pointer;
 }
 
 html.light input[type="range"]::-webkit-slider-thumb {
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.15), 0 1px 4px oklch(0 0 0 / 0.2);
 }
 
 input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7), 0 0 0 4px var(--focus-ring);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.7), 0 0 0 4px var(--focus-ring);
 }
 
 html.light input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.2), 0 0 0 4px var(--focus-ring);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.15), 0 1px 4px oklch(0 0 0 / 0.2), 0 0 0 4px var(--focus-ring);
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -525,7 +531,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 3px;
   border: none;
   background: var(--thumb-bg);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.7);
   cursor: pointer;
 }
 
@@ -573,7 +579,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 input[type="range"]:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.7), 0 0 0 4px var(--focus-ring);
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.7), 0 0 0 4px var(--focus-ring);
 }
 
 /* ── Outputs ── */
@@ -846,7 +852,7 @@ html[data-keyboard-focus="false"] #zoomRange:focus-visible {
   background: var(--rail-bg);
   border: 1px solid var(--rail-border);
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
   pointer-events: none;
   visibility: hidden;
   opacity: 0;
@@ -977,8 +983,8 @@ canvas {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  background: oklch(1 0 0 / 0.85);
+  box-shadow: 0 0 6px oklch(0 0 0 / 0.4);
 }
 
 .split-handle::after {
@@ -987,9 +993,9 @@ canvas {
   top: 50%;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  border: 2px solid oklch(1 0 0 / 0.95);
+  background: oklch(1 0 0 / 0.95);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.35);
 }
 
 .split-arrows {
@@ -998,7 +1004,7 @@ canvas {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
-  color: #222;
+  color: oklch(0.25196475 0 0);
   pointer-events: none;
 }
 
@@ -1254,7 +1260,7 @@ canvas {
    below it cannot show through gaps in the ink. CSS is never exported. */
 #sourceCanvas,
 .halftone-overlay {
-  background-color: #e5e5e5;
-  background-image: repeating-conic-gradient(#dbdbdb 0% 25%, transparent 0% 50%);
+  background-color: oklch(0.92190601 0 0);
+  background-image: repeating-conic-gradient(oklch(0.89143134 0 0) 0% 25%, transparent 0% 50%);
   background-size: 16px 16px;
 }
