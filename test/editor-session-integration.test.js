@@ -329,3 +329,90 @@ test('preset import does not change the editor if storage fails', async () => {
   Object.defineProperty(browser, 'localStorage', { configurable: true, value: storage });
   await editor.close();
 });
+
+async function openClipboardEditor() {
+  const editor = await openEditor();
+  const { browser, studio } = editor;
+  await new Promise(resolve => setTimeout(resolve, 20));
+  studio.setPreviewInteraction(true);
+  Object.defineProperty(browser, 'isSecureContext', { value: true, configurable: true });
+  globalThis.ClipboardItem = class { constructor(items) { this.items = items; } };
+  const workers = [];
+  globalThis.Worker = browser.Worker = class extends browser.EventTarget {
+    constructor() { super(); workers.push(this); }
+    postMessage(message) { if (message.type === 'export') this.job = message; }
+    terminate() { this.terminated = true; }
+    complete(blob) {
+      this.dispatchEvent(new browser.MessageEvent('message', {
+        data: { type: 'export-complete', requestId: this.job.requestId, blob }
+      }));
+    }
+  };
+  browser.OffscreenCanvas = class {};
+  globalThis.createImageBitmap = browser.createImageBitmap = async () => ({ close() {} });
+  const setWrite = write => {
+    Object.defineProperty(browser.navigator, 'clipboard', { configurable: true, value: { write } });
+    studio.setSetting('contrast', 1.2);
+  };
+  return { ...editor, workers, setWrite,
+    copy: browser.document.getElementById('copyBtn'),
+    exportButton: browser.document.getElementById('exportBtn') };
+}
+
+const settleClipboard = () => new Promise(resolve => setTimeout(resolve, 10));
+
+for (const synchronous of [false, true]) {
+  test(`clipboard ${synchronous ? 'throw' : 'immediate rejection'} skips rendering and unlocks Export`, async () => {
+    const editor = await openClipboardEditor();
+    try {
+      editor.setWrite(() => {
+        const error = new Error('NotAllowedError');
+        if (synchronous) throw error;
+        return Promise.reject(error);
+      });
+      editor.copy.click();
+      await settleClipboard();
+      assert.equal(editor.workers.length, 0, 'no expensive render starts');
+      assert.equal(editor.studio.getState().export.exporting, false);
+      assert.equal(editor.exportButton.disabled, false);
+      assert.equal(editor.copy.disabled, false);
+      assert.equal(editor.copy.textContent, 'Copy failed');
+      assert.equal(editor.copy.hasAttribute('aria-busy'), false);
+    } finally { await editor.close(); }
+  });
+}
+
+test('clipboard denial terminates an active render and allows a successful retry', async () => {
+  const editor = await openClipboardEditor();
+  try {
+    let deny;
+    editor.setWrite(() => new Promise((_resolve, reject) => { deny = reject; }));
+    editor.copy.click();
+    await settleClipboard();
+    assert.ok(editor.workers[0].job);
+    assert.equal(editor.exportButton.disabled, true);
+    deny(new Error('NotAllowedError'));
+    await settleClipboard();
+    assert.equal(editor.workers[0].terminated, true);
+    assert.equal(editor.studio.getState().export.exporting, false);
+    assert.equal(editor.exportButton.disabled, false);
+    assert.equal(editor.copy.textContent, 'Copy failed');
+
+    let copied;
+    let writeStarted = false;
+    editor.setWrite(items => {
+      writeStarted = true;
+      return items[0].items['image/png'].then(blob => { copied = blob; });
+    });
+    editor.copy.click();
+    assert.equal(writeStarted, true, 'clipboard write stays inside the click gesture');
+    await settleClipboard();
+    const png = new Blob(['encoded PNG'], { type: 'image/png' });
+    editor.workers[1].complete(png);
+    await settleClipboard();
+    assert.equal(copied, png);
+    assert.equal(editor.copy.textContent, 'Copied');
+    assert.equal(editor.exportButton.disabled, false);
+    assert.equal(editor.studio.getState().export.exporting, false);
+  } finally { await editor.close(); }
+});

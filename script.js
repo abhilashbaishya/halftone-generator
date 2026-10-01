@@ -1832,12 +1832,13 @@ function copyImage() {
   if (activeExport || sharingExport || !sourceImage || !canCopyImage()) return;
   const copy = {};
   const blob = new Promise((resolve, reject) => Object.assign(copy, { resolve, reject }));
+  // A synchronous clipboard failure may leave the PNG promise unconsumed.
+  blob.catch(() => {});
   try {
     copy.written = navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
   } catch (error) {
     copy.written = Promise.reject(error);
   }
-  copy.written.catch(() => {});
   renderOutput(copy);
 }
 
@@ -1846,6 +1847,7 @@ async function renderOutput(copy = null) {
   const plan = getExportPlan(postProcessSettings);
   if (!plan) {
     copy?.reject(new Error("No image to copy."));
+    copy?.written.catch(() => {});
     return;
   }
   const format = getExportFormat(copy ? "png" : exportFormat);
@@ -1881,7 +1883,19 @@ async function renderOutput(copy = null) {
   let outputCanvas = null;
   let outputBitmap = null;
 
+  copy?.written.catch((error) => {
+    if (activeExport !== job || job.cancelled) return;
+    job.copyError = error || new Error("Clipboard write failed.");
+    job.cancelled = true;
+    job.encodingController.abort();
+    // Terminate a refused copy immediately; there is no result to preserve.
+    job.forceCancel?.();
+  });
+
   try {
+    // Let an immediate clipboard refusal settle before starting expensive work.
+    if (copy) await Promise.resolve();
+    if (job.cancelled) return;
     const { dimensions, needsPostEffects } = job.plan;
     let result;
     if (canUseExportWorker()) {
@@ -1979,7 +1993,10 @@ async function renderOutput(copy = null) {
     if (activeExport === job) activeExport = null;
     getJobButton(job).dataset.exporting = "false";
     syncOutputActions();
-    if (job.cancelled && job.copy) {
+    if (job.copyError) {
+      setRenderStatus("Couldn’t copy. Allow clipboard access or use Export.", false, true);
+      setCopyFeedback("Copy failed", 3000);
+    } else if (job.cancelled && job.copy) {
       setRenderStatus("Copy cancelled", false, true);
       setCopyFeedback("Copy cancelled", 1600);
     } else if (job.cancelled) {
