@@ -990,7 +990,7 @@ html.light .studio-preset-sample {
 .studio-preset-toolbar > .dialkit-button-danger {
   grid-column: 1 / -1;
   width: 100%;
-  min-height: 40px;
+  min-height: var(--control-h);
 }
 .studio-history {
   display: flex;
@@ -1000,12 +1000,13 @@ html.light .studio-preset-sample {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  min-height: 40px;
+  width: var(--control-h);
+  min-height: var(--control-h);
   padding: 0;
 }
-.studio-preset-toolbar .dialkit-preset-actions > button {
-  min-height: 40px;
+.studio-preset-toolbar .dialkit-preset-actions > button,
+.halftone-dialkit .studio-preset-namer-actions > .dialkit-button {
+  min-height: var(--control-h);
 }
 
 /* Let Save/Revert stack within their column before crowding the history icons. */
@@ -1015,18 +1016,6 @@ html.light .studio-preset-sample {
 .studio-history {
   flex-shrink: 0;
 }
-@media (max-width: 767px), (any-pointer: coarse) {
-  .halftone-dialkit .studio-history-button {
-    width: 44px;
-    min-height: 44px;
-    touch-action: manipulation;
-  }
-  .studio-preset-toolbar > .dialkit-button-danger,
-  .studio-preset-toolbar .dialkit-preset-actions > button {
-    min-height: 44px;
-  }
-}
-
 .studio-preset-menu-actions {
   margin-top: 6px;
   padding: 8px 4px 4px;
