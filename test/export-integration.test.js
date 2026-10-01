@@ -138,7 +138,7 @@ for (const { nativeWebp, nativeShare, label } of exportCases) test(`default Rona
     Object.defineProperty(browser, 'devicePixelRatio', { configurable: true, value: 2 });
     browser.happyDOM.setWindowSize({ width: 1440, height: 1000 });
     await waitUntil(() => document.getElementById('previewCanvas').width !== previewWidth
-      && document.getElementById('renderStatus').textContent === 'Ready');
+      && document.getElementById('renderStatus').dataset.visible === 'false');
     if (nativeShare) {
       assert.equal(studio.getState().export.readyToShare, true,
         'viewport changes retain the exact finished file');

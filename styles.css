@@ -756,6 +756,10 @@ html[data-keyboard-focus="false"] #zoomRange:focus-visible {
   box-shadow: var(--btn-primary-shadow);
 }
 
+#copyBtn {
+  box-shadow: var(--control-ring);
+}
+
 /* Toolbar-only. Rail buttons all use the full .button size. */
 .button-small {
   min-height: 32px;
@@ -807,7 +811,7 @@ html[data-keyboard-focus="false"] #zoomRange:focus-visible {
   top: var(--rail-inset);
   right: var(--rail-inset);
   display: grid;
-  grid-template-columns: auto minmax(120px, 180px) auto auto auto;
+  grid-template-columns: auto minmax(120px, 180px) auto auto;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -822,19 +826,39 @@ html[data-keyboard-focus="false"] #zoomRange:focus-visible {
 }
 
 .render-status {
-  display: none;
-  justify-self: end;
-  align-self: center;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  margin: 0;
+  padding: 9px 12px;
+  min-inline-size: 10.5em;
+  inline-size: max-content;
+  max-inline-size: min(24rem, calc(100vw - 60px));
+  box-sizing: content-box;
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
   font-size: 0.7825rem;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--status-idle);
+  color: var(--text);
   font-family: var(--font-sans);
+  background: var(--rail-bg);
+  border: 1px solid var(--rail-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s var(--ease-out), transform 0.16s var(--ease-out), visibility 0.16s;
 }
 
-/* Shown only for states worth interrupting for: loading, empty, failure. */
+/* The toast sits outside the toolbar's layout so status never shifts controls. */
 .render-status[data-visible="true"] {
-  display: block;
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .render-status[data-busy="true"] {
@@ -1020,7 +1044,7 @@ canvas {
 /* Tablets retain the sidebar, with room for the artwork beside it. */
 @media (min-width: 768px) and (max-width: 980px) {
   :root { --rail-w: 300px; }
-  .preview-toolbar { grid-template-columns: auto auto auto; }
+  .preview-toolbar { grid-template-columns: auto auto; }
   .preview-toolbar .zoom-control,
   .preview-toolbar #zoomRange { display: none; }
 }
@@ -1089,11 +1113,7 @@ canvas {
     padding: 0;
     pointer-events: none;
   }
-  .preview-toolbar .render-status[data-visible="true"] {
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--rail-bg);
-  }
+  .preview-toolbar .render-status { top: 0; }
 }
 
 /* Keep this breakpoint in sync with src/mobile-layout.js. */
@@ -1233,11 +1253,7 @@ canvas {
     padding: 0;
     pointer-events: none;
   }
-  .preview-toolbar .render-status[data-visible="true"] {
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: var(--rail-bg);
-  }
+  .preview-toolbar .render-status { top: 0; }
 }
 
 /* The processed layer needs its own opaque checkerboard so the original image

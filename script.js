@@ -478,10 +478,21 @@ function getQualityConfig() {
 // `visible` is opt-in: routine Rendering/Ready churn stays hidden, but states
 // the user needs to see — loading, empty, failure — are shown. Without this a
 // stalled boot is indistinguishable from a black image.
-function setRenderStatus(text, busy = false, visible = false) {
+let renderStatusTimer = null;
+function setRenderStatus(text, busy = false, visible = false, dismissAfter = 0) {
+  // Routine preview updates must not interrupt output progress or its confirmation.
+  if (!visible && (activeExport || renderStatusTimer)) return;
+  clearTimeout(renderStatusTimer);
+  renderStatusTimer = null;
   controls.renderStatus.textContent = text;
   controls.renderStatus.dataset.busy = busy ? "true" : "false";
   controls.renderStatus.dataset.visible = visible ? "true" : "false";
+  if (visible && dismissAfter > 0) {
+    renderStatusTimer = setTimeout(() => {
+      controls.renderStatus.dataset.visible = "false";
+      renderStatusTimer = null;
+    }, dismissAfter);
+  }
 }
 
 function setUploadError(message = "") {
@@ -1674,10 +1685,10 @@ async function shareExport(record) {
   controls.exportBtn.removeAttribute("aria-busy");
   if (outcome === "fallback") {
     downloadExport(record.blob, record.file.name);
-    setRenderStatus("Export complete", false, true);
+    setRenderStatus("Export complete", false, true, 5000);
     setExportFeedback(`Exported · ${formatFileSize(record.blob.size)}`);
   } else if (outcome === "shared") {
-    setRenderStatus("Share complete", false, true);
+    setRenderStatus("Share complete", false, true, 5000);
     setExportFeedback(`Shared · ${formatFileSize(record.blob.size)}`);
   } else {
     setRenderStatus("Ready", false);
@@ -1952,7 +1963,7 @@ async function renderOutput(copy = null) {
     if (job.copy) {
       job.copy.resolve(blob);
       await job.copy.written;
-      setRenderStatus("Copied to clipboard", false, true);
+      setRenderStatus("Copied to clipboard", false, true, 5000);
       setCopyFeedback("Copied");
       return;
     }
@@ -1965,7 +1976,7 @@ async function renderOutput(copy = null) {
       setRenderStatus("Ready to save or share", false, true);
     } else {
       downloadExport(blob, job.filename);
-      setRenderStatus("Export complete", false, true);
+      setRenderStatus("Export complete", false, true, 5000);
       setExportFeedback(`Exported · ${formatFileSize(blob.size)}`);
     }
   } catch (error) {
@@ -1997,10 +2008,10 @@ async function renderOutput(copy = null) {
       setRenderStatus("Couldn’t copy. Allow clipboard access or use Export.", false, true);
       setCopyFeedback("Copy failed", 3000);
     } else if (job.cancelled && job.copy) {
-      setRenderStatus("Copy cancelled", false, true);
+      setRenderStatus("Copy cancelled", false, true, 5000);
       setCopyFeedback("Copy cancelled", 1600);
     } else if (job.cancelled) {
-      setRenderStatus("Export cancelled", false, true);
+      setRenderStatus("Export cancelled", false, true, 5000);
       setExportFeedback("Export cancelled", 1600);
     } else if (job.readyToShare) {
       controls.exportBtn.removeAttribute("aria-busy");

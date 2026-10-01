@@ -414,5 +414,12 @@ test('clipboard denial terminates an active render and allows a successful retry
     assert.equal(editor.copy.textContent, 'Copied');
     assert.equal(editor.exportButton.disabled, false);
     assert.equal(editor.studio.getState().export.exporting, false);
+    const toast = editor.browser.document.getElementById('renderStatus');
+    assert.equal(toast.textContent, 'Copied to clipboard');
+    assert.equal(toast.dataset.visible, 'true');
+    await new Promise(resolve => setTimeout(resolve, 2100));
+    assert.equal(toast.dataset.visible, 'true', 'completion toast remains visible beyond two seconds');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    assert.equal(toast.dataset.visible, 'false', 'completion toast dismisses after five seconds');
   } finally { await editor.close(); }
 });
