@@ -72,18 +72,10 @@ export function mountMobileLayout(groups, { onScrollActivity = () => {} } = {}) 
   nav.className = "mobile-editor-tabs export-format-grid";
   nav.setAttribute("aria-label", "Editor controls");
   nav.style.setProperty("--segments", String(labels.length));
-  const surfaces = document.createElement("span");
-  surfaces.className = "export-format-surfaces";
-  surfaces.setAttribute("aria-hidden", "true");
-  labels.forEach(() => {
-    const surface = document.createElement("span");
-    surface.className = "export-format-surface";
-    surfaces.append(surface);
-  });
   const thumb = document.createElement("span");
   thumb.className = "export-format-thumb";
   thumb.setAttribute("aria-hidden", "true");
-  nav.append(surfaces, thumb);
+  nav.append(thumb);
   let active = "image";
   const scrollPositions = new Map();
   const scroller = (tab) => tab === "export" ? actions : panel;

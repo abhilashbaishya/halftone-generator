@@ -477,7 +477,8 @@
 }
 
 .export-format-grid {
-  --segment-gap: 7px;
+  --segment-gap: 2px;
+  --segment-inset: 3px;
   --segments: 3;
   --segment-index: 0;
   position: relative;
@@ -485,37 +486,24 @@
   display: grid;
   grid-template-columns: repeat(var(--segments), minmax(0, 1fr));
   gap: var(--segment-gap);
+  padding: var(--segment-inset);
+  border-radius: calc(var(--radius) + var(--segment-inset));
+  background: var(--control-surface);
+  box-shadow: var(--control-ring);
 }
 
 .render-profile-grid {
   --segments: 4;
 }
 
-/* Fixed cell surfaces, sliding selection, then transparent buttons/labels.
-   No button background can fade over or occlude the travelling selection. */
-.export-format-surfaces {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  display: grid;
-  grid-template-columns: inherit;
-  gap: inherit;
-  pointer-events: none;
-}
-
-.export-format-surface {
-  border-radius: var(--radius);
-  background: var(--control-surface);
-  box-shadow: var(--control-ring);
-}
-
+/* One shared track with a sliding selection beneath transparent labels. */
 .export-format-thumb {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
+  top: var(--segment-inset);
+  bottom: var(--segment-inset);
+  left: var(--segment-inset);
   z-index: 1;
-  width: calc((100% - var(--segment-gap) * (var(--segments) - 1)) / var(--segments));
+  width: calc((100% - 2 * var(--segment-inset) - var(--segment-gap) * (var(--segments) - 1)) / var(--segments));
   border-radius: var(--radius);
   background: var(--segment-selected-bg);
   /* Inset: folder content clips overflow, which would cut an outer ring. */
@@ -579,14 +567,6 @@
     min-height: 44px;
   }
 }
-
-@media (max-width: 767px), (any-pointer: coarse) {
-  .export-format-thumb {
-    background: var(--ref-fill-active);
-    box-shadow: inset 0 0 0 1px var(--segment-selected-ring);
-  }
-}
-
 
 .halftone-dialkit [hidden] {
   display: none !important;

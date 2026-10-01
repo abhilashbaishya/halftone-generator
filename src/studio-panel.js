@@ -138,12 +138,9 @@ function mountSegments(host, options, label, columns, onChange, className = "") 
   group.setAttribute("role", "radiogroup");
   group.setAttribute("aria-label", label);
   group.style.setProperty("--segments", columns);
-  const surfaces = element("span", "export-format-surfaces");
-  surfaces.setAttribute("aria-hidden", "true");
-  options.forEach(() => surfaces.append(element("span", "export-format-surface")));
   const thumb = element("span", "export-format-thumb");
   thumb.setAttribute("aria-hidden", "true");
-  group.append(surfaces, thumb);
+  group.append(thumb);
   let value, disabled = false;
   const buttons = options.map((option) => {
     const node = element("button", "export-format-option", option.label);
