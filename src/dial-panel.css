@@ -1078,3 +1078,11 @@ html.light .studio-preset-sample {
 .studio-preset-menu-actions {
   flex: 0 0 auto;
 }
+
+/* Keep the desktop preset list tall enough for four rows plus its footer.
+   Phone sheets retain their control-region sizing. Exit clones inherit vars. */
+.halftone-dialkit .studio-preset-menu:not(.studio-phone-sheet),
+.halftone-dialkit .studio-preset-menu-exit:not(.studio-phone-sheet-exit) {
+  top: var(--preset-menu-top) !important;
+  max-height: var(--preset-menu-height) !important;
+}

@@ -1209,3 +1209,43 @@ test('import confirmation clears after deletion, navigation, editing, or its tim
   assert.equal(notice.hidden, true);
   assert.equal(notice.textContent, '');
 });
+
+test('preset menu reserves four complete rows and its footer within the viewport', async () => {
+  const { mountPresetMenuSize } = await import('../src/preset-menu-size.js');
+  const popup = document.createElement('div');
+  popup.style.cssText = 'padding:4px;border:1px solid black';
+  popup.innerHTML = '<div class="studio-preset-list">' + '<button></button>'.repeat(5)
+    + '</div><div class="studio-preset-menu-actions" style="margin-top:6px"></div>';
+  document.body.append(popup);
+  for (const row of popup.firstElementChild.children) Object.defineProperty(row, 'offsetHeight', { value: 60 });
+  const footer = popup.lastElementChild;
+  let footerHeight = 84;
+  Object.defineProperty(footer, 'offsetHeight', { get: () => footerHeight });
+  let triggerTop = 200;
+  const trigger = document.createElement('button');
+  trigger.getBoundingClientRect = () => new browser.DOMRect(20, triggerTop, 280, 34);
+  const cleanup = mountPresetMenuSize(popup, trigger);
+  try {
+    assert.equal(popup.style.getPropertyValue('--preset-menu-height'), '340px');
+    assert.equal(popup.style.getPropertyValue('--preset-menu-top'), '238px');
+    // Near the bottom, the larger menu opens above without crossing the trigger.
+    triggerTop = 900;
+    browser.dispatchEvent(new browser.Event('scroll'));
+    assert.equal(popup.style.getPropertyValue('--preset-menu-top'), '556px');
+    // A shorter desktop window caps the list, leaving room for the footer.
+    triggerTop = 180;
+    browser.happyDOM.setWindowSize({ width: 1440, height: 450 });
+    browser.dispatchEvent(new browser.Event('resize'));
+    assert.equal(popup.style.getPropertyValue('--preset-menu-height'), '224px');
+    assert.equal(popup.style.getPropertyValue('--preset-menu-top'), '218px');
+    // Hiding the footer hint still leaves exactly four rows of list space.
+    browser.happyDOM.setWindowSize({ width: 1440, height: 1000 });
+    footerHeight = 60;
+    browser.dispatchEvent(new browser.Event('resize'));
+    assert.equal(popup.style.getPropertyValue('--preset-menu-height'), '316px');
+    // DialKit's own subsequent positioning cannot reset the app's height.
+    popup.style.maxHeight = '320px';
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(popup.style.getPropertyValue('--preset-menu-height'), '316px');
+  } finally { cleanup(); popup.remove(); }
+});
