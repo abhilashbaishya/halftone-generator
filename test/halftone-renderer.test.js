@@ -5,7 +5,7 @@ import { renderHalftoneSync, renderHalftoneAsync } from '../src/halftone-rendere
 
 const settings = { cellSize: 12, angle: 0, contrast: 1, gamma: 1, toneCurve: 1, ink: '#000', paper: '#fff' };
 
-test('halftone screen reaches solid shadows, clean highlights, and preserves detail within cells', () => {
+test('diamond screen preserves detail within cells while transparent pixels stay transparent', () => {
   const width = 48, height = 48;
   const data = new Uint8ClampedArray(width * height * 4);
   // One-pixel alternating lines would be lost by averaging an entire cell.
@@ -14,7 +14,7 @@ test('halftone screen reaches solid shadows, clean highlights, and preserves det
     data[i + 3] = 255;
   }
   const ctx = createCanvas(width, height).getContext('2d');
-  renderHalftoneSync(ctx, data, width, height, settings);
+  renderHalftoneSync(ctx, data, width, height, { ...settings, dotShape: 'diamond' });
   assert.deepEqual(ctx.getImageData(0, 0, width, height).data, data);
   data.fill(0);
   renderHalftoneSync(ctx, data, width, height, { ...settings, paper: 'transparent' });
@@ -36,7 +36,8 @@ test('halftone fallback matches worker output and can cancel', async () => {
   assert.deepEqual(await renderHalftoneAsync(b, data, width, height, settings, {
     onProgress(value) { progress.push(value); cancel = true; }, shouldCancel: () => cancel
   }), { cancelled: true });
-  assert.deepEqual(progress, [0.5], 'cancellation interrupts rendering between chunks');
+  assert.equal(progress.length, 1, 'cancellation interrupts cell sampling at the first chunk');
+  assert.ok(progress[0] > 0 && progress[0] < 1);
 });
 
 test('every dot shape tracks tone from clean paper to solid ink, and invert flips it', () => {
@@ -92,8 +93,8 @@ test('source transparency masks both ink and paper, preserving soft edges', () =
   for (const paper of ['#ffffff', '#15358a', '#f3dfbc']) {
     const ctx = createCanvas(width, height).getContext('2d');
     const reference = createCanvas(width, height).getContext('2d');
-    renderHalftoneSync(ctx, source, width, height, { ...settings, paper });
-    renderHalftoneSync(reference, opaque, width, height, { ...settings, paper });
+    renderHalftoneSync(ctx, source, width, height, { ...settings, paper, dotShape: 'diamond' });
+    renderHalftoneSync(reference, opaque, width, height, { ...settings, paper, dotShape: 'diamond' });
     const actual = ctx.getImageData(0, 0, width, height).data;
     const expected = reference.getImageData(0, 0, width, height).data;
     for (let i = 0; i < source.length; i += 4) {
@@ -153,5 +154,43 @@ test('Paper screen responds to tone, angle, invert and cell size controls', () =
   for (const extra of [{ contrast: 1.8 }, { gamma: 1.6 }, { toneCurve: 1.4 },
     { angle: .4 }, { invert: true }, { cellSize: 6 }, { dotShape: 'square' }, { screenStyle: 'classic' }]) {
     assert.notDeepEqual(render(extra), original, JSON.stringify(extra));
+  }
+});
+
+
+test('Dots keep round marks on fine stripes instead of cutting the marks apart', () => {
+  const width = 72, height = 72;
+  const stripes = new Uint8ClampedArray(width * height * 4);
+  const flat = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < stripes.length; i += 4) {
+    const value = (i / 4 % width) % 2 ? 192 : 64;
+    stripes[i] = stripes[i + 1] = stripes[i + 2] = value;
+    flat[i] = flat[i + 1] = flat[i + 2] = 128;
+    stripes[i + 3] = flat[i + 3] = 255;
+  }
+  const a = createCanvas(width, height).getContext('2d');
+  const b = createCanvas(width, height).getContext('2d');
+  renderHalftoneSync(a, stripes, width, height, settings);
+  renderHalftoneSync(b, flat, width, height, settings);
+  assert.deepEqual(a.getImageData(0, 0, width, height).data, b.getImageData(0, 0, width, height).data,
+    'equal average brightness produces intact, identical round dots');
+});
+
+test('Dots ignore invisible RGB when sampling and retain source alpha at rotated edges', () => {
+  const width = 96, height = 96;
+  const source = new Uint8ClampedArray(width * height * 4).fill(96);
+  for (let i = 3; i < source.length; i += 4) source[i] = (i / 4 | 0) % 4 * 85;
+  const other = source.slice();
+  for (let i = 0; i < source.length; i += 4) {
+    if (source[i + 3] === 0) other[i] = other[i + 1] = other[i + 2] = 255;
+  }
+  const a = createCanvas(width, height).getContext('2d');
+  const b = createCanvas(width, height).getContext('2d');
+  for (const angle of [-1.1, 0, .384, 1.1]) {
+    renderHalftoneSync(a, source, width, height, { ...settings, angle });
+    renderHalftoneSync(b, other, width, height, { ...settings, angle });
+    const pixels = a.getImageData(0, 0, width, height).data;
+    assert.deepEqual(pixels, b.getImageData(0, 0, width, height).data);
+    for (let i = 3; i < source.length; i += 4) assert.equal(pixels[i], source[i]);
   }
 });

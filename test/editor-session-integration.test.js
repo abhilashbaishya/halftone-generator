@@ -437,7 +437,7 @@ test('pattern choices switch both rendering settings atomically and undo restore
     studio.undo();
     assert.equal(studio.getState().settings.screenStyle, 'paper');
     assert.equal(studio.getState().presetModified, false);
-    for (const pattern of ['diamond', 'line', 'organic']) {
+    for (const pattern of ['round', 'line', 'organic']) {
       studio.setSetting('pattern', pattern);
       assert.equal(studio.getState().settings.dotShape, pattern === 'organic' ? 'round' : pattern);
       assert.equal(studio.getState().settings.screenStyle, pattern === 'organic' ? 'paper' : 'classic');

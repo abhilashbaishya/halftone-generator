@@ -17,7 +17,7 @@ test('preset files round-trip only settings, never image bytes or thumbnails', (
 });
 
 test('dot shape, invert, and texture round-trip, and older files default them', () => {
-  const styled = { ...settings, dotShape: 'diamond', invert: true, jitter: 18, microDot: 24, seed: 42 };
+  const styled = { ...settings, dotShape: 'line', invert: true, jitter: 18, microDot: 24, seed: 42 };
   const parsed = parsePreset(serializePreset('Styled', styled).text, isColor);
   for (const key of ['dotShape', 'invert', 'jitter', 'microDot', 'seed']) assert.equal(parsed.settings[key], styled[key]);
   const legacy = JSON.parse(serializePreset('Old', settings).text);
@@ -58,4 +58,15 @@ test('Paper merged-dot treatment survives preset export and import', () => {
   const legacy = parsePreset(serializePreset('Local trial', { ...settings, dotShape: 'gooey' }).text, isColor).settings;
   assert.equal(legacy.dotShape, 'round');
   assert.equal(legacy.screenStyle, 'paper');
+});
+
+
+test('retired diamond and square recipes import as Dots with other settings intact', () => {
+  for (const dotShape of ['diamond', 'square']) {
+    const original = { ...settings, dotShape, screenStyle: 'paper', jitter: 18, microDot: 24, seed: 42 };
+    const restored = parsePreset(serializePreset('Older print', original).text, isColor).settings;
+    assert.equal(restored.dotShape, 'round');
+    assert.equal(restored.screenStyle, 'classic');
+    for (const key of [...Object.keys(settings), 'jitter', 'microDot', 'seed']) assert.equal(restored[key], original[key]);
+  }
 });

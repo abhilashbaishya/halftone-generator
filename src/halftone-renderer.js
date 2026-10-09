@@ -1,3 +1,4 @@
+import { sampleDotCellTones } from './dot-cell-tones.js';
 import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
 
@@ -60,6 +61,8 @@ function* renderRows(ctx, source, width, height, settings) {
   const out = image.data;
   const cell = Math.max(1, settings.cellSize);
   const cos = Math.cos(settings.angle), sin = Math.sin(settings.angle);
+  const sampledDots = !settings.dotShape || settings.dotShape === 'round';
+  const cells = sampledDots ? yield* sampleDotCellTones(source, width, height, cell, cos, sin, settings) : null;
   const softness = Math.min(0.15, 0.5 / cell);
   const coverage = COVERAGE[settings.dotShape] ?? COVERAGE.round;
   const invert = settings.invert === true;
@@ -96,9 +99,14 @@ function* renderRows(ctx, source, width, height, settings) {
       }
       const ox = gx - cx, oy = gy - cy;
       const threshold = coverage(ox - jitterX, oy - jitterY);
-      const luma = (source[i] * 0.299 + source[i + 1] * 0.587 + source[i + 2] * 0.114) / 255;
-      const tone = toneLuma(luma, settings.contrast, settings.gamma);
-      const darkness = Math.pow(invert ? tone : 1 - tone, settings.toneCurve);
+      let darkness;
+      if (cells) {
+        darkness = cells.tones[(cy + cells.offsetY) * cells.stride + cx + cells.offsetX];
+      } else {
+        const luma = (source[i] * 0.299 + source[i + 1] * 0.587 + source[i + 2] * 0.114) / 255;
+        const tone = toneLuma(luma, settings.contrast, settings.gamma);
+        darkness = Math.pow(invert ? tone : 1 - tone, settings.toneCurve);
+      }
       let mask = Math.max(0, Math.min(1, (darkness - threshold + softness) / (2 * softness)));
       mask = darkness === 0 ? 0 : darkness === 1 ? 1 : mask * mask * (3 - 2 * mask);
       if (micro && darkness >= 0.003 && darkness < 0.6) {
@@ -120,7 +128,7 @@ function* renderRows(ctx, source, width, height, settings) {
       }
       out[i + 3] = total * source[i + 3];
     }
-    if (y % 24 === 23) yield (y + 1) / height;
+    if (y % 24 === 23) yield cells ? .25 + .75 * (y + 1) / height : (y + 1) / height;
   }
   ctx.putImageData(image, 0, 0);
 }

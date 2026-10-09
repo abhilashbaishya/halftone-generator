@@ -272,7 +272,7 @@ const builtInPresets = {
     inkColor: "#b8202a",
     paperColor: "#f5f5f5"
   },
-  // A coarser diagonal screen of irregular diamonds and grain on warm paper.
+  // A coarser diagonal screen of textured dots and grain on warm paper.
   orange: {
     quality: "high",
     cellSize: 7,
@@ -284,7 +284,7 @@ const builtInPresets = {
     microDot: 24,
     jitter: 18,
     seed: 42,
-    dotShape: "diamond",
+    dotShape: "round",
     inkColor: "#ad551e",
     paperColor: "#f3dfbc",
     grainStrength: 14

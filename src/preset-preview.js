@@ -1,7 +1,7 @@
 import { renderHalftoneSync } from './halftone-renderer.js';
 import { BloomPass } from '../bloom-pass.js';
 
-export const PRESET_THUMBNAIL_VERSION = 4;
+export const PRESET_THUMBNAIL_VERSION = 5;
 const cache = new WeakMap();
 
 // Use the same close-up tonal ramp for built-in, saved, and imported presets.

@@ -14,7 +14,7 @@ const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({ value, label: titleCase(value) }));
 const PATTERN_OPTIONS = [
   { value: 'organic', label: 'Organic' }, { value: 'round', label: 'Dots' },
-  { value: 'diamond', label: 'Diamonds' }, { value: 'line', label: 'Lines' }
+  { value: 'line', label: 'Lines' }
 ];
 const INVERT_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
@@ -425,16 +425,16 @@ export function mountStudioPanel(studio) {
       control.update({ ...props, value: previous });
     });
   }
-  const layoutFolder = mountStudioFolder(folders, "Layout");
+  const layoutFolder = mountStudioFolder(folders, "Pattern");
   const layout = layoutFolder.body;
-  function segmentedSetting(host, key, label, options, readValue = () => state.settings[key]) {
+  function segmentedSetting(host, key, label, options, readValue = () => state.settings[key], showLabel = true) {
     const field = element("div", "segmented-field");
-    field.append(element("span", "segmented-field-label", label));
+    if (showLabel) field.append(element("span", "segmented-field-label", label));
     const update = mountSegments(field, options, label, options.length, (value) => studio.setSetting(key, value));
     host.append(field);
     bindings.push(() => update(readValue()));
   }
-  segmentedSetting(layout, "pattern", "Pattern", PATTERN_OPTIONS, () => selectedPattern(state.settings));
+  segmentedSetting(layout, "pattern", "Pattern", PATTERN_OPTIONS, () => selectedPattern(state.settings), false);
   slider(layout, "cellSize", "Cell size", 3, 12, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
   const toneFolder = mountStudioFolder(folders, "Tone");

@@ -612,7 +612,7 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   const folder = (name) => document.getElementById(`studio-section-${name}`).closest('.studio-folder');
   const panel = document.getElementById('dialPanelRoot');
   const actions = document.querySelector('.rail-actions');
-  const slider = folder('layout').querySelector('[role="slider"]');
+  const slider = folder('pattern').querySelector('[role="slider"]');
   assert.equal(nav.hidden, false);
   assert.equal(tabs[0].textContent, "Image");
   assert.equal(nav.style.getPropertyValue('--segment-index'), '0');
@@ -624,14 +624,14 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(actions.hidden, true);
   tabs[1].click();
   assert.equal(folder('source').hidden, true);
-  for (const name of ['presets', 'layout', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['presets', 'pattern', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
   const history = folder('presets').querySelector('[aria-label="Edit history"]');
   assert.ok(history);
   assert.equal(history.hidden, false);
   assert.equal(history.closest('[hidden]'), null);
   assert.ok(history.querySelector('[aria-label="Undo"]'));
   assert.ok(history.querySelector('[aria-label="Redo"]'));
-  for (const name of ['layout', 'tone', 'colors', 'advanced']) {
+  for (const name of ['pattern', 'tone', 'colors', 'advanced']) {
     const group = folder(name);
     const trigger = group.querySelector('button.dialkit-folder-header-top');
     const heading = group.querySelector('h2.studio-folder-static-heading');
@@ -654,16 +654,16 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(nav.hidden, true);
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
-  for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
-  assert.equal(folder('layout').dataset.phoneFlat, 'false');
-  assert.equal(folder('layout').querySelector('button.dialkit-folder-header-top').hidden, false);
-  assert.equal(folder('layout').querySelector('h2.studio-folder-static-heading').hidden, true);
-  assert.equal(folder('layout').querySelector('button.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
+  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  assert.equal(folder('pattern').dataset.phoneFlat, 'false');
+  assert.equal(folder('pattern').querySelector('button.dialkit-folder-header-top').hidden, false);
+  assert.equal(folder('pattern').querySelector('h2.studio-folder-static-heading').hidden, true);
+  assert.equal(folder('pattern').querySelector('button.dialkit-folder-header-top').getAttribute('aria-expanded'), 'true');
   browser.happyDOM.setWindowSize({ width: 390, height: 844 });
   assert.equal(tabs[3].getAttribute('aria-pressed'), 'true');
   assert.equal(nav.style.getPropertyValue('--segment-index'), '3');
   tabs[1].click();
-  assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
+  assert.equal(folder('pattern').querySelector('[role="slider"]'), slider);
   assert.equal(state.settings.cellSize, 12);
 });
 
@@ -811,18 +811,18 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   const panel = document.getElementById('dialPanelRoot');
   const actions = document.querySelector('.rail-actions');
   const folder = (name) => document.getElementById(`studio-section-${name}`).closest('.studio-folder');
-  const slider = folder('layout').querySelector('[role="slider"]');
+  const slider = folder('pattern').querySelector('[role="slider"]');
   assert.equal(tabs.hidden, false);
   assert.equal(folder('source').hidden, false);
   assert.equal(actions.hidden, true);
   tabButtons[1].click();
   assert.equal(folder('source').hidden, true);
-  assert.equal(folder('layout').hidden, false);
+  assert.equal(folder('pattern').hidden, false);
   assert.equal(folder('presets').hidden, false);
   panel.scrollTop = 140;
   tabButtons[2].click();
   assert.equal(folder('colors').hidden, false);
-  assert.equal(folder('layout').hidden, true);
+  assert.equal(folder('pattern').hidden, true);
   tabButtons[3].click();
   assert.equal(panel.hidden, true);
   assert.equal(actions.hidden, false);
@@ -831,13 +831,13 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   assert.equal(actions.hidden, false);
   tabButtons[1].click();
   assert.equal(panel.scrollTop, 140);
-  assert.equal(folder('layout').querySelector('[role="slider"]'), slider);
+  assert.equal(folder('pattern').querySelector('[role="slider"]'), slider);
   touch.matches = false;
   touch.dispatchEvent(new browser.Event('change'));
   assert.equal(tabs.hidden, true);
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
-  for (const name of ['source', 'presets', 'layout', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
 });
 
 test('phone tabs restore independent scroll positions and ignore active-tab taps', () => {
@@ -1254,13 +1254,16 @@ test('preset menu shows four rows and a next-row peek within the viewport', asyn
   } finally { cleanup(); popup.remove(); }
 });
 
-test('Pattern exposes Organic, Dots, Diamonds and Lines with the right selection', () => {
+test('Pattern exposes Organic, Dots and Lines with the right selection', () => {
   state.settings.dotShape = 'round';
   state.settings.screenStyle = 'paper';
   emit();
   const pattern = document.querySelector('[role="radiogroup"][aria-label="Pattern"]');
+  const section = pattern.closest('.studio-folder');
+  assert.equal(section.querySelector('.dialkit-folder-title').textContent, 'Pattern');
+  assert.equal(pattern.parentElement.querySelector('.segmented-field-label'), null);
   assert.deepEqual([...pattern.querySelectorAll('button')].map(button => button.textContent),
-    ['Organic', 'Dots', 'Diamonds', 'Lines']);
+    ['Organic', 'Dots', 'Lines']);
   assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Organic');
   pattern.querySelector('[data-value="round"]').click();
   assert.deepEqual(settingsChanged.at(-1), ['pattern', 'round']);
