@@ -294,21 +294,21 @@ test('preset import persists a copy, applies it, and leaves the uploaded image a
   const { studio } = editor;
   await new Promise((resolve) => setTimeout(resolve, 20));
   const original = studio.getState();
-  const file = serializePreset('Fine Screen', { ...original.settings, inkColor: '#123456' });
+  const file = serializePreset('Soft Print', { ...original.settings, inkColor: '#123456' });
   const input = { size: file.text.length, text: async () => file.text };
-  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Fine Screen (2)' });
+  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Soft Print (2)' });
   assert.equal(studio.getState().isCustomPreset, true);
   assert.equal(studio.getState().presetModified, false);
   assert.equal(studio.getState().settings.inkColor, '#123456');
   assert.equal(studio.getState().hasUserImage, original.hasUserImage);
-  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Fine Screen (3)' });
+  assert.deepEqual(await studio.importPreset(input), { ok: true, name: 'Soft Print (3)' });
   const before = studio.getState();
   assert.equal((await studio.importPreset({ size: 100000, text() { assert.fail('oversized file must not be read'); } })).ok, false);
   assert.equal((await studio.importPreset({ size: 1, text: async () => '{' })).ok, false);
   assert.deepEqual(studio.getState(), before);
   const stored = await editor.close();
   const restored = await openEditor(stored);
-  assert.equal(restored.studio.getState().selectedPreset, 'Fine Screen (3)');
+  assert.equal(restored.studio.getState().selectedPreset, 'Soft Print (3)');
   assert.equal(restored.studio.getState().settings.inkColor, '#123456');
   await restored.close();
 });
@@ -421,5 +421,47 @@ test('clipboard denial terminates an active render and allows a successful retry
     assert.equal(toast.dataset.visible, 'true', 'completion toast remains visible beyond two seconds');
     await new Promise(resolve => setTimeout(resolve, 3000));
     assert.equal(toast.dataset.visible, 'false', 'completion toast dismisses after five seconds');
+  } finally { await editor.close(); }
+});
+
+test('pattern choices switch both rendering settings atomically and undo restores Organic', async () => {
+  const editor = await openEditor();
+  const { studio } = editor;
+  try {
+    studio.selectPreset('fine');
+    studio.setHistoryEnabled(true);
+    assert.equal(studio.getState().settings.screenStyle, 'paper');
+    studio.setSetting('pattern', 'round');
+    assert.equal(studio.getState().settings.dotShape, 'round');
+    assert.equal(studio.getState().settings.screenStyle, 'classic');
+    studio.undo();
+    assert.equal(studio.getState().settings.screenStyle, 'paper');
+    assert.equal(studio.getState().presetModified, false);
+    for (const pattern of ['diamond', 'line', 'organic']) {
+      studio.setSetting('pattern', pattern);
+      assert.equal(studio.getState().settings.dotShape, pattern === 'organic' ? 'round' : pattern);
+      assert.equal(studio.getState().settings.screenStyle, pattern === 'organic' ? 'paper' : 'classic');
+    }
+    studio.selectPreset('red');
+    assert.equal(studio.getState().settings.screenStyle, 'classic');
+  } finally { await editor.close(); }
+});
+
+test('Soft Print replaces the local Paper preset and restores its previous session', async () => {
+  let editor = await openEditor();
+  editor.studio.selectPreset('fine');
+  assert.equal(editor.studio.getState().settings.screenStyle, 'paper');
+  assert.equal(editor.studio.getState().presets.some(preset => preset.value === 'paper'), false);
+  assert.equal(editor.studio.getState().presets.length, 5);
+  assert.equal(editor.studio.getState().presets[0].value, 'fine');
+  const storage = await editor.close();
+  const saved = JSON.parse(storage[EDITOR_SESSION_KEY]);
+  saved.selectedPreset = 'paper';
+  storage[EDITOR_SESSION_KEY] = JSON.stringify(saved);
+  editor = await openEditor(storage);
+  try {
+    assert.equal(editor.studio.getState().selectedPreset, 'fine');
+    assert.equal(editor.studio.getState().settings.screenStyle, 'paper');
+    assert.equal(editor.studio.getState().presetModified, false);
   } finally { await editor.close(); }
 });

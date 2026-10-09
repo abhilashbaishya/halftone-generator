@@ -1,7 +1,7 @@
 import { renderHalftoneSync } from './halftone-renderer.js';
 import { BloomPass } from '../bloom-pass.js';
 
-export const PRESET_THUMBNAIL_VERSION = 3;
+export const PRESET_THUMBNAIL_VERSION = 4;
 const cache = new WeakMap();
 
 // Use the same close-up tonal ramp for built-in, saved, and imported presets.
@@ -25,6 +25,7 @@ export function renderPresetPreview(preset) {
     angle: preset.screenAngle * Math.PI / 180,
     toneCurve: preset.toneCurve,
     dotShape: preset.dotShape,
+    screenStyle: preset.screenStyle,
     invert: preset.invert,
     jitter: (preset.jitter ?? 0) / 100,
     microDotAmount: (preset.microDot ?? 0) / 100,

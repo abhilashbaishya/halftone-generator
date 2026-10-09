@@ -1,5 +1,5 @@
 import { safePresetName } from './export-filename.js';
-import { DOT_SHAPES, SCREEN_DEFAULTS } from './screen-settings.js';
+import { DOT_SHAPES, SCREEN_DEFAULTS, SCREEN_STYLES, screenValue } from './screen-settings.js';
 import { MAX_TEXTURE_SEED } from './texture-settings.js';
 
 export const MAX_PRESET_FILE_BYTES = 64 * 1024;
@@ -48,11 +48,13 @@ export function parsePreset(text, isColor) {
     if (s[key] !== undefined && !inRange(s[key], range)) return invalid();
   }
   if (!isColor(s.inkColor) || !isColor(s.paperColor)) return invalid();
-  if (s.dotShape !== undefined && !DOT_SHAPES.includes(s.dotShape)) return invalid();
+  if (s.dotShape !== undefined && s.dotShape !== 'gooey' && !DOT_SHAPES.includes(s.dotShape)) return invalid();
+  if (s.screenStyle !== undefined && !SCREEN_STYLES.includes(s.screenStyle)) return invalid();
   if (s.invert !== undefined && typeof s.invert !== 'boolean') return invalid();
   return { name, settings: {
     ...Object.fromEntries(FIELDS.map((key) => [key, s[key]])),
     ...Object.fromEntries(Object.entries(OPTIONAL_DEFAULTS).map(([key, fallback]) => [key, s[key] ?? fallback])),
+    ...Object.fromEntries(Object.keys(SCREEN_DEFAULTS).map(key => [key, screenValue(s, key)])),
     minDot: 0
   } };
 }

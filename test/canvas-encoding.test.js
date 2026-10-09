@@ -55,8 +55,8 @@ test('download names identify the preset and each output size', () => {
   for (const quality of ['draft', 'high', 'ultra', 'print']) {
     const label = quality[0].toUpperCase() + quality.slice(1);
     for (const extension of ['png', 'jpg', 'webp']) {
-      assert.equal(createExportFilename(extension, { preset: 'Fine Screen', quality }),
-        `Halftone Studio - Fine Screen - ${label}.${extension}`);
+      assert.equal(createExportFilename(extension, { preset: 'Soft Print', quality }),
+        `Halftone Studio - Soft Print - ${label}.${extension}`);
     }
   }
 });

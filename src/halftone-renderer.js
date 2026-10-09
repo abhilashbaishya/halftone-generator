@@ -1,3 +1,4 @@
+import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
 
 // Area covered by a circle clipped to a unit square. Unlike isolated dots,
@@ -51,6 +52,10 @@ function readColor(ctx, color) {
 function* renderRows(ctx, source, width, height, settings) {
   const ink = readColor(ctx, settings.ink);
   const paper = readColor(ctx, settings.paper);
+  if (settings.dotShape === 'gooey' || (settings.screenStyle === 'paper' && (!settings.dotShape || settings.dotShape === 'round'))) {
+    yield* renderPaperRows(ctx, source, width, height, settings, ink, paper);
+    return;
+  }
   const image = ctx.createImageData(width, height);
   const out = image.data;
   const cell = Math.max(1, settings.cellSize);

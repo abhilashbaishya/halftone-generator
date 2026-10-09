@@ -47,5 +47,15 @@ test('imports avoid case-insensitive name collisions without overwriting', () =>
   assert.equal(uniquePresetName('My print', ['MY PRINT', 'My print (2)']), 'My print (3)');
   const name = 'x'.repeat(40);
   assert.equal(uniquePresetName(name, [name]), 'x'.repeat(36) + ' (2)');
-  assert.equal(uniquePresetName('Fine Screen', ['Fine Screen']), 'Fine Screen (2)');
+  assert.equal(uniquePresetName('Soft Print', ['Soft Print']), 'Soft Print (2)');
+});
+
+test('Paper merged-dot treatment survives preset export and import', () => {
+  const paper = { ...settings, dotShape: 'round', screenStyle: 'paper' };
+  const restored = parsePreset(serializePreset('Paper custom', paper).text, isColor).settings;
+  assert.equal(restored.dotShape, 'round');
+  assert.equal(restored.screenStyle, 'paper');
+  const legacy = parsePreset(serializePreset('Local trial', { ...settings, dotShape: 'gooey' }).text, isColor).settings;
+  assert.equal(legacy.dotShape, 'round');
+  assert.equal(legacy.screenStyle, 'paper');
 });

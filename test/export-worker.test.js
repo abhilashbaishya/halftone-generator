@@ -81,7 +81,7 @@ for (const format of ['png', 'webp', 'jpeg']) test(`${format} cutout exports pre
   assert.ok(pixels.some((value, index) => index % 4 === 3 && value > 0 && pixels[index - 1] < 100));
 });
 
-for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses preview renderer: ${format}`, async () => {
+for (const screenStyle of ['classic', 'paper']) for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses preview renderer: ${screenStyle} ${format}`, async () => {
   nativeWebp = true;
   progress = [];
   const width = 192, height = 240;
@@ -91,7 +91,7 @@ for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses previ
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(source, 0, 0, width, height);
   const expected = createCanvas(width, height).getContext('2d');
-  const altSettings = { ...settings };
+  const altSettings = { ...settings, dotShape: 'round', screenStyle };
   renderHalftoneSync(expected, ctx.getImageData(0, 0, width, height).data, width, height, altSettings);
   const done = new Promise((resolve) => { complete = resolve; });
   self.onmessage({ data: { type: 'export', requestId: 3, sourceBitmap: source, width, height,

@@ -7,12 +7,15 @@ import { createStudioIcon } from "./icons.js";
 import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
-import { DOT_SHAPES } from "./screen-settings.js";
+import { selectedPattern } from "./screen-settings.js";
 import { mountFocusSource } from "./focus-source.js";
 
 const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({ value, label: titleCase(value) }));
-const SHAPE_OPTIONS = DOT_SHAPES.map((value) => ({ value, label: titleCase(value) }));
+const PATTERN_OPTIONS = [
+  { value: 'organic', label: 'Organic' }, { value: 'round', label: 'Dots' },
+  { value: 'diamond', label: 'Diamonds' }, { value: 'line', label: 'Lines' }
+];
 const INVERT_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
 function element(tag, className, text) {
@@ -424,14 +427,14 @@ export function mountStudioPanel(studio) {
   }
   const layoutFolder = mountStudioFolder(folders, "Layout");
   const layout = layoutFolder.body;
-  function segmentedSetting(host, key, label, options) {
+  function segmentedSetting(host, key, label, options, readValue = () => state.settings[key]) {
     const field = element("div", "segmented-field");
     field.append(element("span", "segmented-field-label", label));
     const update = mountSegments(field, options, label, options.length, (value) => studio.setSetting(key, value));
     host.append(field);
-    bindings.push(() => update(state.settings[key]));
+    bindings.push(() => update(readValue()));
   }
-  segmentedSetting(layout, "dotShape", "Dot shape", SHAPE_OPTIONS);
+  segmentedSetting(layout, "pattern", "Pattern", PATTERN_OPTIONS, () => selectedPattern(state.settings));
   slider(layout, "cellSize", "Cell size", 3, 12, 1);
   slider(layout, "screenAngle", "Screen angle", -75, 75, 1, "°");
   const toneFolder = mountStudioFolder(folders, "Tone");

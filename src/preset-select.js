@@ -9,7 +9,7 @@ const samples = {
   orange: { description: 'Warm, weathered ink', image: new URL('./preset-previews/orange.png', import.meta.url).href },
   neon: { description: 'Fluorescent negative glow', image: new URL('./preset-previews/neon.png', import.meta.url).href },
   blue: { description: 'Pale cyanotype grid', image: new URL('./preset-previews/blue.png', import.meta.url).href },
-  fine: { description: 'Soft photographic detail', image: new URL('./preset-previews/fine.png', import.meta.url).href }
+  fine: { description: 'Rounded dots, merging shadows', image: new URL('./preset-previews/fine.png', import.meta.url).href }
 };
 
 // Keep DialKit's selection, positioning and keyboard behavior. Only decorate

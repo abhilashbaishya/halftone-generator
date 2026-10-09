@@ -13,7 +13,7 @@ import { getPreviewRenderPlan, shouldPresentPreview } from "./src/preview-policy
 import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
-import { SCREEN_DEFAULTS, normalizeScreenValue } from "./src/screen-settings.js";
+import { SCREEN_DEFAULTS, normalizeScreenValue, screenValue, patternSettings } from "./src/screen-settings.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
@@ -163,7 +163,7 @@ const PRESET_LABELS = {
   orange: "Amber Press",
   neon: "Electric",
   blue: "Blueprint",
-  fine: "Fine Screen"
+  fine: "Soft Print"
 };
 
 const QUALITY_MODES = {
@@ -239,6 +239,24 @@ const controls = {
 };
 
 const builtInPresets = {
+  // Paper-inspired centre-sampled dots, blending into rounded shadow shapes.
+  fine: {
+    quality: "high",
+    cellSize: 8,
+    contrast: 1,
+    gamma: 1,
+    minDot: 0,
+    screenAngle: 0,
+    toneCurve: 1,
+    microDot: 0,
+    jitter: 0,
+    seed: 0,
+    dotShape: "round",
+    screenStyle: "paper",
+    inkColor: "#2b2b2b",
+    paperColor: "#f2f1e8",
+    grainStrength: 12
+  },
   // Clean, regular dots with deeper crimson ink for a punchy poster finish.
   red: {
     quality: "ultra",
@@ -302,21 +320,6 @@ const builtInPresets = {
     seed: 256,
     inkColor: "#d8edff",
     paperColor: "#15358a"
-  },
-  // The smallest screen, preserving continuous tones without added texture.
-  fine: {
-    quality: "print",
-    cellSize: 4,
-    contrast: 1.15,
-    gamma: 1,
-    minDot: 0,
-    screenAngle: 30,
-    toneCurve: 1.15,
-    microDot: 0,
-    jitter: 0,
-    seed: 0,
-    inkColor: "#0a0a0a",
-    paperColor: "#f8f8f8"
   }
 };
 
@@ -539,7 +542,7 @@ function sanitizePreset(rawPreset) {
     sanitized[key] = Number.isFinite(parsed) ? parsed : fallback;
   });
   for (const key of Object.keys(SCREEN_DEFAULTS)) {
-    sanitized[key] = normalizeScreenValue(key, rawPreset[key]);
+    sanitized[key] = screenValue(rawPreset, key);
   }
 
   if (!QUALITY_MODES[sanitized.quality]) {
@@ -1002,6 +1005,7 @@ function getRenderSettings(width = previewCanvas.width, height = previewCanvas.h
     jitter: textureSettings.jitter / 100,
     seed: textureSettings.seed,
     dotShape: screenSettings.dotShape,
+    screenStyle: screenSettings.screenStyle,
     invert: screenSettings.invert,
     quality: getQualityConfig(),
     ink: controls.inkColor.value,
@@ -1192,7 +1196,7 @@ function applySettings(preset) {
   }
 
   for (const key of Object.keys(screenSettings)) {
-    screenSettings[key] = normalizeScreenValue(key, preset[key]);
+    screenSettings[key] = screenValue(preset, key);
   }
 }
 
@@ -2156,8 +2160,12 @@ function setHasUserImage(next) {
 }
 
 function setPanelSetting(key, value) {
-  if (!PANEL_SETTING_FIELDS.has(key)) return;
-  if (Object.hasOwn(textureSettings, key)) {
+  if (key !== 'pattern' && !PANEL_SETTING_FIELDS.has(key)) return;
+  if (key === 'pattern') {
+    const next = patternSettings(value);
+    if (!next || (screenSettings.dotShape === next.dotShape && screenSettings.screenStyle === next.screenStyle)) return;
+    Object.assign(screenSettings, next);
+  } else if (Object.hasOwn(textureSettings, key)) {
     const next = normalizeTextureValue(key, value);
     if (next === null || textureSettings[key] === next) return;
     textureSettings[key] = next;
@@ -2431,9 +2439,12 @@ editorSession = mountEditorSession({
   restore: (saved) => {
     const settings = sanitizePreset(saved.settings);
     if (!settings) return;
-    const knownPreset = typeof saved.selectedPreset === "string"
-      && (Object.hasOwn(builtInPresets, saved.selectedPreset) || Object.hasOwn(customPresets, saved.selectedPreset));
-    controls.presetSelect.value = knownPreset ? saved.selectedPreset : DEFAULT_PRESET;
+    // The local Paper comparison preset is now the built-in Soft Print.
+    const selectedPreset = saved.selectedPreset === "paper" && !Object.hasOwn(customPresets, "paper")
+      ? "fine" : saved.selectedPreset;
+    const knownPreset = typeof selectedPreset === "string"
+      && (Object.hasOwn(builtInPresets, selectedPreset) || Object.hasOwn(customPresets, selectedPreset));
+    controls.presetSelect.value = knownPreset ? selectedPreset : DEFAULT_PRESET;
     applySettings(settings);
     if (typeof saved.grainSeed === "number" && saved.grainSeed >= 0 && saved.grainSeed < 1) {
       grainSeed = saved.grainSeed;

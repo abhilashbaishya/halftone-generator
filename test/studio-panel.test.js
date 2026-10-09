@@ -147,7 +147,7 @@ test('screenshot shortcuts never add focus rings after a click, while keyboard n
 });
 
 test('visual preset options preserve selection and distinguish built-in samples from saved presets', async () => {
-  state.presets = [{ value: 'red', label: 'Crimson Poster' }, { value: 'fine', label: 'Fine Screen' },
+  state.presets = [{ value: 'red', label: 'Crimson Poster' }, { value: 'fine', label: 'Soft Print' },
     { value: 'My print', label: 'My print' }];
   state.selectedPreset = 'red';
   emit();
@@ -1252,4 +1252,19 @@ test('preset menu shows four rows and a next-row peek within the viewport', asyn
     browser.dispatchEvent(new browser.Event('resize'));
     assert.equal(popup.style.getPropertyValue('--preset-menu-height'), '316px');
   } finally { cleanup(); popup.remove(); }
+});
+
+test('Pattern exposes Organic, Dots, Diamonds and Lines with the right selection', () => {
+  state.settings.dotShape = 'round';
+  state.settings.screenStyle = 'paper';
+  emit();
+  const pattern = document.querySelector('[role="radiogroup"][aria-label="Pattern"]');
+  assert.deepEqual([...pattern.querySelectorAll('button')].map(button => button.textContent),
+    ['Organic', 'Dots', 'Diamonds', 'Lines']);
+  assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Organic');
+  pattern.querySelector('[data-value="round"]').click();
+  assert.deepEqual(settingsChanged.at(-1), ['pattern', 'round']);
+  state.settings.screenStyle = 'classic';
+  emit();
+  assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Dots');
 });

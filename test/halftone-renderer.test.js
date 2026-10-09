@@ -106,3 +106,52 @@ test('source transparency masks both ink and paper, preserving soft edges', () =
     }
   }
 });
+
+test('Paper screen renders consistently across row bands and preserves cutout alpha', async () => {
+  const width = 64, height = 192;
+  const source = new Uint8ClampedArray(width * height * 4).fill(128);
+  for (let i = 3; i < source.length; i += 4) source[i] = 255;
+  const paperSettings = { ...settings, cellSize: 4 * Math.SQRT2, dotShape: 'round', screenStyle: 'paper' };
+  const a = createCanvas(width, height).getContext('2d');
+  const b = createCanvas(width, height).getContext('2d');
+  renderHalftoneSync(a, source, width, height, paperSettings);
+  const pixels = a.getImageData(0, 0, width, height).data;
+  assert.ok(pixels.some((v, i) => i % 4 === 0 && v < 50), 'midtone has ink');
+  assert.ok(pixels.some((v, i) => i % 4 === 0 && v > 200), 'midtone has paper');
+  // A uniform screen repeats every two lattice steps, including across bands.
+  for (let y = 8; y < height; y++) {
+    assert.deepEqual(pixels.slice(y * width * 4, (y + 1) * width * 4),
+      pixels.slice((y % 8) * width * 4, (y % 8 + 1) * width * 4), `row ${y} has no band seam`);
+  }
+  await renderHalftoneAsync(b, source, width, height, paperSettings);
+  assert.deepEqual(b.getImageData(0, 0, width, height).data, pixels, 'worker and fallback match');
+  let cancelled = false;
+  assert.deepEqual(await renderHalftoneAsync(b, source, width, height, paperSettings, {
+    onProgress() { cancelled = true; }, shouldCancel: () => cancelled
+  }), { cancelled: true });
+  for (let i = 3; i < source.length; i += 4) source[i] = [0, 64, 128, 255][(i >> 2) % 4];
+  renderHalftoneSync(a, source, width, height, { ...paperSettings, angle: .37 });
+  const cutout = a.getImageData(0, 0, width, height).data;
+  for (let i = 3; i < source.length; i += 4) assert.equal(cutout[i], source[i], 'original alpha survives');
+});
+
+test('Paper screen responds to tone, angle, invert and cell size controls', () => {
+  const width = 96, height = 96;
+  const source = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < source.length; i += 4) {
+    source[i] = source[i + 1] = source[i + 2] = (i / 4 % width) * 255 / width;
+    source[i + 3] = 255;
+  }
+  const ctx = createCanvas(width, height).getContext('2d');
+  const render = (extra) => {
+    renderHalftoneSync(ctx, source, width, height, { ...settings, dotShape: 'round', screenStyle: 'paper', ...extra });
+    return ctx.getImageData(0, 0, width, height).data;
+  };
+  const original = render({});
+  const brightness = pixels => pixels.reduce((sum, value, i) => sum + (i % 4 === 0 ? value : 0), 0);
+  assert.ok(brightness(render({ gamma: 1.6 })) < brightness(original), 'gamma direction matches existing presets');
+  for (const extra of [{ contrast: 1.8 }, { gamma: 1.6 }, { toneCurve: 1.4 },
+    { angle: .4 }, { invert: true }, { cellSize: 6 }, { dotShape: 'square' }, { screenStyle: 'classic' }]) {
+    assert.notDeepEqual(render(extra), original, JSON.stringify(extra));
+  }
+});
