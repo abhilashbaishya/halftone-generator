@@ -1,5 +1,5 @@
 // DialKit's 320px cap includes our extra footer. Reserve four complete rows
-// instead, and place the resulting menu on whichever side has room.
+// plus a peek at the next preset, and place the menu on whichever side has room.
 export function mountPresetMenuSize(popup, trigger) {
   const list = popup.querySelector('.studio-preset-list');
   const footer = popup.querySelector('.studio-preset-menu-actions');
@@ -10,7 +10,8 @@ export function mountPresetMenuSize(popup, trigger) {
     const chrome = px(style.paddingTop) + px(style.paddingBottom)
       + px(style.borderTopWidth) + px(style.borderBottomWidth);
     const rows = [...list.children].slice(0, 4);
-    const desired = Math.ceil(rows.reduce((height, row) => height + row.offsetHeight, 0)
+    const nextRowPeek = (list.children[4]?.offsetHeight ?? 0) / 2;
+    const desired = Math.ceil(nextRowPeek + rows.reduce((height, row) => height + row.offsetHeight, 0)
       + footer.offsetHeight + px(getComputedStyle(footer).marginTop) + chrome);
     const viewport = window.visualViewport;
     const viewportTop = viewport?.offsetTop ?? 0;
