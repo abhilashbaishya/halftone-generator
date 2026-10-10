@@ -257,7 +257,7 @@ const builtInPresets = {
     paperColor: "#f2f1e8",
     grainStrength: 12
   },
-  // Clean, regular dots with deeper crimson ink for a punchy poster finish.
+  // Clean, regular dots in oxblood ink on vivid crimson paper.
   red: {
     quality: "ultra",
     cellSize: 6,
@@ -269,10 +269,10 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 11,
-    inkColor: "#9f0019",
-    paperColor: "#f5f5f5"
+    inkColor: "#2a090b",
+    paperColor: "#ff3148"
   },
-  // A diagonal cutout screen with burnt amber ink and grain on warm paper.
+  // A diagonal cutout screen with dark umber ink on golden amber paper.
   orange: {
     quality: "high",
     cellSize: 7,
@@ -286,11 +286,11 @@ const builtInPresets = {
     seed: 42,
     dotShape: "round",
     screenStyle: "perforated",
-    inkColor: "#913f00",
-    paperColor: "#f3dfbc",
+    inkColor: "#251403",
+    paperColor: "#ffb411",
     grainStrength: 14
   },
-  // A luminous negative: bright scan lines on dark paper, with restrained glow.
+  // A luminous negative: acid-lime scan lines on near-black paper, with restrained glow.
   neon: {
     quality: "ultra",
     cellSize: 5,
@@ -303,8 +303,8 @@ const builtInPresets = {
     jitter: 0,
     seed: 99,
     dotShape: "line",
-    inkColor: "#b5ff3d",
-    paperColor: "#101510",
+    inkColor: "#bbfb00",
+    paperColor: "#070b02",
     bloomStrength: 8
   },
   // A fine, axis-aligned screen with pale ink on deep blue paper.
