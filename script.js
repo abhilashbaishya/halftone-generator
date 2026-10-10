@@ -269,10 +269,10 @@ const builtInPresets = {
     microDot: 0,
     jitter: 0,
     seed: 11,
-    inkColor: "#b8202a",
+    inkColor: "#9f0019",
     paperColor: "#f5f5f5"
   },
-  // A coarser diagonal screen of textured dots and grain on warm paper.
+  // A diagonal cutout screen with burnt amber ink and grain on warm paper.
   orange: {
     quality: "high",
     cellSize: 7,
@@ -285,7 +285,8 @@ const builtInPresets = {
     jitter: 18,
     seed: 42,
     dotShape: "round",
-    inkColor: "#ad551e",
+    screenStyle: "perforated",
+    inkColor: "#913f00",
     paperColor: "#f3dfbc",
     grainStrength: 14
   },
@@ -2439,8 +2440,8 @@ editorSession = mountEditorSession({
   restore: (saved) => {
     const settings = sanitizePreset(saved.settings);
     if (!settings) return;
-    // The local Paper comparison preset is now the built-in Soft Print.
-    const selectedPreset = saved.selectedPreset === "paper" && !Object.hasOwn(customPresets, "paper")
+    // Retired local comparison presets retain edits under Soft Print.
+    const selectedPreset = ["paper", "perforated"].includes(saved.selectedPreset) && !Object.hasOwn(customPresets, saved.selectedPreset)
       ? "fine" : saved.selectedPreset;
     const knownPreset = typeof selectedPreset === "string"
       && (Object.hasOwn(builtInPresets, selectedPreset) || Object.hasOwn(customPresets, selectedPreset));

@@ -1,7 +1,7 @@
 export const DOT_SHAPES = ['round', 'square', 'diamond', 'line'];
 
 // Presets saved before these settings existed render as round, un-inverted dots.
-export const SCREEN_STYLES = ['classic', 'paper'];
+export const SCREEN_STYLES = ['classic', 'paper', 'perforated'];
 export const SCREEN_DEFAULTS = { dotShape: 'round', invert: false, screenStyle: 'classic' };
 
 export function normalizeScreenValue(key, value) {
@@ -26,12 +26,14 @@ export function screenValue(preset, key) {
 }
 
 export function patternSettings(pattern) {
+  if (pattern === 'cutout') return { dotShape: 'round', screenStyle: 'perforated' };
   if (pattern === 'organic') return { dotShape: 'round', screenStyle: 'paper' };
   if (['round', 'line'].includes(pattern)) return { dotShape: pattern, screenStyle: 'classic' };
   return null;
 }
 
 export function selectedPattern(settings) {
+  if (settings.screenStyle === 'perforated') return 'cutout';
   const shape = screenValue(settings, 'dotShape');
   return shape === 'round' && screenValue(settings, 'screenStyle') === 'paper' ? 'organic' : shape;
 }

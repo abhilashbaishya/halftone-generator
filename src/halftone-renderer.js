@@ -1,3 +1,4 @@
+import { renderPerforatedRows } from './perforated-screen.js';
 import { sampleDotCellTones } from './dot-cell-tones.js';
 import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
@@ -53,6 +54,10 @@ function readColor(ctx, color) {
 function* renderRows(ctx, source, width, height, settings) {
   const ink = readColor(ctx, settings.ink);
   const paper = readColor(ctx, settings.paper);
+  if (settings.screenStyle === 'perforated') {
+    yield* renderPerforatedRows(ctx, source, width, height, settings, ink, paper);
+    return;
+  }
   if (settings.dotShape === 'gooey' || (settings.screenStyle === 'paper' && (!settings.dotShape || settings.dotShape === 'round'))) {
     yield* renderPaperRows(ctx, source, width, height, settings, ink, paper);
     return;

@@ -465,3 +465,26 @@ test('Soft Print replaces the local Paper preset and restores its previous sessi
     assert.equal(editor.studio.getState().presetModified, false);
   } finally { await editor.close(); }
 });
+
+test('Cutout works on every built-in and custom preset without changing palette or tone controls', async () => {
+  const editor = await openEditor();
+  const { studio } = editor;
+  try {
+    const presets = studio.getState().presets;
+    assert.equal(presets.some(p => p.value === 'perforated'), false);
+    for (const { value } of presets) {
+      studio.selectPreset(value);
+      const original = studio.getState().settings;
+      studio.setSetting('pattern', 'cutout');
+      assert.deepEqual(studio.getState().settings, { ...original, dotShape: 'round', screenStyle: 'perforated' });
+    }
+    assert.equal(studio.savePreset('Custom cutout').ok, true);
+    studio.selectPreset('red');
+    studio.selectPreset('Custom cutout');
+    assert.equal(studio.getState().settings.screenStyle, 'perforated');
+    studio.setSetting('pattern', 'line');
+    assert.equal(studio.getState().settings.screenStyle, 'classic');
+    studio.setSetting('pattern', 'cutout');
+    assert.equal(studio.getState().settings.screenStyle, 'perforated');
+  } finally { await editor.close(); }
+});

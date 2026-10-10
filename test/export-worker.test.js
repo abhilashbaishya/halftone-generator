@@ -81,7 +81,7 @@ for (const format of ['png', 'webp', 'jpeg']) test(`${format} cutout exports pre
   assert.ok(pixels.some((value, index) => index % 4 === 3 && value > 0 && pixels[index - 1] < 100));
 });
 
-for (const screenStyle of ['classic', 'paper']) for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses preview renderer: ${screenStyle} ${format}`, async () => {
+for (const screenStyle of ['classic', 'paper', 'perforated']) for (const format of ['png', 'jpeg', 'webp', 'effects']) test(`export uses preview renderer: ${screenStyle} ${format}`, async () => {
   nativeWebp = true;
   progress = [];
   const width = 192, height = 240;

@@ -11,7 +11,7 @@ const profile = Float32Array.from({ length: PROFILE_SIZE + 1 }, (_, i) => {
 });
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-function sampleDarkness(source, width, height, x, y, settings) {
+export function samplePaperDarkness(source, width, height, x, y, settings) {
   // Bilinear sampling, like the source texture in Paper's shader. Composite
   // samples onto white before interpolation so invisible RGB cannot add ink.
   x = clamp(x - .5, 0, width - 1);
@@ -23,7 +23,7 @@ function sampleDarkness(source, width, height, x, y, settings) {
     (y1 * width + x0) * 4, (y1 * width + x1) * 4];
   const weights = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
   // Paper's default contrast .4 maps to a sigmoid slope of 3.7947.
-  const slope = 15 * Math.pow(.4, 1.5) * settings.contrast;
+  const slope = (settings.screenStyle === 'perforated' ? 15 : 15 * Math.pow(.4, 1.5)) * settings.contrast;
   let luma = 0;
   for (let channel = 0; channel < 3; channel++) {
     let value = 0;
@@ -65,7 +65,7 @@ export function* renderPaperRows(ctx, source, width, height, settings, ink, pape
         if ((gx + gy) % 2 !== 0) continue;
         const cx = (gx * cos - gy * sin) * pitch + width / 2;
         const cy = (gx * sin + gy * cos) * pitch + height / 2;
-        const radius = maxRadius * sampleDarkness(source, width, height, cx, cy, settings);
+        const radius = maxRadius * samplePaperDarkness(source, width, height, cx, cy, settings);
         if (radius < .001) continue;
         const x0 = Math.max(-1, Math.ceil(cx - radius - .5));
         const x1 = Math.min(width, Math.floor(cx + radius - .5));

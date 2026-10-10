@@ -194,3 +194,36 @@ test('Dots ignore invisible RGB when sampling and retain source alpha at rotated
     for (let i = 3; i < source.length; i += 4) assert.equal(pixels[i], source[i]);
   }
 });
+
+test('Perforated changes round marks into holes in filled cells and preserves alpha', async () => {
+  const width = 96, height = 96;
+  const source = new Uint8ClampedArray(width * height * 4);
+  const fill = (value) => {
+    for (let i = 0; i < source.length; i += 4) {
+      source[i] = source[i + 1] = source[i + 2] = value;
+      source[i + 3] = 255;
+    }
+  };
+  const perforated = { ...settings, cellSize: 16, screenStyle: 'perforated', invert: true };
+  const a = createCanvas(width, height).getContext('2d');
+  const b = createCanvas(width, height).getContext('2d');
+  fill(128);
+  renderHalftoneSync(a, source, width, height, perforated);
+  assert.ok(a.getImageData(48, 48, 1, 1).data[0] < 10, 'midtone has a round ink mark');
+  assert.ok(a.getImageData(55, 55, 1, 1).data[0] > 245, 'its cell corners remain paper');
+  fill(255);
+  renderHalftoneSync(a, source, width, height, perforated);
+  assert.ok(a.getImageData(48, 48, 1, 1).data[0] > 245, 'bright cell has a paper hole');
+  assert.ok(a.getImageData(55, 55, 1, 1).data[0] < 10, 'surrounding cell is filled with ink');
+  for (let i = 3; i < source.length; i += 4) source[i] = [0, 64, 128, 255][(i >> 2) % 4];
+  const rotated = { ...perforated, angle: .49 };
+  renderHalftoneSync(a, source, width, height, rotated);
+  await renderHalftoneAsync(b, source, width, height, rotated);
+  const pixels = a.getImageData(0, 0, width, height).data;
+  assert.deepEqual(pixels, b.getImageData(0, 0, width, height).data);
+  for (let i = 3; i < source.length; i += 4) assert.equal(pixels[i], source[i]);
+  let cancelled = false;
+  assert.deepEqual(await renderHalftoneAsync(b, source, width, height, rotated, {
+    onProgress() { cancelled = true; }, shouldCancel: () => cancelled
+  }), { cancelled: true });
+});

@@ -70,3 +70,9 @@ test('retired diamond and square recipes import as Dots with other settings inta
     for (const key of [...Object.keys(settings), 'jitter', 'microDot', 'seed']) assert.equal(restored[key], original[key]);
   }
 });
+
+test('Perforated recipe retains its treatment through preset export and import', () => {
+  const recipe = { ...settings, dotShape: 'round', screenStyle: 'perforated', invert: true };
+  const restored = parsePreset(serializePreset('Perforated custom', recipe).text, isColor).settings;
+  for (const key of Object.keys(recipe)) assert.equal(restored[key], recipe[key]);
+});

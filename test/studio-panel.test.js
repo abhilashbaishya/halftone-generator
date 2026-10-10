@@ -1254,7 +1254,7 @@ test('preset menu shows four rows and a next-row peek within the viewport', asyn
   } finally { cleanup(); popup.remove(); }
 });
 
-test('Pattern exposes Organic, Dots and Lines with the right selection', () => {
+test('Pattern exposes Organic, Dots, Cutout and Lines with the right selection', () => {
   state.settings.dotShape = 'round';
   state.settings.screenStyle = 'paper';
   emit();
@@ -1263,11 +1263,26 @@ test('Pattern exposes Organic, Dots and Lines with the right selection', () => {
   assert.equal(section.querySelector('.dialkit-folder-title').textContent, 'Pattern');
   assert.equal(pattern.parentElement.querySelector('.segmented-field-label'), null);
   assert.deepEqual([...pattern.querySelectorAll('button')].map(button => button.textContent),
-    ['Organic', 'Dots', 'Lines']);
+    ['Organic', 'Dots', 'Cutout', 'Lines']);
   assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Organic');
   pattern.querySelector('[data-value="round"]').click();
   assert.deepEqual(settingsChanged.at(-1), ['pattern', 'round']);
   state.settings.screenStyle = 'classic';
   emit();
   assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Dots');
+});
+
+test('Cutout remains selectable alongside the other patterns', () => {
+  state.settings.screenStyle = 'perforated';
+  state.settings.dotShape = 'round';
+  emit();
+  const pattern = document.querySelector('[role="radiogroup"][aria-label="Pattern"]');
+  assert.equal(pattern.parentElement.hidden, false);
+  assert.equal(pattern.querySelectorAll('button').length, 4);
+  assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Cutout');
+  assert.ok(document.querySelector('[role="slider"][aria-label="Cell size"]'));
+  state.settings.screenStyle = 'paper';
+  emit();
+  assert.equal(pattern.parentElement.hidden, false);
+  assert.equal(pattern.querySelector('[aria-checked="true"]').textContent, 'Organic');
 });

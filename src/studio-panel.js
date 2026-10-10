@@ -14,7 +14,7 @@ const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
 const PROFILE_OPTIONS = ["draft", "high", "ultra", "print"].map((value) => ({ value, label: titleCase(value) }));
 const PATTERN_OPTIONS = [
   { value: 'organic', label: 'Organic' }, { value: 'round', label: 'Dots' },
-  { value: 'line', label: 'Lines' }
+  { value: 'cutout', label: 'Cutout' }, { value: 'line', label: 'Lines' }
 ];
 const INVERT_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
