@@ -23,7 +23,7 @@ export function samplePaperDarkness(source, width, height, x, y, settings) {
     (y1 * width + x0) * 4, (y1 * width + x1) * 4];
   const weights = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
   // Paper's default contrast .4 maps to a sigmoid slope of 3.7947.
-  const slope = (settings.screenStyle === 'perforated' ? 15 : 15 * Math.pow(.4, 1.5)) * settings.contrast;
+  const slope = 15 * Math.pow(.4, 1.5) * settings.contrast;
   let luma = 0;
   for (let channel = 0; channel < 3; channel++) {
     let value = 0;

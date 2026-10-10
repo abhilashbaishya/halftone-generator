@@ -195,7 +195,7 @@ test('Dots ignore invisible RGB when sampling and retain source alpha at rotated
   }
 });
 
-test('Perforated changes round marks into holes in filled cells and preserves alpha', async () => {
+test('Cutout changes round marks into holes in filled cells and preserves alpha', async () => {
   const width = 96, height = 96;
   const source = new Uint8ClampedArray(width * height * 4);
   const fill = (value) => {
@@ -211,9 +211,9 @@ test('Perforated changes round marks into holes in filled cells and preserves al
   renderHalftoneSync(a, source, width, height, perforated);
   assert.ok(a.getImageData(48, 48, 1, 1).data[0] < 10, 'midtone has a round ink mark');
   assert.ok(a.getImageData(55, 55, 1, 1).data[0] > 245, 'its cell corners remain paper');
-  fill(255);
+  fill(200);
   renderHalftoneSync(a, source, width, height, perforated);
-  assert.ok(a.getImageData(48, 48, 1, 1).data[0] > 245, 'bright cell has a paper hole');
+  assert.ok(a.getImageData(48, 48, 1, 1).data[0] > 245, 'dense cell has a paper hole');
   assert.ok(a.getImageData(55, 55, 1, 1).data[0] < 10, 'surrounding cell is filled with ink');
   for (let i = 3; i < source.length; i += 4) source[i] = [0, 64, 128, 255][(i >> 2) % 4];
   const rotated = { ...perforated, angle: .49 };
@@ -226,4 +226,54 @@ test('Perforated changes round marks into holes in filled cells and preserves al
   assert.deepEqual(await renderHalftoneAsync(b, source, width, height, rotated, {
     onProgress() { cancelled = true; }, shouldCancel: () => cancelled
   }), { cancelled: true });
+});
+
+
+test('Cutout preserves tonal steps without reversing shadows or jumping at the dot-to-hole transition', () => {
+  const size = 96;
+  const ctx = createCanvas(size, size).getContext('2d');
+  const source = new Uint8ClampedArray(size * size * 4);
+  let previous = 0;
+  for (let value = 255; value >= 0; value--) {
+    for (let i = 0; i < source.length; i += 4) {
+      source[i] = source[i + 1] = source[i + 2] = value;
+      source[i + 3] = 255;
+    }
+    renderHalftoneSync(ctx, source, size, size, { ...settings, cellSize: 16, screenStyle: 'perforated' });
+    const pixels = ctx.getImageData(0, 0, size, size).data;
+    let coverage = 0;
+    for (let i = 0; i < pixels.length; i += 4) coverage += 1 - pixels[i] / 255;
+    coverage /= size * size;
+    assert.ok(coverage >= previous - .001, `source ${value}: darker input must not lose ink`);
+    if (value >= 77 && value <= 178) assert.ok(Math.abs(coverage - (1 - value / 255)) < .012, `source ${value}: preserve midtone shading`);
+    if (value <= 20) assert.equal(coverage, 1, 'deep shadows settle to solid ink');
+    if (value >= 235) assert.equal(coverage, 0, 'bright highlights settle to clean paper');
+    if (value === 255 || value === 0) assert.equal(coverage, 1 - value / 255, 'pure paper and ink remain clean');
+    previous = coverage;
+  }
+});
+
+
+test('Cutout solid regions survive cell size, rotation, inversion, and transparent paper', () => {
+  const size = 48;
+  const ctx = createCanvas(size, size).getContext('2d');
+  const source = new Uint8ClampedArray(size * size * 4);
+  for (const value of [12, 243]) {
+    for (let i = 0; i < source.length; i += 4) {
+      source[i] = source[i + 1] = source[i + 2] = value;
+      source[i + 3] = 255;
+    }
+    for (const cellSize of [3, 7, 12, 24]) for (const angle of [0, Math.PI / 4]) {
+      for (const invert of [false, true]) for (const paper of ['#fff', 'transparent']) {
+        renderHalftoneSync(ctx, source, size, size, { ...settings, cellSize, angle, invert, paper, screenStyle: 'perforated' });
+        const pixels = ctx.getImageData(0, 0, size, size).data;
+        const solidInk = (value < 128) !== invert;
+        const channel = solidInk || paper === 'transparent' ? 0 : 255;
+        const alpha = !solidInk && paper === 'transparent' ? 0 : 255;
+        for (let i = 0; i < pixels.length; i += 4) {
+          assert.deepEqual(Array.from(pixels.subarray(i, i + 4)), [channel, channel, channel, alpha]);
+        }
+      }
+    }
+  }
 });

@@ -1,7 +1,7 @@
 import { renderHalftoneSync } from './halftone-renderer.js';
 import { BloomPass } from '../bloom-pass.js';
 
-export const PRESET_THUMBNAIL_VERSION = 5;
+export const PRESET_THUMBNAIL_VERSION = 7;
 const cache = new WeakMap();
 
 // Use the same close-up tonal ramp for built-in, saved, and imported presets.
@@ -13,8 +13,13 @@ export function renderPresetPreview(preset) {
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const ramp = ctx.createLinearGradient(0, size, size, 0);
-  ramp.addColorStop(0, '#171717');
-  ramp.addColorStop(1, '#ededed');
+  // Leave room for solid ink/paper as well as the patterned midtones. A ramp
+  // covering only near-black to near-white makes Cutout look like regular dots
+  // at the menu's 44px size and undersells the palette's stronger colours.
+  ramp.addColorStop(0, '#000000');
+  ramp.addColorStop(.2, '#000000');
+  ramp.addColorStop(.8, '#ffffff');
+  ramp.addColorStop(1, '#ffffff');
   ctx.fillStyle = ramp;
   ctx.fillRect(0, 0, size, size);
   const pixels = ctx.getImageData(0, 0, size, size).data;
