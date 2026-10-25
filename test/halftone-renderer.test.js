@@ -277,3 +277,30 @@ test('Cutout solid regions survive cell size, rotation, inversion, and transpare
     }
   }
 });
+
+test('a full-cell screen phase repeats a flat field and a half-cell phase moves a ramp', () => {
+  const width = 48, height = 48;
+  const flat = new Uint8ClampedArray(width * height * 4).fill(140);
+  for (let i = 3; i < flat.length; i += 4) flat[i] = 255;
+  const ramp = flat.slice();
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 4;
+    ramp[i] = ramp[i + 1] = ramp[i + 2] = Math.round(x / (width - 1) * 255);
+  }
+  const render = (data, extra) => {
+    const ctx = createCanvas(width, height).getContext('2d');
+    renderHalftoneSync(ctx, data, width, height, { ...settings, ...extra });
+    return ctx.getImageData(0, 0, width, height).data;
+  };
+  for (const extra of [
+    {},
+    { dotShape: 'line' },
+    { screenStyle: 'perforated' },
+    { screenStyle: 'paper' }
+  ]) {
+    const still = render(flat, extra);
+    assert.deepEqual(render(flat, { ...extra, screenPhase: 0 }), still);
+    assert.deepEqual(render(flat, { ...extra, screenPhase: 1 }), still, 'one period returns to the same screen');
+    assert.notDeepEqual(render(ramp, { ...extra, screenPhase: 0.5 }), render(ramp, extra), 'mid-loop frame differs');
+  }
+});

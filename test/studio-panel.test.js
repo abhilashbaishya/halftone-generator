@@ -57,7 +57,8 @@ beforeEach(() => {
   state = {
     settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
     isCustomPreset: false, presets: [{ value: "Default", label: "Default" }, { value: "Poster", label: "Poster" }],
-    export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false
+    export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false,
+    motion: { playing: false, fps: 8 }
   };
   studio = {
     eventName: "halftone:test", getState: () => structuredClone(state),
@@ -65,6 +66,7 @@ beforeEach(() => {
     setSetting: (name, value) => { settingsChanged.push([name, value]); state.settings[name] = value; state.presetModified = true; emit(); },
     selectPreset: (name) => { state.selectedPreset = name; state.settings = { ...defaults }; state.presetModified = false; emit(); },
     setExportFormat: (value) => { state.export.format = value; emit(); },
+    setMotion: (patch) => { state.motion = { ...state.motion, ...patch }; emit(); },
     shuffleTexture: () => { state.settings.seed += 1; state.presetModified = true; emit(); },
     savePreset: (name) => {
       if (!name.trim()) return { ok: false, message: "Give the preset a name." };

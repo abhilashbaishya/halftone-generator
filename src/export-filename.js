@@ -16,6 +16,7 @@ export function safePresetName(value) {
 }
 
 export function createExportFilename(extension, { preset, quality } = {}) {
+  if (extension === 'gif') return `Halftone Studio - ${safePresetName(preset)} - Loop.gif`;
   const suffix = ['png', 'jpg', 'jpeg', 'webp'].includes(extension) ? extension : 'png';
   const profile = Object.hasOwn(OUTPUT_LABELS, quality) ? OUTPUT_LABELS[quality] : 'High';
   return `Halftone Studio - ${safePresetName(preset)} - ${profile}.${suffix}`;

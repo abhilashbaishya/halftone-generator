@@ -14,6 +14,8 @@ import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
 import { SCREEN_DEFAULTS, normalizeScreenValue, screenValue, patternSettings } from "./src/screen-settings.js";
+import { MOTION_FPS, MOTION_FRAME_COUNT, clampMotionFps, motionPhase } from "./src/motion-loop.js";
+import { GIF_MAX_EDGE, encodeLoopGif, gifFrameDelay } from "./src/gif-loop.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
 import { CRTPass } from "./crt-pass.js";
@@ -210,6 +212,7 @@ const controls = {
   inkColor: document.getElementById("inkColor"),
   paperColor: document.getElementById("paperColor"),
   exportBtn: document.getElementById("exportBtn"),
+  gifBtn: document.getElementById("gifBtn"),
   copyBtn: document.getElementById("copyBtn"),
   exportMeta: document.getElementById("exportMeta"),
   savePresetBtn: document.getElementById("savePresetBtn"),
@@ -344,6 +347,10 @@ let resizeTimer = null;
 let renderFrame = null;
 const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
 const screenSettings = { ...SCREEN_DEFAULTS };
+const motion = { playing: false, fps: MOTION_FPS.default };
+let motionTimer = 0;
+let motionFrame = -1;
+let motionPhaseNow = 0;
 let editorSession = null;
 let editHistory = null;
 let historyEnabled = false;
@@ -1042,7 +1049,7 @@ function presentPreview(image, job) {
   previewCtx.drawImage(result, 0, 0, previewCanvas.width, previewCanvas.height);
   previewIsCurrent = !job.draft;
   if (previewIsCurrent) scheduleExportEstimate();
-  setRenderStatus("Ready", false);
+  if (!(motion.playing && controls.renderStatus.textContent === "Ready")) setRenderStatus("Ready", false);
 }
 
 // The source was re-scaled from full resolution on every render, including
@@ -1083,9 +1090,50 @@ function disableWorker() {
 // every frame posts more work than the worker can retire and the UI locks up.
 function finishPreviewRender() {
   previewBusy = false;
-  if (!renderQueued) return;
-  renderQueued = false;
-  requestRender();
+  if (renderQueued) {
+    renderQueued = false;
+    requestRender();
+    return;
+  }
+  if (motion.playing) scheduleMotion();
+}
+
+function scheduleMotion() {
+  clearTimeout(motionTimer);
+  motionTimer = 0;
+  if (!motion.playing || !sourceImage || activeExport?.gif) return;
+  const interval = 1000 / motion.fps;
+  const frame = Math.floor(performance.now() / interval);
+  if (previewBusy || frame === motionFrame) {
+    const wait = previewBusy ? 32 : interval - (performance.now() % interval);
+    motionTimer = setTimeout(scheduleMotion, Math.max(16, wait));
+    return;
+  }
+  motionFrame = frame;
+  motionPhaseNow = motionPhase(frame);
+  if (renderFrame !== null) return;
+  generateHalftone();
+}
+
+function setMotion(patch = {}) {
+  const playing = patch.playing === undefined ? motion.playing : Boolean(patch.playing);
+  const fps = patch.fps === undefined ? motion.fps : clampMotionFps(patch.fps);
+  if (playing === motion.playing && fps === motion.fps) return;
+  const wasPlaying = motion.playing;
+  motion.playing = playing;
+  motion.fps = fps;
+  if (playing && !wasPlaying) {
+    motionFrame = -1;
+    previewGeneration += 1;
+    if (!previewBusy) scheduleMotion();
+  } else if (!playing && wasPlaying) {
+    clearTimeout(motionTimer);
+    motionTimer = 0;
+    motionPhaseNow = 0;
+    previewGeneration += 1;
+    requestRender();
+  }
+  emitStudioState();
 }
 
 function initializeWorker() {
@@ -1136,7 +1184,7 @@ function renderWithWorker(job) {
 }
 
 function generateHalftone() {
-  if (previewBusy) { renderQueued = true; return; }
+  if (previewBusy || activeExport?.gif) { renderQueued = true; return; }
   // Slider values do not change the fitted geometry. Avoid writing canvas
   // styles and then forcing layout reads on every interactive frame.
   const layoutKey = [sourceToken, sourceImage?.width, sourceImage?.height,
@@ -1155,14 +1203,17 @@ function generateHalftone() {
   // newer effect values. At most one job runs, plus one latest pending update.
   renderQueued = false;
   drawSourcePreview();
+  const playing = motion.playing;
+  const plan = getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
+    playing || (previewInteractions > 0 && isCompactDevice()));
+  plan.settings.screenPhase = playing ? motionPhaseNow : 0;
   const job = {
-    ...getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
-      previewInteractions > 0 && isCompactDevice()),
+    ...plan,
     generation: previewGeneration,
     postProcess: getPostProcessSettings()
   };
   previewBusy = true;
-  setRenderStatus("Rendering…", true);
+  if (!playing) setRenderStatus("Rendering…", true);
   if (workerEnabled && renderWorker) renderWithWorker(job);
   else renderPreviewOnMain(job);
 }
@@ -1573,10 +1624,12 @@ function setExportFormat(nextFormat) {
 }
 
 function getJobButton(job) {
+  if (job.gif) return controls.gifBtn;
   return job.copy ? controls.copyBtn : controls.exportBtn;
 }
 
 function getJobName(job) {
+  if (job.gif) return "GIF export";
   return job.copy ? "copy" : `${job.format.label} export`;
 }
 
@@ -1602,6 +1655,7 @@ function canCopyImage() {
 }
 
 let copyFeedbackTimer = null;
+let gifFeedbackTimer = null;
 
 function setCopyFeedback(text, resetDelay = 2200) {
   clearTimeout(copyFeedbackTimer);
@@ -1614,11 +1668,26 @@ function setCopyFeedback(text, resetDelay = 2200) {
   }, resetDelay);
 }
 
+function setGifFeedback(text, resetDelay = 2200) {
+  clearTimeout(gifFeedbackTimer);
+  controls.gifBtn.textContent = text;
+  controls.gifBtn.removeAttribute("aria-busy");
+  controls.gifBtn.removeAttribute("aria-label");
+  gifFeedbackTimer = setTimeout(() => {
+    if (activeExport?.gif) return;
+    controls.gifBtn.textContent = "Export GIF";
+  }, resetDelay);
+}
+
 // While one output job runs, the other action waits instead of starting a second render.
 function syncOutputActions() {
   controls.copyBtn.hidden = !canCopyImage();
-  controls.copyBtn.disabled = Boolean(activeExport && !activeExport.copy) || sharingExport;
-  controls.exportBtn.disabled = Boolean(activeExport?.copy);
+  controls.copyBtn.disabled = Boolean((activeExport && !activeExport.copy) || sharingExport);
+  controls.exportBtn.disabled = Boolean(activeExport?.copy || activeExport?.gif);
+  const gifRunning = Boolean(activeExport?.gif);
+  controls.gifBtn.disabled = sharingExport || (Boolean(activeExport) && !gifRunning) || (!motion.playing && !gifRunning);
+  if (motion.playing || gifRunning) controls.gifBtn.removeAttribute("title");
+  else controls.gifBtn.title = "Turn Motion on to export the loop";
 }
 
 function setExportFeedback(text, resetDelay = 2200) {
@@ -1821,6 +1890,112 @@ function cancelExport() {
   if (job.worker) {
     job.worker.postMessage({ type: "cancel-export", requestId: job.id });
     job.forceCancelTimer = setTimeout(() => job.forceCancel?.(), 1000);
+  }
+}
+
+async function exportGif() {
+  if (activeExport?.gif) {
+    cancelExport();
+    return;
+  }
+  if (activeExport || sharingExport || !sourceImage || !motion.playing) return;
+
+  const sourceDimensions = getSourceDimensions();
+  const longest = Math.max(sourceDimensions.width, sourceDimensions.height, 1);
+  const scale = Math.min(1, GIF_MAX_EDGE / longest);
+  const width = Math.max(1, Math.round(sourceDimensions.width * scale));
+  const height = Math.max(1, Math.round(sourceDimensions.height * scale));
+  const postProcessSettings = getPostProcessSettings();
+  const needsPostEffects = hasPostEffects(postProcessSettings);
+  const settings = getRenderSettings(width, height);
+  clearTimeout(gifFeedbackTimer);
+  const job = {
+    id: ++exportRequestId,
+    cancelled: false,
+    gif: true,
+    encodingController: new AbortController(),
+    worker: null,
+    format: { label: "GIF", mimeType: "image/gif", extension: "gif" },
+    filename: createExportFilename("gif", {
+      preset: formatPresetLabel(controls.presetSelect.value || DEFAULT_PRESET)
+    })
+  };
+  activeExport = job;
+  clearTimeout(motionTimer);
+  previewGeneration += 1;
+  controls.gifBtn.dataset.exporting = "true";
+  controls.gifBtn.setAttribute("aria-busy", "true");
+  syncOutputActions();
+  setExportProgress(job, 0);
+  emitStudioState();
+
+  const source = document.createElement("canvas");
+  source.width = width;
+  source.height = height;
+  const sourceContext = source.getContext("2d", { willReadFrequently: true });
+  sourceContext.imageSmoothingEnabled = true;
+  sourceContext.imageSmoothingQuality = "high";
+  sourceContext.drawImage(sourceImage, 0, 0, width, height);
+  const pixels = sourceContext.getImageData(0, 0, width, height).data;
+  source.width = 1;
+  source.height = 1;
+
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const outputContext = output.getContext("2d", { willReadFrequently: true });
+  const frames = [];
+
+  try {
+    for (let frame = 0; frame < MOTION_FRAME_COUNT; frame++) {
+      if (job.cancelled) return;
+      const result = await renderHalftoneAsync(outputContext, pixels, width, height, {
+        ...settings,
+        screenPhase: motionPhase(frame)
+      }, {
+        shouldCancel: () => job.cancelled,
+        onProgress: (progress) => setExportProgress(job, ((frame + progress) / MOTION_FRAME_COUNT) * 85)
+      });
+      if (result.cancelled || job.cancelled) return;
+      if (needsPostEffects) {
+        const effected = runPostProcessChain(output, exportPasses, postProcessSettings);
+        if (effected !== output) {
+          outputContext.clearRect(0, 0, width, height);
+          outputContext.drawImage(effected, 0, 0);
+        }
+      }
+      frames.push(new Uint8Array(outputContext.getImageData(0, 0, width, height).data));
+    }
+    if (job.cancelled) return;
+    setExportEncoding(job);
+    const bytes = encodeLoopGif(frames, width, height, gifFrameDelay(motion.fps));
+    if (job.cancelled) return;
+    setExportProgress(job, 100);
+    downloadExport(new Blob([bytes], { type: "image/gif" }), job.filename);
+    setRenderStatus("Export complete", false, true, 5000);
+    setGifFeedback(`Exported · ${formatFileSize(bytes.length)}`);
+  } catch (error) {
+    if (!job.cancelled) {
+      console.error(error);
+      setRenderStatus(error.message || "GIF export failed", false, true);
+      setGifFeedback("Export failed", 3000);
+    }
+  } finally {
+    output.width = 1;
+    output.height = 1;
+    Object.values(exportPasses).forEach((pass) => pass.release());
+    if (activeExport === job) activeExport = null;
+    controls.gifBtn.dataset.exporting = "false";
+    syncOutputActions();
+    if (job.cancelled) {
+      setRenderStatus("Export cancelled", false, true, 5000);
+      setGifFeedback("Export cancelled", 1600);
+    }
+    if (renderQueued) {
+      renderQueued = false;
+      requestRender();
+    } else if (motion.playing) scheduleMotion();
+    emitStudioState();
   }
 }
 
@@ -2136,6 +2311,7 @@ function getStudioState() {
       exporting: Boolean(activeExport || sharingExport),
       readyToShare: Boolean(getReadyExport())
     },
+    motion: { playing: motion.playing, fps: motion.fps },
     uploadError,
     hasUserImage
   };
@@ -2212,6 +2388,7 @@ window.halftoneStudio = Object.freeze({
   },
   setPreviewInteraction,
   setPanelScrolling,
+  setMotion,
   setExportFormat,
   selectPreset(name) {
     applyPreset(name);
@@ -2403,6 +2580,7 @@ window.addEventListener("resize", () => {
 });
 
 controls.exportBtn.addEventListener("click", exportImage);
+controls.gifBtn.addEventListener("click", exportGif);
 controls.copyBtn.addEventListener("click", copyImage);
 
 controls.grainStrength.addEventListener("input", () => { updateOutputs(); requestRender(); });

@@ -70,6 +70,8 @@ test('custom preset filenames are safe, readable, and bounded', () => {
   assert.ok(new TextEncoder().encode(long).length < 200);
   assert.equal(createExportFilename('../bad', { preset: '...', quality: 'invalid' }),
     'Halftone Studio - Custom - High.png');
+  assert.equal(createExportFilename('gif', { preset: 'Amber Press', quality: 'print' }),
+    'Halftone Studio - Amber Press - Loop.gif');
 });
 
 test('unsupported WebP is detected once on a tiny canvas without full-size PNG encodes', async () => {

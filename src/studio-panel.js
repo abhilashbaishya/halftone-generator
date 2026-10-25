@@ -8,6 +8,7 @@ import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
 import { selectedPattern } from "./screen-settings.js";
+import { MOTION_FPS } from "./motion-loop.js";
 import { mountFocusSource } from "./focus-source.js";
 
 const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
@@ -17,6 +18,7 @@ const PATTERN_OPTIONS = [
   { value: 'cutout', label: 'Cutout' }, { value: 'line', label: 'Lines' }
 ];
 const INVERT_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
+const MOTION_OPTIONS = [{ value: false, label: "Off" }, { value: true, label: "On" }];
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -488,8 +490,34 @@ export function mountStudioPanel(studio) {
     });
   }
   colors.append(element("p", "studio-color-note", "Colors export in sRGB. PNG and WebP support transparency."));
+  const motionFolder = mountStudioFolder(folders, "Motion");
+  const motion = motionFolder.body;
+  const updateMotion = mountSegments(motion, MOTION_OPTIONS, "Motion", 2, (playing) => studio.setMotion({ playing }));
+  const speedHost = element("div", "studio-control-host");
+  motion.append(speedHost);
+  const speed = mountSlider(speedHost, {
+    label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1, unit: " fps",
+    value: state.motion.fps, onChange: (fps) => studio.setMotion({ fps })
+  });
+  controls.push(speed);
+  const speedTrack = speedHost.querySelector(".dialkit-slider");
+  speedTrack.tabIndex = -1;
+  const removeSpeedTouch = mountTouchSlider(speedTrack, {
+    label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1,
+    value: state.motion.fps, onChange: (fps) => studio.setMotion({ fps })
+  });
+  controls.push({ destroy: removeSpeedTouch });
+  motion.append(element("p", "studio-color-note", "The screen drifts and returns. Export GIF saves that loop."));
+  let previousSpeed = state.motion.fps;
+  bindings.push(() => {
+    updateMotion(state.motion.playing);
+    if (previousSpeed === state.motion.fps) return;
+    previousSpeed = state.motion.fps;
+    speed.update({ label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1, unit: " fps",
+      value: previousSpeed, onChange: (fps) => studio.setMotion({ fps }) });
+  });
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
-  const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, advanced];
+  const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, motionFolder, advanced];
   const syncAdjustLayout = () => {
     adjustableFolders.forEach(({ setFlat }) => setFlat(phone.matches));
     if (!phone.matches) advanced.setOpen(!compact.matches);
@@ -519,7 +547,7 @@ export function mountStudioPanel(studio) {
   const unmountMobile = mountMobileLayout({
     image: [source.closest(".studio-folder")],
     adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
-    colors: [colors.closest(".studio-folder")]
+    colors: [colors, motion].map((body) => body.closest(".studio-folder"))
   }, { onScrollActivity: (active) => studio.setPanelScrolling?.(active) });
   const unmountDesktopDrag = mountDesktopPanelDrag(document.querySelector('.control-rail'), rootFolder.header);
 

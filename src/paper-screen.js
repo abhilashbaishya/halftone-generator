@@ -56,15 +56,18 @@ export function* renderPaperRows(ctx, source, width, height, settings, ink, pape
       x -= width / 2; y -= height / 2;
       return [(x * cos + y * sin) / pitch, (-x * sin + y * cos) / pitch];
     });
-    const left = Math.floor(Math.min(...grid.map(p => p[0])));
-    const right = Math.ceil(Math.max(...grid.map(p => p[0])));
+    const shift = (settings.screenPhase || 0) * 2;
+    const pad = shift ? 2 : 0;
+    const left = Math.floor(Math.min(...grid.map(p => p[0]))) - pad;
+    const right = Math.ceil(Math.max(...grid.map(p => p[0]))) + pad;
     const top = Math.floor(Math.min(...grid.map(p => p[1])));
     const bottom = Math.ceil(Math.max(...grid.map(p => p[1])));
     for (let gy = top; gy <= bottom; gy++) {
       for (let gx = left; gx <= right; gx++) {
         if ((gx + gy) % 2 !== 0) continue;
-        const cx = (gx * cos - gy * sin) * pitch + width / 2;
-        const cy = (gx * sin + gy * cos) * pitch + height / 2;
+        const placed = gx + shift;
+        const cx = (placed * cos - gy * sin) * pitch + width / 2;
+        const cy = (placed * sin + gy * cos) * pitch + height / 2;
         const radius = maxRadius * samplePaperDarkness(source, width, height, cx, cy, settings);
         if (radius < .001) continue;
         const x0 = Math.max(-1, Math.ceil(cx - radius - .5));
