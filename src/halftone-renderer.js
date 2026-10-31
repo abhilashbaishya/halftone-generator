@@ -83,10 +83,8 @@ function* renderRows(ctx, source, width, height, settings) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const px = x + 0.5 - width / 2, py = y + 0.5 - height / 2;
-      const phase = settings.screenPhase || 0;
-      const line = settings.dotShape === 'line';
-      const gx = (px * cos + py * sin) / cell - (line ? 0 : phase);
-      const gy = (-px * sin + py * cos) / cell - (line ? phase : 0);
+      const gx = (px * cos + py * sin) / cell;
+      const gy = (-px * sin + py * cos) / cell;
       const cx = Math.round(gx), cy = Math.round(gy);
       if ((jitter || micro) && (cx !== cellX || cy !== cellY)) {
         cellX = cx;

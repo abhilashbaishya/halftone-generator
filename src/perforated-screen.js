@@ -35,8 +35,7 @@ export function* renderPerforatedRows(ctx, source, width, height, settings, ink,
     const py = y + .5 - height / 2;
     for (let x = 0; x < width; x++) {
       const px = x + .5 - width / 2;
-      const phase = settings.screenPhase || 0;
-      const gx = (px * cos + py * sin) / cell - phase;
+      const gx = (px * cos + py * sin) / cell;
       const gy = (-px * sin + py * cos) / cell;
       const cx = Math.round(gx), cy = Math.round(gy);
       const darkness = cells.tones[(cy + cells.offsetY) * cells.stride + cx + cells.offsetX];

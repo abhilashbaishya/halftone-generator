@@ -8,7 +8,7 @@ import { mountPhoneSheetMotion } from "./preset-menu-motion.js";
 import { mountHistoryControls } from "./history-controls.js";
 import { mountDesktopPanelDrag } from "./desktop-panel-drag.js";
 import { selectedPattern } from "./screen-settings.js";
-import { MOTION_FPS } from "./motion-loop.js";
+import { MOTION_FPS, MOTION_STRENGTH } from "./motion-loop.js";
 import { mountFocusSource } from "./focus-source.js";
 
 const titleCase = (value) => value[0].toUpperCase() + value.slice(1);
@@ -401,10 +401,9 @@ export function mountStudioPanel(studio) {
   }
   bindings.push(updateSource);
 
-  function slider(host, key, label, min, max, step, unit = "") {
+  function bindSlider(host, props, read, touchProps = props) {
     const target = element("div", "studio-control-host");
     host.append(target);
-    const props = { label, min, max, step, unit, value: state.settings[key], onChange: (value) => studio.setSetting(key, value) };
     const control = mountSlider(target, props);
     const track = target.querySelector(".dialkit-slider");
     // The studio uses pointer-driven sliders; keep normal editing inside the
@@ -417,15 +416,20 @@ export function mountStudioPanel(studio) {
     track.addEventListener("focusout", () => {
       queueMicrotask(() => { track.tabIndex = -1; });
     });
-    const removeTouch = mountTouchSlider(track, { ...props, onInteraction: (active) => studio.setPreviewInteraction?.(active) });
+    const removeTouch = mountTouchSlider(track, touchProps);
     controls.push({ destroy: removeTouch });
     controls.push(control);
     let previous = props.value;
     bindings.push(() => {
-      if (previous === state.settings[key]) return;
-      previous = state.settings[key];
+      if (previous === read()) return;
+      previous = read();
       control.update({ ...props, value: previous });
     });
+  }
+  function slider(host, key, label, min, max, step, unit = "") {
+    const props = { label, min, max, step, unit, value: state.settings[key], onChange: (value) => studio.setSetting(key, value) };
+    bindSlider(host, props, () => state.settings[key],
+      { ...props, onInteraction: (active) => studio.setPreviewInteraction?.(active) });
   }
   const layoutFolder = mountStudioFolder(folders, "Pattern");
   const layout = layoutFolder.body;
@@ -493,29 +497,16 @@ export function mountStudioPanel(studio) {
   const motionFolder = mountStudioFolder(folders, "Motion");
   const motion = motionFolder.body;
   const updateMotion = mountSegments(motion, MOTION_OPTIONS, "Motion", 2, (playing) => studio.setMotion({ playing }));
-  const speedHost = element("div", "studio-control-host");
-  motion.append(speedHost);
-  const speed = mountSlider(speedHost, {
+  bindings.push(() => updateMotion(state.motion.playing));
+  bindSlider(motion, {
     label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1, unit: " fps",
     value: state.motion.fps, onChange: (fps) => studio.setMotion({ fps })
-  });
-  controls.push(speed);
-  const speedTrack = speedHost.querySelector(".dialkit-slider");
-  speedTrack.tabIndex = -1;
-  const removeSpeedTouch = mountTouchSlider(speedTrack, {
-    label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1,
-    value: state.motion.fps, onChange: (fps) => studio.setMotion({ fps })
-  });
-  controls.push({ destroy: removeSpeedTouch });
-  motion.append(element("p", "studio-color-note", "The screen drifts and returns. Export GIF saves that loop."));
-  let previousSpeed = state.motion.fps;
-  bindings.push(() => {
-    updateMotion(state.motion.playing);
-    if (previousSpeed === state.motion.fps) return;
-    previousSpeed = state.motion.fps;
-    speed.update({ label: "Speed", min: MOTION_FPS.min, max: MOTION_FPS.max, step: 1, unit: " fps",
-      value: previousSpeed, onChange: (fps) => studio.setMotion({ fps }) });
-  });
+  }, () => state.motion.fps);
+  bindSlider(motion, {
+    label: "Strength", min: MOTION_STRENGTH.min, max: MOTION_STRENGTH.max, step: 1, unit: "%",
+    value: state.motion.strength, onChange: (strength) => studio.setMotion({ strength })
+  }, () => state.motion.strength);
+  motion.append(element("p", "studio-color-note", "Dots breathe in and out. Export GIF saves that loop."));
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
   const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, motionFolder, advanced];
   const syncAdjustLayout = () => {
@@ -546,8 +537,8 @@ export function mountStudioPanel(studio) {
 
   const unmountMobile = mountMobileLayout({
     image: [source.closest(".studio-folder")],
-    adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
-    colors: [colors, motion].map((body) => body.closest(".studio-folder"))
+    adjust: [presets, layout, tone, motion, advanced.body].map((body) => body.closest(".studio-folder")),
+    colors: [colors.closest(".studio-folder")]
   }, { onScrollActivity: (active) => studio.setPanelScrolling?.(active) });
   const unmountDesktopDrag = mountDesktopPanelDrag(document.querySelector('.control-rail'), rootFolder.header);
 

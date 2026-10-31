@@ -14,7 +14,7 @@ import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
 import { SCREEN_DEFAULTS, normalizeScreenValue, screenValue, patternSettings } from "./src/screen-settings.js";
-import { MOTION_FPS, MOTION_FRAME_COUNT, clampMotionFps, motionPhase } from "./src/motion-loop.js";
+import { MOTION_FPS, MOTION_FRAME_COUNT, MOTION_STRENGTH, clampMotionFps, clampMotionStrength, motionPulse } from "./src/motion-loop.js";
 import { GIF_MAX_EDGE, encodeLoopGif, gifFrameDelay } from "./src/gif-loop.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
@@ -347,10 +347,10 @@ let resizeTimer = null;
 let renderFrame = null;
 const textureSettings = { jitter: 6, microDot: 24, seed: 0 };
 const screenSettings = { ...SCREEN_DEFAULTS };
-const motion = { playing: false, fps: MOTION_FPS.default };
+const motion = { playing: false, fps: MOTION_FPS.default, strength: MOTION_STRENGTH.default };
 let motionTimer = 0;
 let motionFrame = -1;
-let motionPhaseNow = 0;
+let motionPulseNow = 1;
 let editorSession = null;
 let editHistory = null;
 let historyEnabled = false;
@@ -1110,7 +1110,7 @@ function scheduleMotion() {
     return;
   }
   motionFrame = frame;
-  motionPhaseNow = motionPhase(frame);
+  motionPulseNow = motionPulse(frame, motion.strength);
   if (renderFrame !== null) return;
   generateHalftone();
 }
@@ -1118,10 +1118,12 @@ function scheduleMotion() {
 function setMotion(patch = {}) {
   const playing = patch.playing === undefined ? motion.playing : Boolean(patch.playing);
   const fps = patch.fps === undefined ? motion.fps : clampMotionFps(patch.fps);
-  if (playing === motion.playing && fps === motion.fps) return;
+  const strength = patch.strength === undefined ? motion.strength : clampMotionStrength(patch.strength);
+  if (playing === motion.playing && fps === motion.fps && strength === motion.strength) return;
   const wasPlaying = motion.playing;
   motion.playing = playing;
   motion.fps = fps;
+  motion.strength = strength;
   if (playing && !wasPlaying) {
     motionFrame = -1;
     previewGeneration += 1;
@@ -1129,7 +1131,7 @@ function setMotion(patch = {}) {
   } else if (!playing && wasPlaying) {
     clearTimeout(motionTimer);
     motionTimer = 0;
-    motionPhaseNow = 0;
+    motionPulseNow = 1;
     previewGeneration += 1;
     requestRender();
   }
@@ -1206,7 +1208,7 @@ function generateHalftone() {
   const playing = motion.playing;
   const plan = getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
     playing || (previewInteractions > 0 && isCompactDevice()));
-  plan.settings.screenPhase = playing ? motionPhaseNow : 0;
+  if (playing) plan.settings.toneCurve *= motionPulseNow;
   const job = {
     ...plan,
     generation: previewGeneration,
@@ -1951,7 +1953,7 @@ async function exportGif() {
       if (job.cancelled) return;
       const result = await renderHalftoneAsync(outputContext, pixels, width, height, {
         ...settings,
-        screenPhase: motionPhase(frame)
+        toneCurve: settings.toneCurve * motionPulse(frame, motion.strength)
       }, {
         shouldCancel: () => job.cancelled,
         onProgress: (progress) => setExportProgress(job, ((frame + progress) / MOTION_FRAME_COUNT) * 85)
@@ -2311,7 +2313,7 @@ function getStudioState() {
       exporting: Boolean(activeExport || sharingExport),
       readyToShare: Boolean(getReadyExport())
     },
-    motion: { playing: motion.playing, fps: motion.fps },
+    motion: { playing: motion.playing, fps: motion.fps, strength: motion.strength },
     uploadError,
     hasUserImage
   };
