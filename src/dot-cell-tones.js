@@ -1,4 +1,5 @@
 import { toneLuma } from '../renderer-core.js';
+import { toneCurveAt } from './motion-loop.js';
 
 // Average the source inside each rotated screen cell. Sampling a single pixel
 // can alias fine fabric into an unrelated pattern; averaging stabilizes the
@@ -27,7 +28,10 @@ export function* sampleDotCellTones(source, width, height, cell, cos, sin, setti
   for (let index = 0; index < size; index++) {
     const luma = weights[index] ? tones[index] / weights[index] : 1;
     const tone = toneLuma(Math.max(0, Math.min(1, luma)), settings.contrast, settings.gamma);
-    tones[index] = Math.pow(settings.invert ? tone : 1 - tone, settings.toneCurve);
+    // Cell centre, rotated back from screen space into image space.
+    const gx = (index % stride - offsetX) * cell, gy = (Math.floor(index / stride) - offsetY) * cell;
+    const curve = toneCurveAt(settings, gx * cos - gy * sin, gx * sin + gy * cos, width, height);
+    tones[index] = Math.pow(settings.invert ? tone : 1 - tone, curve);
   }
   return { tones, offsetX, offsetY, stride };
 }

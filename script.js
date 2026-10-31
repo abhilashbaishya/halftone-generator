@@ -14,7 +14,7 @@ import { createEditHistory } from "./src/edit-history.js";
 import { mountEditorSession } from "./src/editor-session.js";
 import { MAX_TEXTURE_SEED, normalizeTextureValue } from "./src/texture-settings.js";
 import { SCREEN_DEFAULTS, normalizeScreenValue, screenValue, patternSettings } from "./src/screen-settings.js";
-import { MOTION_FPS, MOTION_FRAME_COUNT, MOTION_STRENGTH, clampMotionFps, clampMotionStrength, motionPulse } from "./src/motion-loop.js";
+import { MOTION_FPS, MOTION_FRAME_COUNT, MOTION_STRENGTH, clampMotionFps, clampMotionStrength, motionWave } from "./src/motion-loop.js";
 import { GIF_MAX_EDGE, encodeLoopGif, gifFrameDelay } from "./src/gif-loop.js";
 import { GrainPass } from "./grain-pass.js";
 import { BloomPass } from "./bloom-pass.js";
@@ -350,7 +350,7 @@ const screenSettings = { ...SCREEN_DEFAULTS };
 const motion = { playing: false, fps: MOTION_FPS.default, strength: MOTION_STRENGTH.default };
 let motionTimer = 0;
 let motionFrame = -1;
-let motionPulseNow = 1;
+let motionWaveNow = null;
 let editorSession = null;
 let editHistory = null;
 let historyEnabled = false;
@@ -1110,7 +1110,7 @@ function scheduleMotion() {
     return;
   }
   motionFrame = frame;
-  motionPulseNow = motionPulse(frame, motion.strength);
+  motionWaveNow = motionWave(frame, motion.strength);
   if (renderFrame !== null) return;
   generateHalftone();
 }
@@ -1131,7 +1131,7 @@ function setMotion(patch = {}) {
   } else if (!playing && wasPlaying) {
     clearTimeout(motionTimer);
     motionTimer = 0;
-    motionPulseNow = 1;
+    motionWaveNow = null;
     previewGeneration += 1;
     requestRender();
   }
@@ -1207,8 +1207,8 @@ function generateHalftone() {
   drawSourcePreview();
   const playing = motion.playing;
   const plan = getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
-    playing || (previewInteractions > 0 && isCompactDevice()));
-  if (playing) plan.settings.toneCurve *= motionPulseNow;
+    previewInteractions > 0 && isCompactDevice());
+  if (playing) plan.settings.wave = motionWaveNow;
   const job = {
     ...plan,
     generation: previewGeneration,
@@ -1953,7 +1953,7 @@ async function exportGif() {
       if (job.cancelled) return;
       const result = await renderHalftoneAsync(outputContext, pixels, width, height, {
         ...settings,
-        toneCurve: settings.toneCurve * motionPulse(frame, motion.strength)
+        wave: motionWave(frame, motion.strength)
       }, {
         shouldCancel: () => job.cancelled,
         onProgress: (progress) => setExportProgress(job, ((frame + progress) / MOTION_FRAME_COUNT) * 85)

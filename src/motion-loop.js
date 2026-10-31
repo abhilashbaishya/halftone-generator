@@ -1,13 +1,23 @@
 export const MOTION_FPS = { min: 4, max: 12, default: 8 };
 export const MOTION_STRENGTH = { min: 0, max: 100, default: 70 };
 export const MOTION_FRAME_COUNT = 24;
+// Crest spacing as a fraction of the long edge: about two crests on screen.
+const WAVELENGTH = .7;
 
-// Scales the tone-curve exponent, so every dot swells and shrinks while paper
-// stays clean and solids stay solid. A sine meets its own start with matching
-// velocity, so the breath eases at both extremes and loops without a seam.
-export function motionPulse(frame, strength) {
-  const amount = clampMotionStrength(strength) / 100;
-  return 2 ** (-amount * Math.sin(2 * Math.PI * frame / MOTION_FRAME_COUNT));
+export function motionWave(frame, strength) {
+  return { amount: clampMotionStrength(strength) / 100 * 1.5, phase: frame / MOTION_FRAME_COUNT };
+}
+
+// A band of swelling dots rolls from top left to bottom right. Scaling the
+// tone-curve exponent keeps paper clean and solids solid. Position is measured
+// against the long edge, so drafts, previews, and GIF frames show the same wave,
+// and one full phase moves exactly one wavelength, so the loop has no seam.
+// px and py are measured from the image centre.
+export function toneCurveAt(settings, px, py, width, height) {
+  const wave = settings.wave;
+  if (!wave?.amount) return settings.toneCurve;
+  const along = (px + py) / (Math.SQRT2 * Math.max(width, height));
+  return settings.toneCurve * 2 ** (-wave.amount * Math.sin(2 * Math.PI * (along / WAVELENGTH - wave.phase)));
 }
 
 export function clampMotionFps(value) {

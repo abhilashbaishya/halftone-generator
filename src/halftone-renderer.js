@@ -2,6 +2,7 @@ import { renderPerforatedRows } from './perforated-screen.js';
 import { sampleDotCellTones } from './dot-cell-tones.js';
 import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
+import { toneCurveAt } from './motion-loop.js';
 
 // Area covered by a circle clipped to a unit square. Unlike isolated dots,
 // this screen can progress continuously all the way to solid ink.
@@ -110,7 +111,7 @@ function* renderRows(ctx, source, width, height, settings) {
       } else {
         const luma = (source[i] * 0.299 + source[i + 1] * 0.587 + source[i + 2] * 0.114) / 255;
         const tone = toneLuma(luma, settings.contrast, settings.gamma);
-        darkness = Math.pow(invert ? tone : 1 - tone, settings.toneCurve);
+        darkness = Math.pow(invert ? tone : 1 - tone, toneCurveAt(settings, px, py, width, height));
       }
       let mask = Math.max(0, Math.min(1, (darkness - threshold + softness) / (2 * softness)));
       mask = darkness === 0 ? 0 : darkness === 1 ? 1 : mask * mask * (3 - 2 * mask);

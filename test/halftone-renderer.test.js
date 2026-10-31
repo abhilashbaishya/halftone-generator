@@ -278,20 +278,21 @@ test('Cutout solid regions survive cell size, rotation, inversion, and transpare
   }
 });
 
-test('motion pulse swells and shrinks dots in every pattern', () => {
-  const width = 48, height = 48;
+test('the motion wave rolls across a flat field in every pattern', () => {
+  const width = 64, height = 64;
   const grey = new Uint8ClampedArray(width * height * 4).fill(140);
   for (let i = 3; i < grey.length; i += 4) grey[i] = 255;
-  const ink = (extra, toneCurve) => {
+  const render = (extra, wave) => {
     const ctx = createCanvas(width, height).getContext('2d');
-    renderHalftoneSync(ctx, grey, width, height, { ...settings, ...extra, toneCurve });
-    const out = ctx.getImageData(0, 0, width, height).data;
-    let total = 0;
-    for (let i = 0; i < out.length; i += 4) total += 255 - out[i];
-    return total;
+    renderHalftoneSync(ctx, grey, width, height, { ...settings, cellSize: 6, ...extra, wave });
+    return ctx.getImageData(0, 0, width, height).data;
   };
-  for (const extra of [{}, { dotShape: 'line' }, { screenStyle: 'perforated' }, { screenStyle: 'paper' }]) {
-    assert.ok(ink(extra, 0.6) > ink(extra, 1), `${JSON.stringify(extra)} swells`);
-    assert.ok(ink(extra, 1.6) < ink(extra, 1), `${JSON.stringify(extra)} shrinks`);
+  for (const extra of [{}, { dotShape: 'line' }, { dotShape: 'diamond' }, { screenStyle: 'perforated' }, { screenStyle: 'paper' }]) {
+    const label = JSON.stringify(extra);
+    const still = render(extra);
+    assert.deepEqual(render(extra, { amount: 0, phase: .3 }), still, `${label} zero strength is still`);
+    assert.notDeepEqual(render(extra, { amount: .7, phase: 0 }), still, `${label} waves`);
+    assert.notDeepEqual(render(extra, { amount: .7, phase: .25 }), render(extra, { amount: .7, phase: 0 }), `${label} rolls`);
+    assert.deepEqual(render(extra, { amount: .7, phase: 1 }), render(extra, { amount: .7, phase: 0 }), `${label} loops`);
   }
 });

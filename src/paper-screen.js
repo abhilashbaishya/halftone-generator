@@ -3,6 +3,8 @@
 // Apache-2.0; attribution and license: public/licenses/paper-shaders/.
 // Changes: bounded row bands, precomputed radial profile, existing tone controls,
 // finite-difference antialiasing, and the studio's source-alpha composition.
+import { toneCurveAt } from './motion-loop.js';
+
 const RADIUS = 1.25;
 const PROFILE_SIZE = 4096;
 const profile = Float32Array.from({ length: PROFILE_SIZE + 1 }, (_, i) => {
@@ -12,6 +14,7 @@ const profile = Float32Array.from({ length: PROFILE_SIZE + 1 }, (_, i) => {
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 export function samplePaperDarkness(source, width, height, x, y, settings) {
+  const curve = toneCurveAt(settings, x - width / 2, y - height / 2, width, height);
   // Bilinear sampling, like the source texture in Paper's shader. Composite
   // samples onto white before interpolation so invisible RGB cannot add ink.
   x = clamp(x - .5, 0, width - 1);
@@ -34,7 +37,7 @@ export function samplePaperDarkness(source, width, height, x, y, settings) {
     value = Math.pow(value, settings.gamma);
     luma += [0.2126, 0.7152, 0.0722][channel] / (1 + Math.exp(-slope * (value - .5)));
   }
-  return Math.pow(settings.invert ? luma : 1 - luma, settings.toneCurve);
+  return Math.pow(settings.invert ? luma : 1 - luma, curve);
 }
 
 export function* renderPaperRows(ctx, source, width, height, settings, ink, paper) {
