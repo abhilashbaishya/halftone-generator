@@ -57,7 +57,7 @@ export function* renderPaperRows(ctx, source, width, height, settings, ink, pape
       return [(x * cos + y * sin) / pitch, (-x * sin + y * cos) / pitch];
     });
     const shift = (settings.screenPhase || 0) * 2;
-    const pad = shift ? 2 : 0;
+    const pad = Math.ceil(shift);
     const left = Math.floor(Math.min(...grid.map(p => p[0]))) - pad;
     const right = Math.ceil(Math.max(...grid.map(p => p[0]))) + pad;
     const top = Math.floor(Math.min(...grid.map(p => p[1])));
