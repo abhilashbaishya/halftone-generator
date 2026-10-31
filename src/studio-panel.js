@@ -506,7 +506,7 @@ export function mountStudioPanel(studio) {
     label: "Strength", min: MOTION_STRENGTH.min, max: MOTION_STRENGTH.max, step: 1, unit: "%",
     value: state.motion.strength, onChange: (strength) => studio.setMotion({ strength })
   }, () => state.motion.strength);
-  motion.append(element("p", "studio-color-note", "A wave of dots rolls across the image. Export GIF saves that loop."));
+  motion.append(element("p", "studio-color-note", "Crossing waves swell and sway the dots. Export GIF saves that loop."));
   const advanced = mountStudioFolder(folders, "Advanced", !compact.matches);
   const adjustableFolders = [layoutFolder, toneFolder, colorsFolder, motionFolder, advanced];
   const syncAdjustLayout = () => {

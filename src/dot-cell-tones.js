@@ -1,12 +1,13 @@
 import { toneLuma } from '../renderer-core.js';
-import { toneCurveAt } from './motion-loop.js';
 
 // Average the source inside each rotated screen cell. Sampling a single pixel
 // can alias fine fabric into an unrelated pattern; averaging stabilizes the
 // tone while keeping every dot circular. Alpha weights exclude invisible RGB.
-export function* sampleDotCellTones(source, width, height, cell, cos, sin, settings) {
-  const offsetX = Math.ceil((width * Math.abs(cos) + height * Math.abs(sin)) / (2 * cell)) + 1;
-  const offsetY = Math.ceil((width * Math.abs(sin) + height * Math.abs(cos)) / (2 * cell)) + 1;
+// Swaying dots can reach just under one cell past the frame, so keep two
+// cells of margin. The motion field also sets each cell's tone curve.
+export function* sampleDotCellTones(source, width, height, cell, cos, sin, settings, motion) {
+  const offsetX = Math.ceil((width * Math.abs(cos) + height * Math.abs(sin)) / (2 * cell)) + 2;
+  const offsetY = Math.ceil((width * Math.abs(sin) + height * Math.abs(cos)) / (2 * cell)) + 2;
   const stride = offsetX * 2 + 1;
   const size = stride * (offsetY * 2 + 1);
   const tones = new Float32Array(size);
@@ -30,8 +31,8 @@ export function* sampleDotCellTones(source, width, height, cell, cos, sin, setti
     const tone = toneLuma(Math.max(0, Math.min(1, luma)), settings.contrast, settings.gamma);
     // Cell centre, rotated back from screen space into image space.
     const gx = (index % stride - offsetX) * cell, gy = (Math.floor(index / stride) - offsetY) * cell;
-    const curve = toneCurveAt(settings, gx * cos - gy * sin, gx * sin + gy * cos, width, height);
-    tones[index] = Math.pow(settings.invert ? tone : 1 - tone, curve);
+    motion.sample(gx * cos - gy * sin + width / 2, gx * sin + gy * cos + height / 2);
+    tones[index] = Math.pow(settings.invert ? tone : 1 - tone, motion.curve);
   }
   return { tones, offsetX, offsetY, stride };
 }

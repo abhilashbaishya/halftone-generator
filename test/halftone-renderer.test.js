@@ -290,9 +290,13 @@ test('the motion wave rolls across a flat field in every pattern', () => {
   for (const extra of [{}, { dotShape: 'line' }, { dotShape: 'diamond' }, { screenStyle: 'perforated' }, { screenStyle: 'paper' }]) {
     const label = JSON.stringify(extra);
     const still = render(extra);
-    assert.deepEqual(render(extra, { amount: 0, phase: .3 }), still, `${label} zero strength is still`);
-    assert.notDeepEqual(render(extra, { amount: .7, phase: 0 }), still, `${label} waves`);
-    assert.notDeepEqual(render(extra, { amount: .7, phase: .25 }), render(extra, { amount: .7, phase: 0 }), `${label} rolls`);
-    assert.deepEqual(render(extra, { amount: .7, phase: 1 }), render(extra, { amount: .7, phase: 0 }), `${label} loops`);
+    assert.deepEqual(render(extra, { amount: 0, sway: 0, phase: .3 }), still, `${label} zero strength is still`);
+    assert.notDeepEqual(render(extra, { amount: .7, sway: .35, phase: 0 }), still, `${label} waves`);
+    assert.notDeepEqual(render(extra, { amount: .7, sway: .35, phase: .25 }), render(extra, { amount: .7, sway: .35, phase: 0 }), `${label} rolls`);
+    assert.deepEqual(render(extra, { amount: .7, sway: .35, phase: 1 }), render(extra, { amount: .7, sway: .35, phase: 0 }), `${label} loops`);
+    for (let phase = 0; phase < 1; phase += 1 / 8) {
+      const strongest = render({ ...extra, angle: .4 }, { amount: 1.2, sway: .5, phase });
+      for (let i = 3; i < strongest.length; i += 4) assert.equal(strongest[i], 255, `${label} sways without edge holes`);
+    }
   }
 });

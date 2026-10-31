@@ -2,32 +2,52 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MOTION_FPS, MOTION_FRAME_COUNT, MOTION_STRENGTH,
-  clampMotionFps, clampMotionStrength, motionWave, toneCurveAt
+  clampMotionFps, clampMotionStrength, createMotionField, motionWave
 } from '../src/motion-loop.js';
 
-const at = (frame, px, py, strength = MOTION_STRENGTH.default) =>
-  toneCurveAt({ toneCurve: 1, wave: motionWave(frame, strength) }, px, py, 400, 300);
+const width = 400, height = 300;
+const field = (frame, strength = MOTION_STRENGTH.default) =>
+  createMotionField({ toneCurve: 1, cellSize: 8, wave: motionWave(frame, strength) }, width, height);
+const read = (motion, x, y) => {
+  motion.sample(x, y);
+  return [motion.curve, motion.dx, motion.dy];
+};
+const points = [[20, 30], [200, 150], [330, 60], [90, 270], [380, 290]];
 
-test('the wave varies across the image and rolls toward the bottom right', () => {
-  assert.notEqual(at(0, -150, -150), at(0, 150, 150));
-  // Find where the crest (smallest exponent, biggest dots) sits on the diagonal.
-  const crest = (frame) => {
-    let best = 0;
-    for (let d = -100; d <= 100; d++) if (at(frame, d, d) < at(frame, best, best)) best = d;
-    return best;
-  };
-  assert.ok(crest(1) > crest(0), 'the crest moves along the diagonal');
+test('crossing waves swell and sway dots differently across the image', () => {
+  const motion = field(0);
+  const samples = points.map(([x, y]) => read(motion, x, y));
+  assert.ok(samples.some(([curve]) => curve < 1) && samples.some(([curve]) => curve > 1));
+  assert.ok(samples.some(([, dx, dy]) => Math.hypot(dx, dy) > 1), 'dots sway by pixels');
+  assert.ok(samples.every(([, dx, dy]) => Math.hypot(dx, dy) < 8), 'sway stays inside one cell');
 });
 
-test('the last frame leads back into the first without a seam', () => {
-  for (const [px, py] of [[-180, -120], [0, 0], [90, -40], [200, 150]]) {
-    assert.ok(Math.abs(at(MOTION_FRAME_COUNT, px, py) - at(0, px, py)) < 1e-12);
+test('the motion is not a single band sliding in one direction', () => {
+  // A lone travelling wave would look identical when shifted along its path.
+  // Crossing waves change shape as they move, so no shift reproduces a frame.
+  const now = field(0), later = field(3);
+  for (const shift of [-60, -30, 30, 60]) {
+    const diff = points.reduce((sum, [x, y]) => sum + Math.abs(read(later, x + shift, y + shift)[0] - read(now, x, y)[0]), 0);
+    assert.ok(diff > .05, `shift ${shift}`);
   }
 });
 
-test('zero strength and no wave leave the tone curve alone', () => {
-  for (let frame = 0; frame < MOTION_FRAME_COUNT; frame++) assert.equal(at(frame, 120, -60, 0), 1);
-  assert.equal(toneCurveAt({ toneCurve: 1.3 }, 50, 50, 400, 300), 1.3);
+test('the last frame leads back into the first without a seam', () => {
+  const first = field(0), wrapped = field(MOTION_FRAME_COUNT);
+  for (const [x, y] of points) {
+    read(first, x, y).forEach((value, index) => assert.ok(Math.abs(read(wrapped, x, y)[index] - value) < 1e-5));
+  }
+});
+
+test('zero strength and no wave leave the screen still', () => {
+  for (const motion of [field(5, 0), createMotionField({ toneCurve: 1.3, cellSize: 8 }, width, height)]) {
+    for (const [x, y] of points) {
+      const [curve, dx, dy] = read(motion, x, y);
+      assert.ok(curve === 1 || curve === 1.3);
+      assert.equal(dx, 0);
+      assert.equal(dy, 0);
+    }
+  }
 });
 
 test('speed and strength stay inside their ranges', () => {
