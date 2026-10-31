@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCanvas } from '@napi-rs/canvas';
 import { renderHalftoneSync, renderHalftoneAsync } from '../src/halftone-renderer.js';
+import { MOTION_TRAVEL } from '../src/motion-loop.js';
 
 const settings = { cellSize: 12, angle: 0, contrast: 1, gamma: 1, toneCurve: 1, ink: '#000', paper: '#fff' };
 
@@ -278,7 +279,7 @@ test('Cutout solid regions survive cell size, rotation, inversion, and transpare
   }
 });
 
-test('a full-cell screen phase repeats a flat field and a half-cell phase moves a ramp', () => {
+test('whole-cell screen phases repeat a flat field and partial phases move a ramp', () => {
   const width = 48, height = 48;
   const flat = new Uint8ClampedArray(width * height * 4).fill(140);
   for (let i = 3; i < flat.length; i += 4) flat[i] = 255;
@@ -301,6 +302,12 @@ test('a full-cell screen phase repeats a flat field and a half-cell phase moves 
     const still = render(flat, extra);
     assert.deepEqual(render(flat, { ...extra, screenPhase: 0 }), still);
     assert.deepEqual(render(flat, { ...extra, screenPhase: 1 }), still, 'one period returns to the same screen');
+    assert.deepEqual(render(flat, { ...extra, screenPhase: MOTION_TRAVEL }), still, 'the far turn is a whole period too');
     assert.notDeepEqual(render(ramp, { ...extra, screenPhase: 0.5 }), render(ramp, extra), 'mid-loop frame differs');
+    // Tones beyond the frame read as paper. Full travel must not uncover gaps
+    // where the screen slid away from the edge of the image.
+    const dark = flat.map((value, i) => i % 4 === 3 ? 255 : 0);
+    const far = render(dark, { ...extra, angle: .4, screenPhase: MOTION_TRAVEL - .3 });
+    for (let i = 0; i < far.length; i += 4) assert.ok(far[i] < 128, `ink reaches pixel ${i / 4} at full travel`);
   }
 });

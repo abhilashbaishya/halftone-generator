@@ -546,8 +546,8 @@ export function mountStudioPanel(studio) {
 
   const unmountMobile = mountMobileLayout({
     image: [source.closest(".studio-folder")],
-    adjust: [presets, layout, tone, advanced.body].map((body) => body.closest(".studio-folder")),
-    colors: [colors, motion].map((body) => body.closest(".studio-folder"))
+    adjust: [presets, layout, tone, motion, advanced.body].map((body) => body.closest(".studio-folder")),
+    colors: [colors.closest(".studio-folder")]
   }, { onScrollActivity: (active) => studio.setPanelScrolling?.(active) });
   const unmountDesktopDrag = mountDesktopPanelDrag(document.querySelector('.control-rail'), rootFolder.header);
 

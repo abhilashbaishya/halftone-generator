@@ -626,14 +626,15 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(actions.hidden, true);
   tabs[1].click();
   assert.equal(folder('source').hidden, true);
-  for (const name of ['presets', 'pattern', 'tone', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['presets', 'pattern', 'tone', 'motion', 'advanced']) assert.equal(folder(name).hidden, false);
+  assert.equal(folder('colors').hidden, true);
   const history = folder('presets').querySelector('[aria-label="Edit history"]');
   assert.ok(history);
   assert.equal(history.hidden, false);
   assert.equal(history.closest('[hidden]'), null);
   assert.ok(history.querySelector('[aria-label="Undo"]'));
   assert.ok(history.querySelector('[aria-label="Redo"]'));
-  for (const name of ['pattern', 'tone', 'colors', 'advanced']) {
+  for (const name of ['pattern', 'tone', 'colors', 'motion', 'advanced']) {
     const group = folder(name);
     const trigger = group.querySelector('button.dialkit-folder-header-top');
     const heading = group.querySelector('h2.studio-folder-static-heading');
@@ -649,6 +650,7 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   tabs[2].click();
   assert.equal(folder('colors').hidden, false);
   assert.equal(folder('tone').hidden, true);
+  assert.equal(folder('motion').hidden, true, 'motion is not a color setting');
   tabs[3].click();
   assert.equal(panel.hidden, true);
   assert.equal(actions.hidden, false);
@@ -656,7 +658,7 @@ test("phone tabs keep one group visible and preserve controls across desktop res
   assert.equal(nav.hidden, true);
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
-  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'motion', 'advanced']) assert.equal(folder(name).hidden, false);
   assert.equal(folder('pattern').dataset.phoneFlat, 'false');
   assert.equal(folder('pattern').querySelector('button.dialkit-folder-header-top').hidden, false);
   assert.equal(folder('pattern').querySelector('h2.studio-folder-static-heading').hidden, true);
@@ -821,10 +823,12 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   assert.equal(folder('source').hidden, true);
   assert.equal(folder('pattern').hidden, false);
   assert.equal(folder('presets').hidden, false);
+  assert.equal(folder('motion').hidden, false);
   panel.scrollTop = 140;
   tabButtons[2].click();
   assert.equal(folder('colors').hidden, false);
   assert.equal(folder('pattern').hidden, true);
+  assert.equal(folder('motion').hidden, true);
   tabButtons[3].click();
   assert.equal(panel.hidden, true);
   assert.equal(actions.hidden, false);
@@ -839,7 +843,7 @@ test('iPad sidebar tabs separate editing from export and preserve controls acros
   assert.equal(tabs.hidden, true);
   assert.equal(panel.hidden, false);
   assert.equal(actions.hidden, false);
-  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'advanced']) assert.equal(folder(name).hidden, false);
+  for (const name of ['source', 'presets', 'pattern', 'tone', 'colors', 'motion', 'advanced']) assert.equal(folder(name).hidden, false);
 });
 
 test('phone tabs restore independent scroll positions and ignore active-tab taps', () => {

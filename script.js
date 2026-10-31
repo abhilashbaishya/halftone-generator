@@ -1205,7 +1205,7 @@ function generateHalftone() {
   drawSourcePreview();
   const playing = motion.playing;
   const plan = getPreviewRenderPlan(previewCanvas.width, previewCanvas.height, getRenderSettings(),
-    playing || (previewInteractions > 0 && isCompactDevice()));
+    previewInteractions > 0 && isCompactDevice());
   plan.settings.screenPhase = playing ? motionPhaseNow : 0;
   const job = {
     ...plan,
