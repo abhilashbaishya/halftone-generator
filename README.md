@@ -41,7 +41,7 @@ npm run build
 
 The editor uses the dependency-free DialKit 2 vanilla adapter. React and Motion are not part of the runtime. Sliders use pointer adjustment and click-to-edit numeric values; DialKit’s added slider keyboard shortcuts are disabled. Folder headers use native buttons; closed sections are removed from keyboard navigation. Preset names remain single-line.
 
-Colors keep their CSS representation in saved presets and render through the browser’s sRGB canvas. PNG and WebP support transparency; JPEG does not. Existing HEX presets and the 40 MB upload policy remain supported.
+Colors keep their CSS representation in saved presets and render through the browser’s sRGB canvas. PNG and WebP support transparency; JPEG does not. Existing HEX presets and the 30 MB upload limit remain supported.
 
 Presets may carry dot irregularity, micro-dots, and a texture seed (Amber Press does). These have no panel controls; they are saved, imported, and exported with the preset.
 
