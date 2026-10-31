@@ -1,4 +1,4 @@
-export const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 60_000_000;
 const MAX_IMAGE_EDGE = 16_384;
 
@@ -152,7 +152,7 @@ export function validateImageByteLength(size) {
     return { ok: false, message: "This doesn’t appear to be a supported image." };
   }
   if (size > MAX_IMAGE_BYTES) {
-    return { ok: false, message: "This image is over 40 MB. Choose a smaller JPEG, PNG, or WebP." };
+    return { ok: false, message: "This image is over 30 MB. Choose a smaller JPEG, PNG, or WebP." };
   }
   return { ok: true };
 }

@@ -70,9 +70,12 @@ test("animation checks continue past a large PNG metadata chunk", async () => {
   assert.equal(result.message, "Animated images aren’t supported. Upload a static JPEG, PNG, or WebP.");
 });
 
-test("image uploads have a bounded byte length", () => {
+test("image uploads are capped at 30 MB", () => {
+  assert.equal(MAX_IMAGE_BYTES, 30 * 1024 * 1024);
   assert.equal(validateImageByteLength(MAX_IMAGE_BYTES).ok, true);
-  assert.equal(validateImageByteLength(MAX_IMAGE_BYTES + 1).ok, false);
+  const tooLarge = validateImageByteLength(MAX_IMAGE_BYTES + 1);
+  assert.equal(tooLarge.ok, false);
+  assert.match(tooLarge.message, /over 30 MB/);
 });
 
 test("intrinsic dimensions are capped before decode", () => {
