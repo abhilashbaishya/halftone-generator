@@ -507,7 +507,7 @@ export function mountStudioPanel(studio) {
     value: state.motion.fps, onChange: (fps) => studio.setMotion({ fps })
   });
   controls.push({ destroy: removeSpeedTouch });
-  motion.append(element("p", "studio-color-note", "The screen drifts and returns. Export GIF saves that loop."));
+  motion.append(element("p", "studio-color-note", "The screen drifts one way and loops. Export GIF saves that loop."));
   let previousSpeed = state.motion.fps;
   bindings.push(() => {
     updateMotion(state.motion.playing);

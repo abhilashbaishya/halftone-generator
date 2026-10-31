@@ -1,14 +1,15 @@
-export const MOTION_FPS = { min: 4, max: 12, default: 8 };
-export const MOTION_FRAME_COUNT = 24;
-// How many screen cells the drift travels before turning back. Its fastest
-// step is travel * pi / frames ≈ .39 cell; nearer half a cell the dots strobe.
-export const MOTION_TRAVEL = 3;
+// Frames per second of the 48-frame loop. The preview keeps the same clock
+// and skips frames when a render takes longer than one frame.
+export const MOTION_FPS = { min: 8, max: 24, default: 16 };
+export const MOTION_FRAME_COUNT = 48;
+// Cells the screen travels per loop. The screen repeats every cell, so a whole
+// number of cells lands on the starting frame: the drift runs one way at a
+// steady pace and loops without stopping or turning back.
+export const MOTION_TRAVEL = 6;
 
-// Out and back. A photo is not periodic, so a one-way crawl would not meet
-// itself; returning to phase 0 makes the first frame follow the last. A cosine
-// eases the screen into each turn instead of reversing it abruptly.
 export function motionPhase(frame) {
-  return MOTION_TRAVEL * (1 - Math.cos(2 * Math.PI * frame / MOTION_FRAME_COUNT)) / 2;
+  const step = ((frame % MOTION_FRAME_COUNT) + MOTION_FRAME_COUNT) % MOTION_FRAME_COUNT;
+  return MOTION_TRAVEL * step / MOTION_FRAME_COUNT;
 }
 
 export function clampMotionFps(value) {

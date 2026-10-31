@@ -58,7 +58,7 @@ beforeEach(() => {
     settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
     isCustomPreset: false, presets: [{ value: "Default", label: "Default" }, { value: "Poster", label: "Poster" }],
     export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false,
-    motion: { playing: false, fps: 8 }
+    motion: { playing: false, fps: 16 }
   };
   studio = {
     eventName: "halftone:test", getState: () => structuredClone(state),
