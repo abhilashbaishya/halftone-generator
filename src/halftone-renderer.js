@@ -2,6 +2,7 @@ import { renderPerforatedRows } from './perforated-screen.js';
 import { sampleDotCellTones } from './dot-cell-tones.js';
 import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
+import { MOTION_TRAVEL } from './motion-loop.js';
 
 // Area covered by a circle clipped to a unit square. Unlike isolated dots,
 // this screen can progress continuously all the way to solid ink.
@@ -75,6 +76,19 @@ function* renderRows(ctx, source, width, height, settings) {
   const micro = Math.max(0, settings.microDotAmount || 0);
   const seed = settings.seed || 0;
   const microRadius = Math.max(0.35, cell * 0.085 * (0.4 + micro));
+  const phase = settings.screenPhase || 0;
+  const line = settings.dotShape === 'line';
+  // Over one motion loop each dot travels MOTION_TRAVEL cells, onto the spot
+  // whose still-frame texture belongs to the cell that far ahead. Easing every
+  // random value toward that cell's keeps frame 0 identical to the still image
+  // and lets the last frame meet the first; the irregularity drifts gently.
+  const blend = phase / MOTION_TRAVEL;
+  const texture = (cx, cy, salt) => {
+    const now = hash2d(cx, cy, salt, seed);
+    if (!blend) return now;
+    const ahead = line ? hash2d(cx, cy + MOTION_TRAVEL, salt, seed) : hash2d(cx + MOTION_TRAVEL, cy, salt, seed);
+    return now + (ahead - now) * blend;
+  };
   // Pixels are visited cell by cell along each row, so per-cell random values
   // are computed once and reused until the pixel crosses into another cell.
   let cellX = NaN, cellY = NaN, jitterX = 0, jitterY = 0;
@@ -83,8 +97,6 @@ function* renderRows(ctx, source, width, height, settings) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const px = x + 0.5 - width / 2, py = y + 0.5 - height / 2;
-      const phase = settings.screenPhase || 0;
-      const line = settings.dotShape === 'line';
       const gx = (px * cos + py * sin) / cell - (line ? 0 : phase);
       const gy = (-px * sin + py * cos) / cell - (line ? phase : 0);
       const cx = Math.round(gx), cy = Math.round(gy);
@@ -92,15 +104,15 @@ function* renderRows(ctx, source, width, height, settings) {
         cellX = cx;
         cellY = cy;
         if (jitter) {
-          jitterX = (hash2d(cx, cy, 0.1, seed) - 0.5) * 0.5 * jitter;
-          jitterY = (hash2d(cx, cy, 0.9, seed) - 0.5) * 0.5 * jitter;
+          jitterX = (texture(cx, cy, 0.1) - 0.5) * 0.5 * jitter;
+          jitterY = (texture(cx, cy, 0.9) - 0.5) * 0.5 * jitter;
         }
         if (micro) {
           microCell.forEach((slot, index) => {
             const salt = 2.4 + index * 1.7;
-            slot.chance = hash2d(cx, cy, salt, seed);
-            slot.x = MICRO_SLOTS[index][0] + (hash2d(cx, cy, salt + 1.2, seed) - 0.5) * 0.2;
-            slot.y = MICRO_SLOTS[index][1] + (hash2d(cx, cy, salt + 2.4, seed) - 0.5) * 0.2;
+            slot.chance = texture(cx, cy, salt);
+            slot.x = MICRO_SLOTS[index][0] + (texture(cx, cy, salt + 1.2) - 0.5) * 0.2;
+            slot.y = MICRO_SLOTS[index][1] + (texture(cx, cy, salt + 2.4) - 0.5) * 0.2;
           });
         }
       }

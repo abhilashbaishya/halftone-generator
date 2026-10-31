@@ -279,6 +279,22 @@ test('Cutout solid regions survive cell size, rotation, inversion, and transpare
   }
 });
 
+test('dot irregularity and micro-dots meet themselves at the end of a motion loop', () => {
+  const width = 64, height = 64;
+  const grey = new Uint8ClampedArray(width * height * 4).fill(150);
+  for (let i = 3; i < grey.length; i += 4) grey[i] = 255;
+  const render = (extra) => {
+    const ctx = createCanvas(width, height).getContext('2d');
+    renderHalftoneSync(ctx, grey, width, height, { ...settings, cellSize: 8, angle: .4, jitter: .18, microDotAmount: .24, seed: 42, ...extra });
+    return ctx.getImageData(0, 0, width, height).data;
+  };
+  for (const shape of [{}, { dotShape: 'line' }, { dotShape: 'diamond' }]) {
+    const still = render(shape);
+    assert.deepEqual(render({ ...shape, screenPhase: MOTION_TRAVEL }), still, `${JSON.stringify(shape)} full travel matches the still`);
+    assert.notDeepEqual(render({ ...shape, screenPhase: MOTION_TRAVEL / 2 }), still, 'mid-loop frame moves');
+  }
+});
+
 test('whole-cell screen phases repeat a flat field and partial phases move a ramp', () => {
   const width = 48, height = 48;
   const flat = new Uint8ClampedArray(width * height * 4).fill(140);
