@@ -4,7 +4,6 @@
 // Changes: area-calibrated marks, cell-averaged tones, rotated antialiasing,
 // cancellable row chunks, and preservation of the source image's alpha.
 import { sampleDotCellTones } from './dot-cell-tones.js';
-import { createMotionField } from './motion-loop.js';
 
 const smoothstep = (x) => x * x * (3 - 2 * x);
 
@@ -26,19 +25,18 @@ export function* renderPerforatedRows(ctx, source, width, height, settings, ink,
   const cos = Math.cos(settings.angle), sin = Math.sin(settings.angle);
   // Use the same continuous tone controls as Dots. A steep sigmoid followed
   // by radius scaling flattened faces into nearly solid regions.
-  const motion = createMotionField(settings, width, height);
-  const cells = yield* sampleDotCellTones(source, width, height, cell, cos, sin, settings, motion);
+  const cells = yield* sampleDotCellTones(source, width, height, cell, cos, sin, settings);
   for (let i = 0; i < cells.tones.length; i++) cells.tones[i] = settleCoverage(cells.tones[i]);
   // The largest circle that fits inside one cell covers pi/4 of its area.
   // Beyond that, shrink a paper hole as darkness rises. Matching filled area
   // at the handoff avoids a brightness jump and keeps shadows monotonic.
   const circleLimit = Math.PI / 4;
-  const rowCurves = new Float32Array(width), rowDx = new Float32Array(width), rowDy = new Float32Array(width);
   for (let y = 0; y < height; y++) {
-    motion.fillRow(y, rowCurves, rowDx, rowDy);
+    const py = y + .5 - height / 2;
     for (let x = 0; x < width; x++) {
-      const px = x + .5 - width / 2 - rowDx[x], py = y + .5 - height / 2 - rowDy[x];
-      const gx = (px * cos + py * sin) / cell;
+      const px = x + .5 - width / 2;
+      const phase = settings.screenPhase || 0;
+      const gx = (px * cos + py * sin) / cell - phase;
       const gy = (-px * sin + py * cos) / cell;
       const cx = Math.round(gx), cy = Math.round(gy);
       const darkness = cells.tones[(cy + cells.offsetY) * cells.stride + cx + cells.offsetX];

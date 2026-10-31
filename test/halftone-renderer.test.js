@@ -278,25 +278,29 @@ test('Cutout solid regions survive cell size, rotation, inversion, and transpare
   }
 });
 
-test('the motion wave rolls across a flat field in every pattern', () => {
-  const width = 64, height = 64;
-  const grey = new Uint8ClampedArray(width * height * 4).fill(140);
-  for (let i = 3; i < grey.length; i += 4) grey[i] = 255;
-  const render = (extra, wave) => {
+test('a full-cell screen phase repeats a flat field and a half-cell phase moves a ramp', () => {
+  const width = 48, height = 48;
+  const flat = new Uint8ClampedArray(width * height * 4).fill(140);
+  for (let i = 3; i < flat.length; i += 4) flat[i] = 255;
+  const ramp = flat.slice();
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 4;
+    ramp[i] = ramp[i + 1] = ramp[i + 2] = Math.round(x / (width - 1) * 255);
+  }
+  const render = (data, extra) => {
     const ctx = createCanvas(width, height).getContext('2d');
-    renderHalftoneSync(ctx, grey, width, height, { ...settings, cellSize: 6, ...extra, wave });
+    renderHalftoneSync(ctx, data, width, height, { ...settings, ...extra });
     return ctx.getImageData(0, 0, width, height).data;
   };
-  for (const extra of [{}, { dotShape: 'line' }, { dotShape: 'diamond' }, { screenStyle: 'perforated' }, { screenStyle: 'paper' }]) {
-    const label = JSON.stringify(extra);
-    const still = render(extra);
-    assert.deepEqual(render(extra, { amount: 0, sway: 0, phase: .3 }), still, `${label} zero strength is still`);
-    assert.notDeepEqual(render(extra, { amount: .7, sway: .35, phase: 0 }), still, `${label} waves`);
-    assert.notDeepEqual(render(extra, { amount: .7, sway: .35, phase: .25 }), render(extra, { amount: .7, sway: .35, phase: 0 }), `${label} rolls`);
-    assert.deepEqual(render(extra, { amount: .7, sway: .35, phase: 1 }), render(extra, { amount: .7, sway: .35, phase: 0 }), `${label} loops`);
-    for (let phase = 0; phase < 1; phase += 1 / 8) {
-      const strongest = render({ ...extra, angle: .4 }, { amount: 1.2, sway: .5, phase });
-      for (let i = 3; i < strongest.length; i += 4) assert.equal(strongest[i], 255, `${label} sways without edge holes`);
-    }
+  for (const extra of [
+    {},
+    { dotShape: 'line' },
+    { screenStyle: 'perforated' },
+    { screenStyle: 'paper' }
+  ]) {
+    const still = render(flat, extra);
+    assert.deepEqual(render(flat, { ...extra, screenPhase: 0 }), still);
+    assert.deepEqual(render(flat, { ...extra, screenPhase: 1 }), still, 'one period returns to the same screen');
+    assert.notDeepEqual(render(ramp, { ...extra, screenPhase: 0.5 }), render(ramp, extra), 'mid-loop frame differs');
   }
 });

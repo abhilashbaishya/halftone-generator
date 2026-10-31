@@ -2,7 +2,6 @@ import { renderPerforatedRows } from './perforated-screen.js';
 import { sampleDotCellTones } from './dot-cell-tones.js';
 import { renderPaperRows } from './paper-screen.js';
 import { toneLuma } from '../renderer-core.js';
-import { createMotionField } from './motion-loop.js';
 
 // Area covered by a circle clipped to a unit square. Unlike isolated dots,
 // this screen can progress continuously all the way to solid ink.
@@ -68,9 +67,7 @@ function* renderRows(ctx, source, width, height, settings) {
   const cell = Math.max(1, settings.cellSize);
   const cos = Math.cos(settings.angle), sin = Math.sin(settings.angle);
   const sampledDots = !settings.dotShape || settings.dotShape === 'round';
-  const motion = createMotionField(settings, width, height);
-  const rowCurves = new Float32Array(width), rowDx = new Float32Array(width), rowDy = new Float32Array(width);
-  const cells = sampledDots ? yield* sampleDotCellTones(source, width, height, cell, cos, sin, settings, motion) : null;
+  const cells = sampledDots ? yield* sampleDotCellTones(source, width, height, cell, cos, sin, settings) : null;
   const softness = Math.min(0.15, 0.5 / cell);
   const coverage = COVERAGE[settings.dotShape] ?? COVERAGE.round;
   const invert = settings.invert === true;
@@ -83,14 +80,13 @@ function* renderRows(ctx, source, width, height, settings) {
   let cellX = NaN, cellY = NaN, jitterX = 0, jitterY = 0;
   const microCell = MICRO_SLOTS.map(() => ({ x: 0, y: 0, chance: 1 }));
   for (let y = 0; y < height; y++) {
-    motion.fillRow(y, rowCurves, rowDx, rowDy);
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      // Read the screen where this pixel's dot came from, so dots sway while
-      // the tone stays anchored to the image.
-      const px = x + 0.5 - width / 2 - rowDx[x], py = y + 0.5 - height / 2 - rowDy[x];
-      const gx = (px * cos + py * sin) / cell;
-      const gy = (-px * sin + py * cos) / cell;
+      const px = x + 0.5 - width / 2, py = y + 0.5 - height / 2;
+      const phase = settings.screenPhase || 0;
+      const line = settings.dotShape === 'line';
+      const gx = (px * cos + py * sin) / cell - (line ? 0 : phase);
+      const gy = (-px * sin + py * cos) / cell - (line ? phase : 0);
       const cx = Math.round(gx), cy = Math.round(gy);
       if ((jitter || micro) && (cx !== cellX || cy !== cellY)) {
         cellX = cx;
@@ -116,7 +112,7 @@ function* renderRows(ctx, source, width, height, settings) {
       } else {
         const luma = (source[i] * 0.299 + source[i + 1] * 0.587 + source[i + 2] * 0.114) / 255;
         const tone = toneLuma(luma, settings.contrast, settings.gamma);
-        darkness = Math.pow(invert ? tone : 1 - tone, rowCurves[x]);
+        darkness = Math.pow(invert ? tone : 1 - tone, settings.toneCurve);
       }
       let mask = Math.max(0, Math.min(1, (darkness - threshold + softness) / (2 * softness)));
       mask = darkness === 0 ? 0 : darkness === 1 ? 1 : mask * mask * (3 - 2 * mask);

@@ -58,7 +58,7 @@ beforeEach(() => {
     settings: { ...defaults }, theme: "dark", selectedPreset: "Default", presetModified: false,
     isCustomPreset: false, presets: [{ value: "Default", label: "Default" }, { value: "Poster", label: "Poster" }],
     export: { format: "png", exporting: false }, uploadError: "", hasUserImage: false,
-    motion: { playing: false, fps: 8, strength: 70 }
+    motion: { playing: false, fps: 8 }
   };
   studio = {
     eventName: "halftone:test", getState: () => structuredClone(state),
@@ -605,21 +605,6 @@ test("vertical touch scrolling leaves slider values alone", () => {
   pointer('pointermove', 280, 25);
   pointer('pointerup', 280, 25);
   assert.ok(state.settings.cellSize > defaults.cellSize);
-});
-
-test("motion sliders drive speed and strength and follow outside changes", () => {
-  const strength = document.querySelector('[role="slider"][aria-label="Strength"]');
-  assert.ok(document.querySelector('[role="slider"][aria-label="Speed"]'));
-  assert.equal(strength.tabIndex, -1);
-  const pointer = (type, x) => strength.dispatchEvent(new browser.PointerEvent(type, {
-    pointerType: 'touch', pointerId: 1, button: 0, clientX: x, clientY: 25, bubbles: true, cancelable: true
-  }));
-  state.motion.strength = 20; emit();
-  pointer('pointerdown', 50);
-  pointer('pointermove', 280);
-  pointer('pointerup', 280);
-  assert.ok(state.motion.strength > 20);
-  assert.equal(settingsChanged.length, 0, 'motion is not a preset setting');
 });
 
 test("phone tabs keep one group visible and preserve controls across desktop resizing", () => {

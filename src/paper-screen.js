@@ -3,8 +3,6 @@
 // Apache-2.0; attribution and license: public/licenses/paper-shaders/.
 // Changes: bounded row bands, precomputed radial profile, existing tone controls,
 // finite-difference antialiasing, and the studio's source-alpha composition.
-import { createMotionField } from './motion-loop.js';
-
 const RADIUS = 1.25;
 const PROFILE_SIZE = 4096;
 const profile = Float32Array.from({ length: PROFILE_SIZE + 1 }, (_, i) => {
@@ -13,7 +11,7 @@ const profile = Float32Array.from({ length: PROFILE_SIZE + 1 }, (_, i) => {
 });
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-export function samplePaperDarkness(source, width, height, x, y, settings, curve = settings.toneCurve) {
+export function samplePaperDarkness(source, width, height, x, y, settings) {
   // Bilinear sampling, like the source texture in Paper's shader. Composite
   // samples onto white before interpolation so invisible RGB cannot add ink.
   x = clamp(x - .5, 0, width - 1);
@@ -36,7 +34,7 @@ export function samplePaperDarkness(source, width, height, x, y, settings, curve
     value = Math.pow(value, settings.gamma);
     luma += [0.2126, 0.7152, 0.0722][channel] / (1 + Math.exp(-slope * (value - .5)));
   }
-  return Math.pow(settings.invert ? luma : 1 - luma, curve);
+  return Math.pow(settings.invert ? luma : 1 - luma, settings.toneCurve);
 }
 
 export function* renderPaperRows(ctx, source, width, height, settings, ink, paper) {
@@ -45,9 +43,6 @@ export function* renderPaperRows(ctx, source, width, height, settings, ink, pape
   const pitch = Math.max(1, settings.cellSize) / Math.SQRT2;
   const maxRadius = .42 * RADIUS * 6 * pitch;
   const cos = Math.cos(settings.angle), sin = Math.sin(settings.angle);
-  const motion = createMotionField(settings, width, height);
-  // Swaying dots travel under one cell; two grid steps of margin cover them.
-  const pad = settings.wave ? 2 : 0;
   const bandHeight = 64;
   const stride = width + 2;
   // One-pixel halo for antialias derivatives; memory does not grow with export height.
@@ -61,18 +56,19 @@ export function* renderPaperRows(ctx, source, width, height, settings, ink, pape
       x -= width / 2; y -= height / 2;
       return [(x * cos + y * sin) / pitch, (-x * sin + y * cos) / pitch];
     });
+    const shift = (settings.screenPhase || 0) * 2;
+    const pad = shift ? 2 : 0;
     const left = Math.floor(Math.min(...grid.map(p => p[0]))) - pad;
     const right = Math.ceil(Math.max(...grid.map(p => p[0]))) + pad;
-    const top = Math.floor(Math.min(...grid.map(p => p[1]))) - pad;
-    const bottom = Math.ceil(Math.max(...grid.map(p => p[1]))) + pad;
+    const top = Math.floor(Math.min(...grid.map(p => p[1])));
+    const bottom = Math.ceil(Math.max(...grid.map(p => p[1])));
     for (let gy = top; gy <= bottom; gy++) {
       for (let gx = left; gx <= right; gx++) {
         if ((gx + gy) % 2 !== 0) continue;
-        const homeX = (gx * cos - gy * sin) * pitch + width / 2;
-        const homeY = (gx * sin + gy * cos) * pitch + height / 2;
-        motion.sample(homeX, homeY);
-        const radius = maxRadius * samplePaperDarkness(source, width, height, homeX, homeY, settings, motion.curve);
-        const cx = homeX + motion.dx, cy = homeY + motion.dy;
+        const placed = gx + shift;
+        const cx = (placed * cos - gy * sin) * pitch + width / 2;
+        const cy = (placed * sin + gy * cos) * pitch + height / 2;
+        const radius = maxRadius * samplePaperDarkness(source, width, height, cx, cy, settings);
         if (radius < .001) continue;
         const x0 = Math.max(-1, Math.ceil(cx - radius - .5));
         const x1 = Math.min(width, Math.floor(cx + radius - .5));
